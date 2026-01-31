@@ -1,0 +1,47 @@
+name: engrowth_app
+description: 英会話学習アプリ - 画像と例文で暗記する英会話学習アプリ
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Supabase
+  supabase_flutter: ^2.0.0
+  
+  # 状態管理
+  flutter_riverpod: ^2.4.0
+  
+  # ナビゲーション
+  go_router: ^13.0.0
+  
+  # 画像キャッシュ
+  cached_network_image: ^3.3.0
+  
+  # CSV解析
+  csv: ^6.0.0
+  
+  # パス操作
+  path_provider: ^2.1.0
+  
+  # 環境変数
+  flutter_dotenv: ^5.1.0
+  
+  # UI
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - .env
