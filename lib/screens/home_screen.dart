@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/progress_indicator.dart';
+import '../widgets/main_bottom_nav.dart';
 import '../providers/progress_provider.dart';
 import '../providers/sentence_provider.dart';
 
@@ -17,7 +18,15 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Engrowth - 英会話学習'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => context.push('/account'),
+            tooltip: 'アカウント',
+          ),
+        ],
       ),
+      bottomNavigationBar: const MainBottomNav(),
       body: SingleChildScrollView(
         child: Column(
           children: [

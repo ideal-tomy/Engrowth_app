@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/progress_indicator.dart';
+import '../widgets/main_bottom_nav.dart';
 import '../providers/progress_provider.dart';
 import '../providers/sentence_provider.dart';
 
@@ -16,7 +18,15 @@ class ProgressScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('進捗確認'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => context.push('/account'),
+            tooltip: 'アカウント',
+          ),
+        ],
       ),
+      bottomNavigationBar: const MainBottomNav(),
       body: SingleChildScrollView(
         child: Column(
           children: [

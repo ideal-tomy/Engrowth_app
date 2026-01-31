@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/study_card.dart';
+import '../widgets/main_bottom_nav.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
 import '../services/learning_service.dart';
@@ -52,6 +53,13 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           tooltip: '終了',
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              context.push('/account');
+            },
+            tooltip: 'アカウント',
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -159,6 +167,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const MainBottomNav(),
     );
   }
 

@@ -5,6 +5,7 @@ import '../screens/sentence_list_screen.dart';
 import '../screens/study_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/hint_settings_screen.dart';
+import '../screens/account_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -32,6 +33,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/hint-settings',
       builder: (context, state) => const HintSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/account',
+      builder: (context, state) => const AccountScreen(),
     ),
   ],
 );

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/word_card.dart';
 import '../widgets/sort_menu.dart';
 import '../widgets/filter_chips.dart';
+import '../widgets/main_bottom_nav.dart';
 import '../providers/word_provider.dart';
 import '../models/word.dart';
 
@@ -83,11 +85,17 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('単語リスト'),
-        actions: const [
-          SortMenu(),
-          SizedBox(width: 8),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => context.push('/account'),
+            tooltip: 'アカウント',
+          ),
+          const SortMenu(),
+          const SizedBox(width: 8),
         ],
       ),
+      bottomNavigationBar: const MainBottomNav(),
       body: Column(
         children: [
           // 検索バー
