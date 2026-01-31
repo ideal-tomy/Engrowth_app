@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,7 +27,7 @@ class StudyCard extends ConsumerStatefulWidget {
   ConsumerState<StudyCard> createState() => _StudyCardState();
 }
 
-class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProviderStateMixin {
+class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateMixin {
   bool _showJapanese = false;
   bool _showAnswer = false; // 解答（英語例文全体）を表示するか
   HintPhase _currentHintPhase = HintPhase.none;
@@ -34,6 +35,9 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
   bool _isShowingVisualFeedback = false;
   late AnimationController _pulseController;
   late AnimationController _fadeController;
+  Timer? _answerTimer;
+  Timer? _autoNextTimer;
+  int _autoNextSecondsRemaining = 0;
 
   @override
   void initState() {
@@ -80,6 +84,15 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
         _showVisualFeedback();
       }
 
+      // 重要単語の段階まで到達後、一定時間入力がなければ解答を表示
+      if (phase == HintPhase.keywords && !_showAnswer) {
+        _answerTimer?.cancel();
+        _answerTimer = Timer(const Duration(seconds: 3), () {
+          if (!mounted || _showAnswer) return;
+          _showAnswerAuto();
+        });
+      }
+
       // コールバック呼び出し
       if (widget.onHintUsed != null) {
         widget.onHintUsed!(phase, _thinkingTimer?.thinkingTimeSeconds ?? 0);
@@ -104,6 +117,8 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
   @override
   void dispose() {
     _thinkingTimer?.dispose();
+    _answerTimer?.cancel();
+    _autoNextTimer?.cancel();
     _pulseController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -111,15 +126,58 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
 
   void _onAnswerShown() {
     _thinkingTimer?.stop();
+    _answerTimer?.cancel();
     setState(() {
       _showAnswer = true;
       _showJapanese = true;
     });
     _fadeController.forward(from: 0);
+    _startAutoNextCountdown();
+  }
+
+  void _showAnswerAuto() {
+    _thinkingTimer?.stop();
+    setState(() {
+      _showAnswer = true;
+    });
+    _fadeController.forward(from: 0);
+    _startAutoNextCountdown();
+  }
+
+  void _startAutoNextCountdown() {
+    _autoNextTimer?.cancel();
+    setState(() {
+      _autoNextSecondsRemaining = 3;
+    });
+    _autoNextTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_autoNextSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() {
+          _autoNextSecondsRemaining = 0;
+        });
+        _triggerAutoNext();
+        return;
+      }
+      setState(() {
+        _autoNextSecondsRemaining -= 1;
+      });
+    });
+  }
+
+  void _triggerAutoNext() {
+    _autoNextTimer?.cancel();
+    if (!mounted) return;
+    _onNext();
   }
 
   void _onMastered() {
     _thinkingTimer?.stop();
+    _answerTimer?.cancel();
+    _autoNextTimer?.cancel();
     if (widget.onMastered != null) {
       widget.onMastered!();
     }
@@ -128,10 +186,13 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
   void _onNext() {
     _thinkingTimer?.reset();
     _fadeController.reset();
+    _answerTimer?.cancel();
+    _autoNextTimer?.cancel();
     setState(() {
       _showJapanese = false;
       _showAnswer = false;
       _currentHintPhase = HintPhase.none;
+      _autoNextSecondsRemaining = 0;
     });
     _thinkingTimer?.start();
     if (widget.onNext != null) {
@@ -223,71 +284,75 @@ class _StudyCardState extends ConsumerState<StudyCard> with SingleTickerProvider
                           // ヒントまたは解答を画像の中心にオーバーレイ表示
                           if (_currentHintPhase != HintPhase.none || _showAnswer)
                             Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.4),
-                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                ),
-                                child: Center(
-                                  child: FadeTransition(
-                                    opacity: _fadeController,
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 24),
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.95),
-                                        borderRadius: BorderRadius.circular(20),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.3),
-                                            blurRadius: 20,
-                                            spreadRadius: 5,
-                                          ),
-                                        ],
-                                      ),
-                                      child: _showAnswer
-                                          ? Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  widget.sentence.englishText,
-                                                  style: TextStyle(
-                                                    fontSize: screenWidth < 360 ? 20 : 24,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.grey[900],
-                                                    height: 1.4,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                                if (_showJapanese) ...[
-                                                  const SizedBox(height: 12),
-                                                  Container(
-                                                    padding: const EdgeInsets.all(12),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.grey[100],
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                    child: Text(
-                                                      widget.sentence.japaneseText,
-                                                      style: TextStyle(
-                                                        fontSize: screenWidth < 360 ? 16 : 18,
-                                                        color: Colors.grey[800],
-                                                        height: 1.5,
-                                                      ),
-                                                      textAlign: TextAlign.center,
-                                                    ),
+                              child: Center(
+                                child: FadeTransition(
+                                  opacity: _fadeController,
+                                  child: _showAnswer
+                                      ? Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              widget.sentence.englishText,
+                                              style: TextStyle(
+                                                fontSize: screenWidth < 360 ? 20 : 24,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                height: 1.4,
+                                                shadows: [
+                                                  Shadow(
+                                                    color: Colors.black.withOpacity(0.85),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
                                                   ),
                                                 ],
-                                              ],
-                                            )
-                                          : HintDisplay(
-                                              fullText: widget.sentence.englishText,
-                                              phase: _currentHintPhase,
-                                              opacity: 1.0, // オーバーレイでは常に不透明
-                                              targetWords: targetWords,
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
-                                    ),
-                                  ),
+                                            if (_showJapanese) ...[
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                widget.sentence.japaneseText,
+                                                style: TextStyle(
+                                                  fontSize: screenWidth < 360 ? 16 : 18,
+                                                  color: Colors.white.withOpacity(0.9),
+                                                  height: 1.5,
+                                                  shadows: [
+                                                    Shadow(
+                                                      color: Colors.black.withOpacity(0.85),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
+                                            if (_autoNextSecondsRemaining > 0) ...[
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                '次の例文へ ${_autoNextSecondsRemaining}s',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.white.withOpacity(0.9),
+                                                  shadows: [
+                                                    Shadow(
+                                                      color: Colors.black.withOpacity(0.85),
+                                                      blurRadius: 6,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        )
+                                      : HintDisplay(
+                                          fullText: widget.sentence.englishText,
+                                          phase: _currentHintPhase,
+                                          opacity: 1.0, // オーバーレイでは常に不透明
+                                          targetWords: targetWords,
+                                          overlayStyle: true,
+                                        ),
                                 ),
                               ),
                             ),

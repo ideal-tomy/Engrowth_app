@@ -27,9 +27,9 @@ class HintSettingsService {
   static Future<HintSettings> createDefaultSettings(String userId) async {
     final defaultSettings = {
       'user_id': userId,
-      'initial_hint_delay_seconds': 2,
-      'extended_hint_delay_seconds': 6,
-      'keywords_hint_delay_seconds': 10,
+      'initial_hint_delay_seconds': 3,
+      'extended_hint_delay_seconds': 8,
+      'keywords_hint_delay_seconds': 13,
       'hint_opacity': 0.6,
       'hint_phases_enabled': ['initial', 'extended', 'keywords'],
       'haptic_feedback_enabled': true,

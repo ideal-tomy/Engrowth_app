@@ -22,9 +22,9 @@ class HintSettings {
   HintSettings({
     required this.id,
     required this.userId,
-    this.initialHintDelaySeconds = 2,
-    this.extendedHintDelaySeconds = 6,
-    this.keywordsHintDelaySeconds = 10,
+    this.initialHintDelaySeconds = 3,
+    this.extendedHintDelaySeconds = 8,
+    this.keywordsHintDelaySeconds = 13,
     this.hintOpacity = 0.6,
     this.hintPhasesEnabled = const ['initial', 'extended', 'keywords'],
     this.hapticFeedbackEnabled = true,
@@ -37,9 +37,9 @@ class HintSettings {
     return HintSettings(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      initialHintDelaySeconds: json['initial_hint_delay_seconds'] as int? ?? 2,
-      extendedHintDelaySeconds: json['extended_hint_delay_seconds'] as int? ?? 6,
-      keywordsHintDelaySeconds: json['keywords_hint_delay_seconds'] as int? ?? 10,
+      initialHintDelaySeconds: json['initial_hint_delay_seconds'] as int? ?? 3,
+      extendedHintDelaySeconds: json['extended_hint_delay_seconds'] as int? ?? 8,
+      keywordsHintDelaySeconds: json['keywords_hint_delay_seconds'] as int? ?? 13,
       hintOpacity: (json['hint_opacity'] as num?)?.toDouble() ?? 0.6,
       hintPhasesEnabled: json['hint_phases_enabled'] != null
           ? List<String>.from(json['hint_phases_enabled'] as List)

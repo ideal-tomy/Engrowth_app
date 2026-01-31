@@ -7,6 +7,7 @@ class HintDisplay extends StatelessWidget {
   final HintPhase phase;
   final double opacity;
   final List<String>? targetWords;
+  final bool overlayStyle;
 
   const HintDisplay({
     super.key,
@@ -14,6 +15,7 @@ class HintDisplay extends StatelessWidget {
     required this.phase,
     required this.opacity,
     this.targetWords,
+    this.overlayStyle = false,
   });
 
   @override
@@ -31,47 +33,58 @@ class HintDisplay extends StatelessWidget {
       child: AnimatedSlide(
         offset: Offset(0, phase == HintPhase.none ? -10 : 0),
         duration: const Duration(milliseconds: 300),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.blue.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: _buildHintContent(hintText, phase),
-        ),
+        child: overlayStyle
+            ? _buildHintContent(hintText, phase)
+            : Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: _buildHintContent(hintText, phase),
+              ),
       ),
     );
   }
 
   Widget _buildHintContent(String hintText, HintPhase phase) {
+    final overlayTextStyle = TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
+      letterSpacing: 0.5,
+      shadows: [
+        Shadow(
+          color: Colors.black.withOpacity(0.85),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+
     if (phase == HintPhase.keywords && targetWords != null && targetWords!.isNotEmpty) {
       // 重要単語をハイライト表示
       return Wrap(
         spacing: 8,
         runSpacing: 8,
         children: targetWords!.map((word) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.blue.withOpacity(0.5),
-                width: 1.5,
-              ),
-            ),
-            child: Text(
-              word,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade700,
-              ),
-            ),
+          return Text(
+            word,
+            style: overlayStyle
+                ? overlayTextStyle.copyWith(
+                    fontSize: 18,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white.withOpacity(0.8),
+                  )
+                : TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
           );
         }).toList(),
       );
@@ -79,12 +92,14 @@ class HintDisplay extends StatelessWidget {
 
     return Text(
       hintText,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w500,
-        color: Colors.blue.shade700,
-        letterSpacing: 0.5,
-      ),
+      style: overlayStyle
+          ? overlayTextStyle
+          : TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.blue.shade700,
+              letterSpacing: 0.5,
+            ),
       textAlign: TextAlign.center,
     );
   }
