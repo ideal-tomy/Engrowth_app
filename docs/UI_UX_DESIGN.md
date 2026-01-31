@@ -91,5 +91,23 @@ spacing: {
 
 ### マイクロインタラクション
 - ボタンタップ: スケールアニメーション（0.95 → 1.0）
-- カードタップ: エレベーション変化
+- カードタップ: エレーション変化
 - スワイプ: スムーズなページ遷移
+
+### 学習モード専用アニメーション
+- **ヒントフェードイン**: 300ms、`Curves.easeOut`
+- **画面の光る効果**: 200ms、`Curves.easeInOut`
+- **パルスアニメーション**: 1000ms、無限ループ
+- **スライドイン**: 300ms、`Curves.easeOut`
+
+## 触覚的フィードバック（Haptic Feedback）
+
+### バイブレーションパターン
+- **軽いタップ**: `HapticFeedback.lightImpact()` - ヒント表示時
+- **選択クリック**: `HapticFeedback.selectionClick()` - 拡張ヒント表示時
+- **中程度のインパクト**: `HapticFeedback.mediumImpact()` - 重要単語表示時
+- **強いインパクト**: `HapticFeedback.heavyImpact()` - 覚えた時
+
+### 設定
+- ユーザーがON/OFFを切り替え可能
+- アクセシビリティ設定に準拠

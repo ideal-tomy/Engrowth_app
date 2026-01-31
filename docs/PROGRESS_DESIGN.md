@@ -122,12 +122,30 @@
 - 学習した例文のサムネイル
 - 学習時間
 - 達成状況
+- ヒント使用状況（バッジ表示）
 
 #### 詳細表示
 - 例文カード
 - 学習回数
 - 最後の学習日時
 - 習熟度
+- ヒント使用統計
+  - ヒント使用回数
+  - 使用したヒントの段階
+  - 平均思考時間
+
+### 8. ヒント使用統計
+
+#### 表示項目
+- ヒント使用率（%）
+- 段階別ヒント使用回数
+- ヒントを使って覚えた例文数
+- 平均思考時間
+
+#### ビジュアル
+- 円グラフ（段階別ヒント使用）
+- 棒グラフ（ヒント使用率の推移）
+- カテゴリ別ヒント使用統計
 
 ## 技術要件
 
@@ -143,8 +161,23 @@ class UserProgress {
   final int studyCount; // 学習回数
   final Duration totalStudyTime; // 総学習時間
   final double masteryLevel; // 習熟度 (0.0-1.0)
+  
+  // ヒント関連の新規フィールド
+  final int hintUsageCount;        // ヒント使用回数
+  final List<HintPhase> usedHints;  // 使用したヒントの段階
+  final bool usedHintToMaster;      // ヒントを使って覚えたか
+  final Duration averageThinkingTime; // 平均思考時間
+  
   final DateTime createdAt;
 }
+
+enum HintPhase {
+  none,        // ヒントなし
+  initial,     // 初期ヒント（3秒）
+  extended,    // 拡張ヒント（6秒）
+  keywords,    // 重要単語（10秒）
+}
+```
 
 class LearningStats {
   final int totalSentences;
