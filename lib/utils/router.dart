@@ -4,6 +4,7 @@ import '../screens/word_list_screen.dart';
 import '../screens/sentence_list_screen.dart';
 import '../screens/study_screen.dart';
 import '../screens/progress_screen.dart';
+import '../screens/hint_settings_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -27,6 +28,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/progress',
       builder: (context, state) => const ProgressScreen(),
+    ),
+    GoRoute(
+      path: '/hint-settings',
+      builder: (context, state) => const HintSettingsScreen(),
     ),
   ],
 );

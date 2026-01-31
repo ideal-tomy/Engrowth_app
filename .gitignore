@@ -45,3 +45,35 @@ app.*.map.json
 
 # 環境変数ファイル
 .env
+.env.local
+.env.*.local
+
+# 一時ファイル・セットアップガイド（開発中のみ）
+CHECK_*.md
+CREATE_*.md
+EASY_*.md
+FLUTTER_*.md
+SETUP_*.md
+STEP_*.md
+NEXT_*.md
+FIX_*.md
+IMPORT_*.md
+MANUAL_*.md
+TABLE_*.md
+DEVELOPMENT_PLAN.md
+QUICK_START.md# SQLファイル（一時的なもの）
+CHECK_*.sql
+CREATE_*.sql
+FIX_*.sql
+UPDATE_*.sql
+
+# CSVファイル（データソース）
+*.csv
+words_import.csv
+
+# インストーラー
+*.exe
+
+# PowerShellスクリプト（一時的なもの）
+install_*.ps1
+set_*.ps1

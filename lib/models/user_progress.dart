@@ -5,6 +5,12 @@ class UserProgress {
   final bool isMastered;
   final DateTime? lastStudiedAt;
   final DateTime createdAt;
+  
+  // ヒント関連フィールド（拡張）
+  final int hintUsageCount;
+  final bool usedHintToMaster;
+  final int averageThinkingTimeSeconds;
+  final String? lastHintPhase;
 
   UserProgress({
     required this.id,
@@ -13,6 +19,10 @@ class UserProgress {
     required this.isMastered,
     this.lastStudiedAt,
     required this.createdAt,
+    this.hintUsageCount = 0,
+    this.usedHintToMaster = false,
+    this.averageThinkingTimeSeconds = 0,
+    this.lastHintPhase,
   });
 
   factory UserProgress.fromJson(Map<String, dynamic> json) {
@@ -25,6 +35,10 @@ class UserProgress {
           ? DateTime.parse(json['last_studied_at'] as String)
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
+      hintUsageCount: json['hint_usage_count'] as int? ?? 0,
+      usedHintToMaster: json['used_hint_to_master'] as bool? ?? false,
+      averageThinkingTimeSeconds: json['average_thinking_time_seconds'] as int? ?? 0,
+      lastHintPhase: json['last_hint_phase'] as String?,
     );
   }
 
@@ -36,6 +50,10 @@ class UserProgress {
       'is_mastered': isMastered,
       'last_studied_at': lastStudiedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
+      'hint_usage_count': hintUsageCount,
+      'used_hint_to_master': usedHintToMaster,
+      'average_thinking_time_seconds': averageThinkingTimeSeconds,
+      'last_hint_phase': lastHintPhase,
     };
   }
 }

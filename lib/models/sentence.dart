@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class Sentence {
   final String id;
   final String englishText;
@@ -69,5 +71,30 @@ class Sentence {
       'category_tag': categoryTag,
       'image_prompt': imagePrompt,
     };
+  }
+
+  /// 画像URLを取得（imageUrlが空の場合はGroup名から生成）
+  String? getImageUrl() {
+    // 既にimageUrlが設定されている場合はそれを返す
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return imageUrl;
+    }
+
+    // Group名から画像URLを生成
+    if (group != null && group!.isNotEmpty) {
+      try {
+        // Supabase Storageのパスを生成
+        // 形式: https://{project}.supabase.co/storage/v1/object/public/sentences-images/{group}.png
+        final supabaseUrl = dotenv.env['SUPABASE_URL'];
+        if (supabaseUrl != null && supabaseUrl.isNotEmpty) {
+          return '$supabaseUrl/storage/v1/object/public/sentences-images/$group.png';
+        }
+      } catch (e) {
+        // 環境変数が読み込まれていない場合はnullを返す
+        return null;
+      }
+    }
+
+    return null;
   }
 }
