@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/progress_indicator.dart';
-import '../widgets/main_bottom_nav.dart';
+import '../widgets/streak_display.dart';
+import '../widgets/achievement_display.dart';
 import '../providers/progress_provider.dart';
 import '../providers/sentence_provider.dart';
 
@@ -26,10 +27,13 @@ class ProgressScreen extends ConsumerWidget {
           ),
         ],
       ),
-      bottomNavigationBar: const MainBottomNav(),
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // ストリーク表示
+            const StreakDisplay(),
+            // バッジ・称号
+            const AchievementDisplay(),
             // 全体進捗
             masteredCountAsync.when(
               data: (mastered) {

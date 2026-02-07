@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS hint_settings (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   
   -- ヒントタイミング設定
-  initial_hint_delay_seconds INTEGER DEFAULT 2,  -- 初期ヒントまでの秒数
+  initial_hint_delay_seconds INTEGER DEFAULT 3,  -- 初期ヒントまでの秒数（デフォルト3秒、カスタマイズ可能な範囲: 2-10秒）
   extended_hint_delay_seconds INTEGER DEFAULT 6,  -- 拡張ヒントまでの秒数
   keywords_hint_delay_seconds INTEGER DEFAULT 10,  -- 重要単語ヒントまでの秒数
   

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/sentence_card.dart';
-import '../widgets/main_bottom_nav.dart';
 import '../providers/sentence_provider.dart';
 
 class SentenceListScreen extends ConsumerStatefulWidget {
@@ -59,7 +58,6 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const MainBottomNav(),
       body: Column(
         children: [
           // 検索バー

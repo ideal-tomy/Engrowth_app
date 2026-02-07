@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../widgets/word_card.dart';
 import '../widgets/sort_menu.dart';
 import '../widgets/filter_chips.dart';
-import '../widgets/main_bottom_nav.dart';
 import '../providers/word_provider.dart';
 import '../models/word.dart';
 
@@ -80,8 +79,6 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final wordsAsync = ref.watch(filteredWordsProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('単語リスト'),
@@ -95,7 +92,6 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      bottomNavigationBar: const MainBottomNav(),
       body: Column(
         children: [
           // 検索バー

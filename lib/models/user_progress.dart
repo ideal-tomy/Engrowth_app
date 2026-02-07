@@ -11,6 +11,13 @@ class UserProgress {
   final bool usedHintToMaster;
   final int averageThinkingTimeSeconds;
   final String? lastHintPhase;
+  
+  // 復習最適化フィールド
+  final DateTime? lastReviewAt;
+  final DateTime? nextReviewAt;
+  final double stability;  // 記憶安定度
+  final double difficulty;  // 難易度
+  final int reviewCount;  // 復習回数
 
   UserProgress({
     required this.id,
@@ -23,6 +30,11 @@ class UserProgress {
     this.usedHintToMaster = false,
     this.averageThinkingTimeSeconds = 0,
     this.lastHintPhase,
+    this.lastReviewAt,
+    this.nextReviewAt,
+    this.stability = 1.0,
+    this.difficulty = 0.3,
+    this.reviewCount = 0,
   });
 
   factory UserProgress.fromJson(Map<String, dynamic> json) {
@@ -39,6 +51,15 @@ class UserProgress {
       usedHintToMaster: json['used_hint_to_master'] as bool? ?? false,
       averageThinkingTimeSeconds: json['average_thinking_time_seconds'] as int? ?? 0,
       lastHintPhase: json['last_hint_phase'] as String?,
+      lastReviewAt: json['last_review_at'] != null
+          ? DateTime.parse(json['last_review_at'] as String)
+          : null,
+      nextReviewAt: json['next_review_at'] != null
+          ? DateTime.parse(json['next_review_at'] as String)
+          : null,
+      stability: (json['stability'] as num?)?.toDouble() ?? 1.0,
+      difficulty: (json['difficulty'] as num?)?.toDouble() ?? 0.3,
+      reviewCount: json['review_count'] as int? ?? 0,
     );
   }
 
@@ -54,6 +75,11 @@ class UserProgress {
       'used_hint_to_master': usedHintToMaster,
       'average_thinking_time_seconds': averageThinkingTimeSeconds,
       'last_hint_phase': lastHintPhase,
+      'last_review_at': lastReviewAt?.toIso8601String(),
+      'next_review_at': nextReviewAt?.toIso8601String(),
+      'stability': stability,
+      'difficulty': difficulty,
+      'review_count': reviewCount,
     };
   }
 }

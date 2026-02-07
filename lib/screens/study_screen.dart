@@ -3,10 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/study_card.dart';
-import '../widgets/main_bottom_nav.dart';
+import '../widgets/review_card.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/user_stats_provider.dart';
+import '../providers/achievement_provider.dart';
 import '../services/learning_service.dart';
+import '../services/achievement_service.dart';
+import '../services/scenario_service.dart';
+import '../widgets/achievement_unlock_dialog.dart';
 import '../models/hint_phase.dart';
 
 class StudyScreen extends ConsumerStatefulWidget {
@@ -67,6 +72,13 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
             },
             tooltip: 'ヒント設定',
           ),
+          IconButton(
+            icon: const Icon(Icons.auto_stories),
+            onPressed: () {
+              context.push('/scenarios');
+            },
+            tooltip: 'シナリオ学習',
+          ),
           sentencesAsync.when(
             data: (sentences) => Padding(
               padding: const EdgeInsets.all(16),
@@ -79,95 +91,113 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           ),
         ],
       ),
-      body: sentencesAsync.when(
-        data: (sentences) {
-          if (sentences.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.school, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    '例文がまだ登録されていません',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
+      body: Column(
+        children: [
+          // 復習カード（復習が必要な場合のみ表示）
+          const ReviewCard(),
+          // 学習コンテンツ
+          Expanded(
+            child: sentencesAsync.when(
+              data: (sentences) {
+                if (sentences.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.school, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text(
+                          '例文がまだ登録されていません',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (_currentIndex >= sentences.length) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle, size: 64, color: Colors.green),
+                        SizedBox(height: 16),
+                        Text(
+                          'すべての例文を学習しました！',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final currentSentence = sentences[_currentIndex];
+
+                return StudyCard(
+                  sentence: currentSentence,
+                  onMastered: () async {
+                    // ストリークとミッション進捗を更新
+                    ref.read(userStatsNotifierProvider.notifier).updateStreak();
+                    ref.read(userStatsNotifierProvider.notifier).incrementDailyDone();
+                    
+                    final usedHint = _learningLogs[currentSentence.id]?['used_hint'] ?? false;
+                    
+                    _logLearning(
+                      sentenceId: currentSentence.id,
+                      hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
+                      thinkingTimeSeconds: _learningLogs[currentSentence.id]?['thinking_time'] ?? 0,
+                      usedHint: usedHint,
+                      mastered: true,
+                      answerShown: false,
+                    );
+                    progressNotifier.updateProgress(
+                      sentenceId: currentSentence.id,
+                      isMastered: true,
+                    );
+                    
+                    // バッジ解除チェック
+                    await _checkAchievements(context, usedHint: usedHint);
+                    
+                    _showSnackBar(context, '覚えた！');
+                    _nextSentence(sentences.length);
+                  },
+                  onNext: () {
+                    _logLearning(
+                      sentenceId: currentSentence.id,
+                      hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
+                      thinkingTimeSeconds: _learningLogs[currentSentence.id]?['thinking_time'] ?? 0,
+                      usedHint: _learningLogs[currentSentence.id]?['used_hint'] ?? false,
+                      mastered: false,
+                      answerShown: false,
+                    );
+                    _nextSentence(sentences.length);
+                  },
+                  onHintUsed: (HintPhase phase, int thinkingTimeSeconds) {
+                    _learningLogs[currentSentence.id] = {
+                      'hint_phase': phase,
+                      'thinking_time': thinkingTimeSeconds,
+                      'used_hint': true,
+                    };
+                  },
+                );
+              },
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
               ),
-            );
-          }
-
-          if (_currentIndex >= sentences.length) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, size: 64, color: Colors.green),
-                  SizedBox(height: 16),
-                  Text(
-                    'すべての例文を学習しました！',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ],
+              error: (error, stack) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text('エラー: $error'),
+                  ],
+                ),
               ),
-            );
-          }
-
-          final currentSentence = sentences[_currentIndex];
-
-          return StudyCard(
-            sentence: currentSentence,
-            onMastered: () {
-              _logLearning(
-                sentenceId: currentSentence.id,
-                hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
-                thinkingTimeSeconds: _learningLogs[currentSentence.id]?['thinking_time'] ?? 0,
-                usedHint: _learningLogs[currentSentence.id]?['used_hint'] ?? false,
-                mastered: true,
-                answerShown: false,
-              );
-              progressNotifier.updateProgress(
-                sentenceId: currentSentence.id,
-                isMastered: true,
-              );
-              _showSnackBar(context, '覚えた！');
-              _nextSentence(sentences.length);
-            },
-            onNext: () {
-              _logLearning(
-                sentenceId: currentSentence.id,
-                hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
-                thinkingTimeSeconds: _learningLogs[currentSentence.id]?['thinking_time'] ?? 0,
-                usedHint: _learningLogs[currentSentence.id]?['used_hint'] ?? false,
-                mastered: false,
-                answerShown: false,
-              );
-              _nextSentence(sentences.length);
-            },
-            onHintUsed: (HintPhase phase, int thinkingTimeSeconds) {
-              _learningLogs[currentSentence.id] = {
-                'hint_phase': phase,
-                'thinking_time': thinkingTimeSeconds,
-                'used_hint': true,
-              };
-            },
-          );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('エラー: $error'),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
-      bottomNavigationBar: const MainBottomNav(),
     );
   }
 
@@ -228,6 +258,70 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  Future<void> _checkAchievements(BuildContext context, {required bool usedHint}) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // 統計情報を取得
+      final stats = await ref.read(userStatsProvider.future);
+      
+      // 進捗情報を取得
+      final progressList = await ref.read(userProgressProvider.future);
+      final masteredCount = progressList.where((p) => p.isMastered).length;
+      
+      // シナリオ完了数を取得
+      final scenarioService = ScenarioService();
+      final scenarios = await scenarioService.getScenarios();
+      int completedScenarios = 0;
+      for (final scenario in scenarios) {
+        final progress = await scenarioService.getUserProgress(userId, scenario.id);
+        if (progress?.isCompleted == true) {
+          completedScenarios++;
+        }
+      }
+      
+      // ヒントなし正解数を取得（簡易版：user_progressから取得）
+      final hintFreeCount = progressList
+          .where((p) => p.isMastered && !p.usedHintToMaster)
+          .length;
+
+      // バッジ解除チェック
+      final achievementService = AchievementService();
+      final newlyUnlocked = await achievementService.checkAndUnlockAchievements(
+        userId: userId,
+        streakCount: stats.streakCount,
+        sentenceCount: masteredCount,
+        scenarioCount: completedScenarios,
+        hintFreeCount: hintFreeCount,
+      );
+
+      // 新しく解除されたバッジがあれば演出を表示
+      if (newlyUnlocked.isNotEmpty && mounted) {
+        final achievements = await ref.read(achievementsProvider.future);
+        
+        for (final achievementId in newlyUnlocked) {
+          final achievement = achievements.firstWhere((a) => a.id == achievementId);
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AchievementUnlockDialog(achievement: achievement),
+            );
+            // 2秒後に自動で閉じる
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted && Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking achievements: $e');
+    }
   }
 
   void _showExitConfirmation(BuildContext context) {

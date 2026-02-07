@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/sentence.dart';
+import '../services/tts_service.dart';
 import 'optimized_image.dart';
 
-class SentenceCard extends StatelessWidget {
+class SentenceCard extends StatefulWidget {
   final Sentence sentence;
   final VoidCallback? onTap;
 
@@ -13,11 +14,53 @@ class SentenceCard extends StatelessWidget {
   });
 
   @override
+  State<SentenceCard> createState() => _SentenceCardState();
+}
+
+class _SentenceCardState extends State<SentenceCard> {
+  final TtsService _ttsService = TtsService();
+  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ttsService.initialize();
+  }
+
+  @override
+  void dispose() {
+    _ttsService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playEnglish() async {
+    if (_isPlaying) {
+      await _ttsService.stop();
+      setState(() => _isPlaying = false);
+      return;
+    }
+    setState(() => _isPlaying = true);
+    await _ttsService.speakEnglish(widget.sentence.englishText);
+    setState(() => _isPlaying = false);
+  }
+
+  Future<void> _playEnglishSlow() async {
+    if (_isPlaying) {
+      await _ttsService.stop();
+      setState(() => _isPlaying = false);
+      return;
+    }
+    setState(() => _isPlaying = true);
+    await _ttsService.speakEnglishSlow(widget.sentence.englishText);
+    setState(() => _isPlaying = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -25,11 +68,11 @@ class SentenceCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: OptimizedImage(
-                imageUrl: sentence.getImageUrl(),
+                imageUrl: widget.sentence.getImageUrl(),
                 width: double.infinity,
                 height: 200,
                 fit: BoxFit.cover,
-                groupName: sentence.group,
+                groupName: widget.sentence.group,
               ),
             ),
             Padding(
@@ -40,7 +83,7 @@ class SentenceCard extends StatelessWidget {
                   // カテゴリタグと難易度
                   Row(
                     children: [
-                      if (sentence.categoryTag != null && sentence.categoryTag!.isNotEmpty)
+                      if (widget.sentence.categoryTag != null && widget.sentence.categoryTag!.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
@@ -48,7 +91,7 @@ class SentenceCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            sentence.categoryTag!,
+                            widget.sentence.categoryTag!,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.blue.shade700,
@@ -56,13 +99,13 @@ class SentenceCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      if (sentence.categoryTag != null && sentence.categoryTag!.isNotEmpty)
+                      if (widget.sentence.categoryTag != null && widget.sentence.categoryTag!.isNotEmpty)
                         const SizedBox(width: 8),
                       // 難易度バッジ
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getDifficultyColor(sentence.difficulty).withOpacity(0.2),
+                          color: _getDifficultyColor(widget.sentence.difficulty).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -71,14 +114,14 @@ class SentenceCard extends StatelessWidget {
                             Icon(
                               Icons.star,
                               size: 14,
-                              color: _getDifficultyColor(sentence.difficulty),
+                              color: _getDifficultyColor(widget.sentence.difficulty),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '難易度 ${sentence.difficulty}',
+                              '難易度 ${widget.sentence.difficulty}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: _getDifficultyColor(sentence.difficulty),
+                                color: _getDifficultyColor(widget.sentence.difficulty),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -91,7 +134,7 @@ class SentenceCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   
                   // シーン設定
-                  if (sentence.sceneSetting != null && sentence.sceneSetting!.isNotEmpty)
+                  if (widget.sentence.sceneSetting != null && widget.sentence.sceneSetting!.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -104,7 +147,7 @@ class SentenceCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              sentence.sceneSetting!,
+                              widget.sentence.sceneSetting!,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade700,
@@ -116,23 +159,63 @@ class SentenceCard extends StatelessWidget {
                       ),
                     ),
                   
-                  if (sentence.sceneSetting != null && sentence.sceneSetting!.isNotEmpty)
+                  if (widget.sentence.sceneSetting != null && widget.sentence.sceneSetting!.isNotEmpty)
                     const SizedBox(height: 12),
                   
-                  // 英語例文
-                  Text(
-                    sentence.englishText,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // 英語例文（音声ボタン付き）
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.sentence.englishText,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 音声ボタン
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: _isPlaying
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.volume_up, size: 20),
+                            onPressed: _playEnglish,
+                            tooltip: '英語',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          IconButton(
+                            icon: _isPlaying
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.slow_motion_video, size: 20),
+                            onPressed: _playEnglishSlow,
+                            tooltip: 'ゆっくり',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   
                   const SizedBox(height: 8),
                   
                   // 日本語例文
                   Text(
-                    sentence.japaneseText,
+                    widget.sentence.japaneseText,
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[700],
@@ -140,12 +223,12 @@ class SentenceCard extends StatelessWidget {
                   ),
                   
                   // ターゲット単語
-                  if (sentence.targetWords != null && sentence.targetWords!.isNotEmpty) ...[
+                  if (widget.sentence.targetWords != null && widget.sentence.targetWords!.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: sentence.targetWords!.split(',').map((word) {
+                      children: widget.sentence.targetWords!.split(',').map((word) {
                         final trimmedWord = word.trim();
                         if (trimmedWord.isEmpty) return const SizedBox.shrink();
                         return Container(

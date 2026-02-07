@@ -184,7 +184,7 @@ class LearningStats {
   final int masteredSentences;
   final int studyingSentences;
   final int unstudiedSentences;
-  final int consecutiveDays; // 連続学習日数
+  final int consecutiveDays; // 連続学習日数（user_statsテーブルから取得）
   final Duration totalStudyTime;
   final Duration weeklyStudyTime;
   final Map<String, int> categoryProgress; // カテゴリ別進捗

@@ -1,0 +1,272 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/study_card.dart';
+import '../providers/scenario_provider.dart';
+import '../providers/progress_provider.dart';
+import '../providers/user_stats_provider.dart';
+import '../services/scenario_service.dart';
+import '../services/learning_service.dart';
+import '../models/hint_phase.dart';
+
+/// シナリオ学習画面
+class ScenarioStudyScreen extends ConsumerStatefulWidget {
+  final String scenarioId;
+
+  const ScenarioStudyScreen({
+    super.key,
+    required this.scenarioId,
+  });
+
+  @override
+  ConsumerState<ScenarioStudyScreen> createState() => _ScenarioStudyScreenState();
+}
+
+class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
+  int _currentIndex = 0;
+  String? _sessionId;
+  DateTime? _sessionStartTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSession();
+  }
+
+  void _initializeSession() {
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'anonymous';
+    _sessionId = LearningService.startSession(
+      userId: userId,
+      sentenceIds: [], // 後で更新
+    );
+    _sessionStartTime = DateTime.now();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sentencesAsync = ref.watch(scenarioSentencesProvider(widget.scenarioId));
+    final progressNotifier = ref.read(progressNotifierProvider.notifier);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('シナリオ学習'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            _showExitConfirmation(context);
+          },
+          tooltip: '終了',
+        ),
+        actions: [
+          sentencesAsync.when(
+            data: (sentences) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: Text('${_currentIndex + 1} / ${sentences.length}'),
+              ),
+            ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
+      body: sentencesAsync.when(
+        data: (sentences) {
+          if (sentences.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.auto_stories, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'シナリオに例文が登録されていません',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (_currentIndex >= sentences.length) {
+            // シナリオ完了
+            _markScenarioCompleted();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.check_circle, size: 64, color: Colors.green),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'シナリオ完了！',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'お疲れ様でした！',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('戻る'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final currentSentence = sentences[_currentIndex];
+
+          return StudyCard(
+            sentence: currentSentence,
+            onMastered: () {
+              // ストリークとミッション進捗を更新
+              ref.read(userStatsNotifierProvider.notifier).updateStreak();
+              ref.read(userStatsNotifierProvider.notifier).incrementDailyDone();
+              
+              _logLearning(
+                sentenceId: currentSentence.id,
+                hintPhase: HintPhase.none,
+                thinkingTimeSeconds: 0,
+                usedHint: false,
+                mastered: true,
+                answerShown: false,
+              );
+              progressNotifier.updateProgress(
+                sentenceId: currentSentence.id,
+                isMastered: true,
+              );
+              _nextSentence(sentences.length);
+            },
+            onNext: () {
+              _logLearning(
+                sentenceId: currentSentence.id,
+                hintPhase: HintPhase.none,
+                thinkingTimeSeconds: 0,
+                usedHint: false,
+                mastered: false,
+                answerShown: false,
+              );
+              _nextSentence(sentences.length);
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('エラー: $error'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _nextSentence(int total) {
+    if (_currentIndex < total - 1) {
+      setState(() {
+        _currentIndex++;
+      });
+      _updateProgress();
+    } else {
+      setState(() {
+        _currentIndex = total;
+      });
+    }
+  }
+
+  Future<void> _updateProgress() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final service = ScenarioService();
+      await service.updateProgress(
+        userId: userId,
+        scenarioId: widget.scenarioId,
+        stepIndex: _currentIndex,
+        completed: false,
+      );
+    } catch (e) {
+      print('Error updating scenario progress: $e');
+    }
+  }
+
+  Future<void> _markScenarioCompleted() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final service = ScenarioService();
+      await service.updateProgress(
+        userId: userId,
+        scenarioId: widget.scenarioId,
+        stepIndex: _currentIndex,
+        completed: true,
+      );
+    } catch (e) {
+      print('Error marking scenario completed: $e');
+    }
+  }
+
+  Future<void> _logLearning({
+    required String sentenceId,
+    required HintPhase hintPhase,
+    required int thinkingTimeSeconds,
+    required bool usedHint,
+    required bool mastered,
+    required bool answerShown,
+  }) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      if (_sessionId == null || _sessionStartTime == null) {
+        _initializeSession();
+      }
+
+      await LearningService.logLearning(
+        userId: userId,
+        sentenceId: sentenceId,
+        sessionId: _sessionId!,
+        sessionStartTime: _sessionStartTime!,
+        hintPhase: hintPhase,
+        thinkingTimeSeconds: thinkingTimeSeconds,
+        usedHint: usedHint,
+        mastered: mastered,
+        answerShown: answerShown,
+      );
+    } catch (e) {
+      print('Error logging learning: $e');
+    }
+  }
+
+  void _showExitConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('学習を終了しますか？'),
+        content: const Text('途中で終了しても、進捗は保存されます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.pop();
+            },
+            child: const Text('終了'),
+          ),
+        ],
+      ),
+    );
+  }
+}

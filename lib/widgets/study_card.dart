@@ -7,6 +7,7 @@ import '../models/hint_phase.dart';
 import '../services/thinking_timer.dart';
 import 'hint_display.dart';
 import 'optimized_image.dart';
+import 'audio_controls.dart';
 import '../providers/hint_settings_provider.dart';
 
 class StudyCard extends ConsumerStatefulWidget {
@@ -404,6 +405,12 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                 ),
               ),
             ),
+        
+          // 音声操作エリア（ボタンエリアの上）
+          AudioControls(
+            englishText: widget.sentence.englishText,
+            japaneseText: widget.sentence.japaneseText,
+          ),
         
           // ボタンエリア（画面下部に固定）
           Container(

@@ -45,6 +45,11 @@ dependencies:
   
   # スケルトンUI
   shimmer: ^3.0.0
+  
+  # 音声機能
+  flutter_tts: ^4.0.0
+  record: ^5.0.0
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:
