@@ -638,6 +638,227 @@ GitHubで作成する具体的なIssueの内容です。
 
 ---
 
+## Phase 5: 学習体験強化機能
+
+### Issue #30: 習慣化UX（ストリーク/今日のミッション/通知）
+
+**タイトル**: `[Feature] 習慣化UX機能の実装（ストリーク/今日のミッション/通知）`
+
+**内容**:
+- 連続学習日数（ストリーク）の表示と更新
+- 今日のミッション（1タップ開始）
+- 学習リマインド通知（任意ON/OFF）
+
+**技術要件**:
+- `user_stats`テーブル追加（`user_id`, `streak_count`, `last_study_date`, `daily_goal_count`, `daily_done_count`, `timezone`, `updated_at`）
+- ストリーク算出ロジック（日付跨ぎ判定）
+  - `last_study_date == 今日` → ストリーク維持
+  - `last_study_date == 昨日` → +1
+  - それ以外 → 1にリセット
+- `flutter_local_notifications`パッケージ導入
+- 通知設定の永続化（SharedPreferencesまたはSupabase）
+- `UserStats`モデルの実装
+- `userStatsProvider`（FutureProvider）と`userStatsNotifier`の実装
+- 学習完了時の`daily_done_count`更新ロジック
+- アプリ起動時/学習開始時の日付跨ぎ判定
+
+**デザイン要件**:
+- 進捗画面トップにストリークを大きく表示
+- 学習タブの最上部に「今日のミッション」カードを固定
+- ミッション達成時の小さな演出（チェック + 軽い振動）
+- 学習開始CTAは親指で押しやすい位置（画面下寄り）
+- ミッション初期案: 例文学習3件、画像想起3件、音読1件（音声機能導入後に解禁）
+
+**関連ドキュメント**: `docs/HABIT_UX_IMPLEMENTATION.md`
+
+---
+
+### Issue #31: 復習最適化（忘却曲線/ヒント使用率）
+
+**タイトル**: `[Feature] 復習最適化機能の実装（忘却曲線/ヒント使用率ベース）`
+
+**内容**:
+- 復習リスト自動生成
+- ヒント使用率ベースの優先度付け
+- 1日の復習枠（今日の復習）
+
+**技術要件**:
+- `user_progress`テーブル拡張
+  - `last_review_at` (timestamptz)
+  - `next_review_at` (timestamptz)
+  - `stability` (float) // 記憶安定度
+  - `difficulty` (float) // 難易度
+  - `review_count` (int)
+- 復習優先度ロジック
+  ```
+  priority = base
+  base += (now > next_review_at) ? 3 : 0
+  base += (hint_usage_count >= 2) ? 2 : 0
+  base += (used_hint_to_master) ? 1 : 0
+  base += (average_thinking_time > threshold) ? 1 : 0
+  ```
+- 復習間隔の算出（簡易SR: Spaced Repetition）
+  - 正解 & ヒントなし → 次回 +3日
+  - 正解 & ヒントあり → 次回 +1日
+  - 不正解 → 次回 +6時間
+- `UserProgress`モデルの更新
+- 復習キュー生成ロジック（`next_review_at`が過去のものを優先取得、`priority`計算で並び替え）
+- 学習完了時の`last_review_at`/`next_review_at`更新ロジック
+
+**デザイン要件**:
+- 学習タブの上部に「今日の復習」カード
+- 進捗画面に「要復習」セクションを追加
+- 復習セッションは通常学習と同じUI/導線で開始
+- 「要復習」件数/カテゴリを表示
+
+**関連ドキュメント**: `docs/REVIEW_OPTIMIZATION_IMPLEMENTATION.md`
+
+---
+
+### Issue #32: 音声機能（再生/録音/発話入力）
+
+**タイトル**: `[Feature] 音声機能の実装（再生/録音/発話入力）`
+
+**内容**:
+- 例文音声再生（英語/日本語/ゆっくり）
+- 録音 → 自分の発話を再生比較
+- 発話入力で次へ進む（任意）
+
+**技術要件**:
+- `flutter_tts`パッケージ導入（TTS）
+  - 速度切替: `0.6 / 1.0`
+  - 音声選択: en-US / en-GB
+  - 例文テキストを即時再生
+- `record`または`flutter_sound`パッケージ導入（録音）
+  - 録音ファイルはローカル保存
+  - 学習終了時に削除（省容量）
+- `speech_to_text`パッケージ導入（音声認識、任意）
+  - 正確性は端末依存のため「補助機能」として扱う
+  - 成功時のみ軽い成功演出
+- iOS/Androidのマイク権限設定
+- 再生ロジック（例文テキストからTTS再生、再生中はボタンをローディング表示）
+- 録音ロジック（録音開始/停止 → 再生）
+- 発話入力ロジック（成功率が一定以上なら「次へ」自動遷移）
+
+**デザイン要件**:
+- 学習画面下部に音声操作ボタン配置
+- 画像の視認性を損なわない配置
+- 推奨配置: 再生ボタン（英語/日本語/ゆっくり）、録音ボタン（押して録音/停止）、再生比較ボタン
+
+**関連ドキュメント**: `docs/AUDIO_SPEAKING_IMPLEMENTATION.md`
+
+---
+
+### Issue #33: シチュエーション連鎖学習（ストーリー型）
+
+**タイトル**: `[Feature] シチュエーション連鎖学習機能の実装（ストーリー型）`
+
+**内容**:
+- シーン連鎖ストーリー（例: 空港 → ホテル → レストラン）
+- シナリオ単位の進捗管理
+- シナリオ完了演出
+
+**技術要件**:
+- `scenarios`テーブル追加
+  - `id` (uuid)
+  - `title` (text)
+  - `description` (text)
+  - `thumbnail_url` (text)
+  - `difficulty` (text)
+  - `estimated_minutes` (int)
+- `scenario_steps`テーブル追加
+  - `id` (uuid)
+  - `scenario_id` (uuid)
+  - `sentence_id` (uuid)
+  - `order_index` (int)
+- `user_scenario_progress`テーブル追加
+  - `user_id` (uuid)
+  - `scenario_id` (uuid)
+  - `last_step_index` (int)
+  - `completed_at` (timestamptz)
+- `Scenario`, `ScenarioStep`, `UserScenarioProgress`モデルの実装
+- シナリオ一覧画面の実装（カード型、進捗率表示）
+- 学習導線（シナリオ選択 → 学習モードへ遷移、`order_index`で順番に進む）
+- 完了判定（最終ステップ学習後に`completed_at`更新）
+
+**デザイン要件**:
+- シナリオ一覧はカード型で「所要時間/難易度/進捗率」を表示
+- 学習モードはシナリオ内の順序で自動遷移
+- 完了時に小さな達成演出（バッジ連動可）
+- 進捗が中断/再開で維持される
+
+**関連ドキュメント**: `docs/SCENARIO_CHAIN_IMPLEMENTATION.md`
+
+---
+
+### Issue #34: ゲーミフィケーション（バッジ/称号/演出）
+
+**タイトル**: `[Feature] ゲーミフィケーション機能の実装（バッジ/称号/演出）`
+
+**内容**:
+- バッジ/称号システム
+- 達成演出（学習完了時）
+- ポイント/レベル（段階導入）
+
+**技術要件**:
+- `achievements`テーブル追加
+  - `id` (uuid)
+  - `title` (text)
+  - `description` (text)
+  - `icon` (text)
+  - `condition_type` (text)
+  - `condition_value` (int)
+- `user_achievements`テーブル追加
+  - `user_id` (uuid)
+  - `achievement_id` (uuid)
+  - `unlocked_at` (timestamptz)
+- `Achievement`, `UserAchievement`モデルの実装
+- 解除判定ロジック（学習完了時に条件チェック）
+  - ストリーク7日
+  - 例文50件達成
+  - シナリオ3本完了
+  - ヒントなし正解10回
+- 達成演出のアニメーション実装（解除時に軽いアニメーション/バイブ）
+
+**デザイン要件**:
+- 進捗画面に「称号/バッジ」セクション
+- 学習完了時に小さな演出（1〜2秒）
+- 演出は邪魔にならず、すぐ次へ行ける
+- 進捗画面でバッジ一覧が確認できる
+
+**関連ドキュメント**: `docs/GAMIFICATION_IMPLEMENTATION.md`
+
+---
+
+### Issue #35: ナビゲーション/UX洗練（M3/状態保持）
+
+**タイトル**: `[UI/UX] ナビゲーション/UX洗練（Material Design 3/状態保持）`
+
+**内容**:
+- M3 `NavigationBar`への統一
+- タブ切り替え時の状態保持
+- 初期画面の学習優先化
+
+**技術要件**:
+- `go_router`の`StatefulShellRoute`採用
+  - 各タブのルートをブランチ化
+  - タブ遷移で画面がリセットされない
+  - Deep Link対応
+- `BottomNavigationBar`から`NavigationBar`への置き換え
+- 各タブの状態保持（スクロール位置、フィルタ状態）
+- 初期画面を`/study`へリダイレクト
+- 状態保持確認（タブ切替時にスクロール位置維持）
+
+**デザイン要件**:
+- メイン4機能は常時表示
+- 親指で届く位置に主要CTA
+- タブ切替後もスクロール/フィルタ状態を維持
+- Material Design 3準拠の`NavigationBar`デザイン
+
+**関連ドキュメント**: `docs/NAVIGATION_UI_POLISH_IMPLEMENTATION.md`
+
+---
+
 ## 使用方法
 
 1. GitHubリポジトリの「Issues」タブを開く

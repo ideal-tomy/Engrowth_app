@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme/engrowth_theme.dart';
 import 'utils/router.dart';
 
 class EngrowthApp extends StatelessWidget {
@@ -8,10 +9,7 @@ class EngrowthApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Engrowth - 英会話学習',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      theme: EngrowthTheme.lightTheme,
       routerConfig: appRouter,
     );
   }

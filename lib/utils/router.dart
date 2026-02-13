@@ -8,6 +8,8 @@ import '../screens/hint_settings_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/scenario_list_screen.dart';
 import '../screens/scenario_study_screen.dart';
+import '../screens/conversation_list_screen.dart';
+import '../screens/conversation_study_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/study',
@@ -74,6 +76,21 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final scenarioId = state.pathParameters['id']!;
         return ScenarioStudyScreen(scenarioId: scenarioId);
+      },
+    ),
+    GoRoute(
+      path: '/conversations',
+      builder: (context, state) {
+        final situationType = state.uri.queryParameters['type'];
+        return ConversationListScreen(situationType: situationType);
+      },
+    ),
+    GoRoute(
+      path: '/conversation/:id',
+      builder: (context, state) {
+        final conversationId = state.pathParameters['id']!;
+        final mode = state.uri.queryParameters['mode'] ?? 'listen';  // listen, roleA, roleB
+        return ConversationStudyScreen(conversationId: conversationId, initialMode: mode);
       },
     ),
     // ルートパスは/studyへリダイレクト

@@ -74,23 +74,26 @@ class Sentence {
   }
 
   /// 画像URLを取得（imageUrlが空の場合はGroup名から生成）
+  /// 画像未アップロード時に400エラーを避けるため、ENABLE_GROUP_IMAGE_URLS=false で生成を無効化可能
   String? getImageUrl() {
     // 既にimageUrlが設定されている場合はそれを返す
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       return imageUrl;
     }
 
-    // Group名から画像URLを生成
+    // Group名から画像URLを生成（未アップロード時は400エラーが出るため、ENABLE_GROUP_IMAGE_URLS=true の時のみ有効）
+    final enableGroupUrls = dotenv.env['ENABLE_GROUP_IMAGE_URLS']?.toLowerCase();
+    if (enableGroupUrls != 'true' && enableGroupUrls != '1') {
+      return null;
+    }
+
     if (group != null && group!.isNotEmpty) {
       try {
-        // Supabase Storageのパスを生成
-        // 形式: https://{project}.supabase.co/storage/v1/object/public/sentences-images/{group}.png
         final supabaseUrl = dotenv.env['SUPABASE_URL'];
         if (supabaseUrl != null && supabaseUrl.isNotEmpty) {
           return '$supabaseUrl/storage/v1/object/public/sentences-images/$group.png';
         }
       } catch (e) {
-        // 環境変数が読み込まれていない場合はnullを返す
         return null;
       }
     }

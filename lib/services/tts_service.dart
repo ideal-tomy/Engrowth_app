@@ -19,6 +19,7 @@ class TtsService {
     await _flutterTts.setSpeechRate(1.0);
     await _flutterTts.setVolume(1.0);
     await _flutterTts.setPitch(1.0);
+    await _flutterTts.awaitSpeakCompletion(true);  // speak() の Future が発話完了まで待つように
 
     // コールバック設定
     _flutterTts.setStartHandler(() {
@@ -38,11 +39,12 @@ class TtsService {
   }
 
   /// 英語で再生（通常速度）
+  /// awaitSpeakCompletion(true) により、発話が完全に終わるまで await がブロックする
   Future<void> speakEnglish(String text) async {
     await initialize();
     await _flutterTts.setLanguage('en-US');
     await _flutterTts.setSpeechRate(1.0);
-    await _flutterTts.speak(text);
+    await _flutterTts.speak(text);  // 発話完了まで待つ
   }
 
   /// 英語で再生（ゆっくり）

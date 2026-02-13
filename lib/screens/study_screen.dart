@@ -79,6 +79,51 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
             },
             tooltip: 'シナリオ学習',
           ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: '会話学習',
+            onSelected: (value) {
+              if (value == 'student') {
+                context.push('/conversations?type=student');
+              } else if (value == 'business') {
+                context.push('/conversations?type=business');
+              } else {
+                context.push('/conversations');
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'all',
+                child: Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline, size: 20),
+                    SizedBox(width: 8),
+                    Text('すべての会話'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'student',
+                child: Row(
+                  children: [
+                    Icon(Icons.school, size: 20),
+                    SizedBox(width: 8),
+                    Text('学生コース'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'business',
+                child: Row(
+                  children: [
+                    Icon(Icons.business, size: 20),
+                    SizedBox(width: 8),
+                    Text('ビジネスコース'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           sentencesAsync.when(
             data: (sentences) => Padding(
               padding: const EdgeInsets.all(16),

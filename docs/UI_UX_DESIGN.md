@@ -21,28 +21,24 @@ EngrowthアプリのUI/UXを最高レベルに引き上げるための包括的�
 - 画像の最適化とキャッシュ
 - 遅延読み込み（Lazy Loading）
 
-## カラーパレット
+## カラーパレット（Engrowth ブランド）
+
+本アプリは Engrowth 提供アプリとしてリリースするため、以下のテーマカラーを採用します。
 
 ```dart
-// プライマリカラー
-primary: Color(0xFF2196F3) // Blue
-primaryVariant: Color(0xFF1976D2)
-secondary: Color(0xFF03DAC6) // Teal
-secondaryVariant: Color(0xFF018786)
+// Engrowth ブランドカラー
+primary: Color(0xFFD30306)     // #d30306 ブランドレッド
+background: Color(0xFFF5F5F5)  // #f5f5f5 オフホワイト
+surface: Color(0xFFFFFFFF)     // 白（カード等）
 
 // セマンティックカラー
-success: Color(0xFF4CAF50) // Green
-warning: Color(0xFFFF9800) // Orange
-error: Color(0xFFF44336) // Red
-info: Color(0xFF2196F3) // Blue
+success: Color(0xFF2E7D32)     // Green
+warning: Color(0xFFF57C00)     // Orange
+error: Color(0xFFD30306)       // プライマリと統一
 
-// ニュートラル
-background: Color(0xFFFAFAFA) // Light Gray
-surface: Color(0xFFFFFFFF) // White
-onPrimary: Color(0xFFFFFFFF) // White
-onSecondary: Color(0xFF000000) // Black
-onBackground: Color(0xFF212121) // Dark Gray
-onSurface: Color(0xFF212121) // Dark Gray
+// A役/B役（会話学習）
+roleA: Color(0xFF1565C0)       // お客様
+roleB: Color(0xFF2E7D32)       // 店員
 ```
 
 ## タイポグラフィ

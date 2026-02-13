@@ -55,6 +55,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  # インポートスクリプト用（Flutter非依存・dart run で実行可能）
+  supabase: ^2.0.0
+  dotenv: ^4.2.0
 
 flutter:
   uses-material-design: true

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/scenario_background.dart';
 import '../widgets/study_card.dart';
 import '../providers/scenario_provider.dart';
 import '../providers/progress_provider.dart';
@@ -49,8 +50,12 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
     final progressNotifier = ref.read(progressNotifierProvider.notifier);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('シナリオ学習'),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
@@ -71,55 +76,60 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
           ),
         ],
       ),
-      body: sentencesAsync.when(
-        data: (sentences) {
-          if (sentences.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.auto_stories, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'シナリオに例文が登録されていません',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
+      body: ScenarioBackground(
+        overlayOpacity: 0.35,
+        child: sentencesAsync.when(
+          data: (sentences) {
+            if (sentences.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.auto_stories, size: 64, color: Colors.white70),
+                    const SizedBox(height: 16),
+                    Text(
+                      'シナリオに例文が登録されていません',
+                      style: TextStyle(fontSize: 16, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              );
           }
 
           if (_currentIndex >= sentences.length) {
-            // シナリオ完了
             _markScenarioCompleted();
-            return Center(
-              child: Column(
+            return SafeArea(
+              child: Center(
+                child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.check_circle, size: 64, color: Colors.green),
                   const SizedBox(height: 16),
                   const Text(
                     'シナリオ完了！',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'お疲れ様でした！',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 16, color: Colors.white70),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => context.pop(),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white),
                     child: const Text('戻る'),
                   ),
                 ],
               ),
+            ),
             );
           }
 
           final currentSentence = sentences[_currentIndex];
 
-          return StudyCard(
+          return SafeArea(
+            child: StudyCard(
             sentence: currentSentence,
             onMastered: () {
               // ストリークとミッション進捗を更新
@@ -151,18 +161,20 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
               );
               _nextSentence(sentences.length);
             },
+          ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.error, size: 48, color: Colors.red),
               const SizedBox(height: 16),
-              Text('エラー: $error'),
+              Text('エラー: $error', style: const TextStyle(color: Colors.white)),
             ],
           ),
+        ),
         ),
       ),
     );
