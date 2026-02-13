@@ -10,6 +10,7 @@ import '../screens/scenario_list_screen.dart';
 import '../screens/scenario_study_screen.dart';
 import '../screens/conversation_list_screen.dart';
 import '../screens/conversation_study_screen.dart';
+import '../screens/scenario_learning_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/study',
@@ -70,6 +71,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/scenarios',
       builder: (context, state) => const ScenarioListScreen(),
+    ),
+    GoRoute(
+      path: '/scenario-learning',
+      builder: (context, state) => const ScenarioLearningScreen(),
     ),
     GoRoute(
       path: '/scenario/:id',

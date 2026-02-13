@@ -75,7 +75,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           IconButton(
             icon: const Icon(Icons.auto_stories),
             onPressed: () {
-              context.push('/scenarios');
+              context.push('/scenario-learning');
             },
             tooltip: 'シナリオ学習',
           ),

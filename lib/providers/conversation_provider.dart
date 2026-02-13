@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/scenario_categories.dart';
 import '../models/conversation.dart';
 import '../services/conversation_service.dart';
 
@@ -48,4 +49,24 @@ class ConversationFilter {
 final conversationWithUtterancesProvider = FutureProvider.family<ConversationWithUtterances, String>((ref, conversationId) async {
   final service = ref.read(conversationServiceProvider);
   return await service.getConversationWithUtterances(conversationId);
+});
+
+/// シナリオ学習ページ用: 全会話を取得（theme フィルタなし）
+final allConversationsProvider = FutureProvider<List<Conversation>>((ref) async {
+  final service = ref.read(conversationServiceProvider);
+  return await service.getConversations();
+});
+
+/// シナリオ学習ページ用: カテゴリ別に会話をグルーピング
+/// 戻り値: カテゴリID -> 会話リスト のマップ
+final conversationsByCategoryProvider = FutureProvider<Map<String, List<Conversation>>>((ref) async {
+  final conversations = await ref.watch(allConversationsProvider.future);
+  final map = <String, List<Conversation>>{};
+  for (final category in kScenarioCategories) {
+    final list = conversations
+        .where((c) => category.matchesTheme(c.theme))
+        .toList();
+    map[category.id] = list;
+  }
+  return map;
 });
