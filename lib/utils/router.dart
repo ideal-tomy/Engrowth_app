@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../screens/dashboard_screen.dart';
+import '../screens/library_hub_screen.dart';
 import '../screens/word_list_screen.dart';
 import '../screens/sentence_list_screen.dart';
 import '../screens/study_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/hint_settings_screen.dart';
+import '../screens/playback_speed_settings_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/scenario_list_screen.dart';
 import '../screens/scenario_study_screen.dart';
@@ -13,47 +16,43 @@ import '../screens/conversation_study_screen.dart';
 import '../screens/scenario_learning_screen.dart';
 
 final appRouter = GoRouter(
-  initialLocation: '/study',
+  initialLocation: '/home',
   routes: [
-    // メイン4タブをStatefulShellRouteで管理（状態保持）
+    // メイン4タブ: Home / Library / Stats / Search
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return ScaffoldWithNavBar(navigationShell: navigationShell);
       },
       branches: [
-        // 単語タブ
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/words',
-              builder: (context, state) => const WordListScreen(),
+              path: '/home',
+              builder: (context, state) => const DashboardScreen(),
             ),
           ],
         ),
-        // 例文タブ
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/sentences',
-              builder: (context, state) => const SentenceListScreen(),
+              path: '/library',
+              builder: (context, state) => const LibraryHubScreen(),
             ),
           ],
         ),
-        // 学習タブ
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/study',
-              builder: (context, state) => const StudyScreen(),
-            ),
-          ],
-        ),
-        // 進捗タブ
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: '/progress',
               builder: (context, state) => const ProgressScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/words',
+              builder: (context, state) => const WordListScreen(),
             ),
           ],
         ),
@@ -63,6 +62,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/hint-settings',
       builder: (context, state) => const HintSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/playback-speed-settings',
+      builder: (context, state) => const PlaybackSpeedSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/study',
+      builder: (context, state) => const StudyScreen(),
+    ),
+    GoRoute(
+      path: '/sentences',
+      builder: (context, state) => const SentenceListScreen(),
     ),
     GoRoute(
       path: '/account',
@@ -98,10 +109,9 @@ final appRouter = GoRouter(
         return ConversationStudyScreen(conversationId: conversationId, initialMode: mode);
       },
     ),
-    // ルートパスは/studyへリダイレクト
     GoRoute(
       path: '/',
-      redirect: (context, state) => '/study',
+      redirect: (context, state) => '/home',
     ),
   ],
 );
@@ -131,24 +141,24 @@ class ScaffoldWithNavBar extends StatelessWidget {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.book_outlined),
-            selectedIcon: Icon(Icons.book),
-            label: '単語',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.article_outlined),
-            selectedIcon: Icon(Icons.article),
-            label: '例文',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
-            label: '学習',
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Library',
           ),
           NavigationDestination(
             icon: Icon(Icons.trending_up_outlined),
             selectedIcon: Icon(Icons.trending_up),
-            label: '進捗',
+            label: 'Stats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.search_outlined),
+            selectedIcon: Icon(Icons.search),
+            label: 'Search',
           ),
         ],
       ),

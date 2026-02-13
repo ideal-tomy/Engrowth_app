@@ -7,9 +7,16 @@ class TtsService {
   factory TtsService() => _instance;
   TtsService._internal();
 
+  static double _defaultSpeechRate = 1.0;
+
   final FlutterTts _flutterTts = FlutterTts();
   bool _isInitialized = false;
   bool _isSpeaking = false;
+
+  /// 再生速度のデフォルト値を設定（設定画面から呼び出し）
+  static void setDefaultSpeechRate(double rate) {
+    _defaultSpeechRate = rate.clamp(0.5, 2.0);
+  }
 
   /// 初期化
   Future<void> initialize() async {
@@ -38,16 +45,16 @@ class TtsService {
     _isInitialized = true;
   }
 
-  /// 英語で再生（通常速度）
+  /// 英語で再生（設定画面の再生速度を使用）
   /// awaitSpeakCompletion(true) により、発話が完全に終わるまで await がブロックする
   Future<void> speakEnglish(String text) async {
     await initialize();
     await _flutterTts.setLanguage('en-US');
-    await _flutterTts.setSpeechRate(1.0);
+    await _flutterTts.setSpeechRate(_defaultSpeechRate);
     await _flutterTts.speak(text);  // 発話完了まで待つ
   }
 
-  /// 英語で再生（ゆっくり）
+  /// 英語で再生（ゆっくり固定）
   Future<void> speakEnglishSlow(String text) async {
     await initialize();
     await _flutterTts.setLanguage('en-US');
@@ -59,7 +66,7 @@ class TtsService {
   Future<void> speakJapanese(String text) async {
     await initialize();
     await _flutterTts.setLanguage('ja-JP');
-    await _flutterTts.setSpeechRate(1.0);
+    await _flutterTts.setSpeechRate(_defaultSpeechRate);
     await _flutterTts.speak(text);
   }
 

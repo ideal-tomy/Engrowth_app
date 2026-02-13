@@ -46,9 +46,7 @@ app.*.map.json
 # 環境変数ファイル
 .env
 .env.local
-.env.*.local
-
-# 一時ファイル・セットアップガイド（開発中のみ）
+.env.*.local# 一時ファイル・セットアップガイド（開発中のみ）
 CHECK_*.md
 CREATE_*.md
 EASY_*.md
