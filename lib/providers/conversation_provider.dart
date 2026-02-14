@@ -70,3 +70,60 @@ final conversationsByCategoryProvider = FutureProvider<Map<String, List<Conversa
   }
   return map;
 });
+
+/// シナリオ学習ページ用: カテゴリ別・サブセクション別に会話をグルーピング
+/// theme ごとに最大10件ずつに分割し、横スクロール行を分けて表示
+const int _kMaxCardsPerRow = 10;
+
+class ConversationSubSection {
+  final String subTitle;
+  final List<Conversation> conversations;
+
+  const ConversationSubSection({
+    required this.subTitle,
+    required this.conversations,
+  });
+}
+
+final conversationsByCategoryWithSubsectionsProvider =
+    FutureProvider<Map<String, List<ConversationSubSection>>>((ref) async {
+  final conversations = await ref.watch(allConversationsProvider.future);
+  final map = <String, List<ConversationSubSection>>{};
+
+  for (final category in kScenarioCategories) {
+    final list = conversations
+        .where((c) => category.matchesTheme(c.theme))
+        .toList();
+
+    if (list.isEmpty) {
+      map[category.id] = [];
+      continue;
+    }
+
+    // theme でグループ化
+    final byTheme = <String, List<Conversation>>{};
+    for (final c in list) {
+      final theme = c.theme ?? 'その他';
+      byTheme.putIfAbsent(theme, () => []).add(c);
+    }
+
+    // 各 theme を10件ずつチャンクしてサブセクション化
+    final subsections = <ConversationSubSection>[];
+    for (final entry in byTheme.entries) {
+      final themeName = entry.key;
+      final convs = entry.value;
+      for (var i = 0; i < convs.length; i += _kMaxCardsPerRow) {
+        final chunk = convs.skip(i).take(_kMaxCardsPerRow).toList();
+        final subTitle = i == 0 ? themeName : '$themeName（続き）';
+        subsections.add(ConversationSubSection(
+          subTitle: subTitle,
+          conversations: chunk,
+        ));
+      }
+    }
+    // サブセクションを theme 名でソート（続きは元の theme の次に）
+    subsections.sort((a, b) => a.subTitle.compareTo(b.subTitle));
+    map[category.id] = subsections;
+  }
+  return map;
+});

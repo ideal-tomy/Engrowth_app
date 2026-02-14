@@ -8,7 +8,7 @@ import '../providers/user_stats_provider.dart';
 import '../widgets/scenario_background.dart';
 
 /// Dashboard（Home タブ）
-/// ヘッダー／再開カード／2x2タイル／クイック検索をコンパクトに表示
+/// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -23,14 +23,12 @@ class DashboardScreen extends ConsumerWidget {
             _DashboardHeader(),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   children: [
                     const _ResumeLearningCard(),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
                     _MainTilesGrid(),
-                    const SizedBox(height: 12),
-                    _QuickSearchBar(),
                   ],
                 ),
               ),
@@ -48,7 +46,7 @@ class _DashboardHeader extends ConsumerWidget {
     final statsAsync = ref.watch(userStatsProvider);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: Row(
         children: [
           IconButton(
@@ -209,67 +207,74 @@ class _ResumeLearningCard extends StatelessWidget {
 }
 
 class _MainTilesGrid extends StatelessWidget {
+  static const _items = [
+    _GridItem('会話トレーニング', Icons.record_voice_over, '/scenario-learning'),
+    _GridItem('1000単語特訓', Icons.style, '/words'),
+    _GridItem('瞬間英作文', Icons.bolt, '/study'),
+    _GridItem('単語・例文検索', Icons.search, '/search'),
+    _GridItem('学習進捗', Icons.bar_chart, '/progress'),
+    _GridItem('お気に入り', Icons.favorite_border, '/favorites'),
+    _GridItem('本日の復習', Icons.history, '/study'),
+    _GridItem('設定', Icons.settings, 'drawer'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Expanded(
       flex: 3,
-      child: GridView.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.1,
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childAspectRatio: 0.9,
+        ),
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _MainTile(
-            title: '会話学習',
-            icon: Icons.chat_bubble_outline,
-            accent: true,
+        padding: EdgeInsets.zero,
+        itemCount: _items.length,
+        itemBuilder: (context, index) {
+          final item = _items[index];
+          return _MainTile(
+            title: item.title,
+            icon: item.icon,
             onTap: () {
               HapticFeedback.selectionClick();
-              context.push('/scenario-learning');
+              if (item.route == 'drawer') {
+                Scaffold.of(context).openDrawer();
+              } else if (item.route == '/search') {
+                context.push('/search');
+              } else if (item.route == '/progress' || item.route == '/words') {
+                context.go(item.route);
+              } else if (item.route == '/favorites') {
+                context.push('/words'); // お気に入りは単語一覧へ
+              } else {
+                context.push(item.route);
+              }
             },
-          ),
-          _MainTile(
-            title: '例文集',
-            icon: Icons.article_outlined,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.push('/sentences');
-            },
-          ),
-          _MainTile(
-            title: '単語検索',
-            icon: Icons.search,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.go('/words');
-            },
-          ),
-          _MainTile(
-            title: '進捗確認',
-            icon: Icons.trending_up_outlined,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.go('/progress');
-            },
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
+class _GridItem {
+  final String title;
+  final IconData icon;
+  final String route;
+
+  const _GridItem(this.title, this.icon, this.route);
+}
+
 class _MainTile extends StatelessWidget {
   final String title;
   final IconData icon;
-  final bool accent;
   final VoidCallback onTap;
 
   const _MainTile({
     required this.title,
     required this.icon,
-    this.accent = false,
     required this.onTap,
   });
 
@@ -279,119 +284,45 @@ class _MainTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        splashColor: EngrowthColors.primary.withOpacity(0.2),
-        highlightColor: EngrowthColors.primary.withOpacity(0.08),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: EngrowthColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-            ),
-            if (accent)
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        kScenarioBgAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const SizedBox.shrink(),
-                      ),
-                      Container(
-                        color: EngrowthColors.surface.withOpacity(0.82),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 32,
-                    color: accent
-                        ? EngrowthColors.primary
-                        : EngrowthColors.onSurface,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: accent
-                          ? EngrowthColors.primary
-                          : EngrowthColors.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickSearchBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: EngrowthColors.surface,
-      borderRadius: BorderRadius.circular(16),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.08),
-        child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          context.go('/words');
-        },
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         splashColor: EngrowthColors.primary.withOpacity(0.2),
         highlightColor: EngrowthColors.primary.withOpacity(0.08),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: EngrowthColors.onSurfaceVariant.withOpacity(0.2),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.search,
-                size: 22,
-                color: EngrowthColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '単語を検索',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: EngrowthColors.onSurfaceVariant,
-                ),
+            color: EngrowthColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 24,
+                  color: EngrowthColors.primary,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                    color: EngrowthColors.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),

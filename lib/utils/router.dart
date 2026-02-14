@@ -52,7 +52,11 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/words',
-              builder: (context, state) => const WordListScreen(),
+              builder: (context, state) {
+                final focusSearch =
+                    state.uri.queryParameters['focus'] == 'search';
+                return WordListScreen(initialFocusSearch: focusSearch);
+              },
             ),
           ],
         ),
@@ -74,6 +78,11 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/sentences',
       builder: (context, state) => const SentenceListScreen(),
+    ),
+    GoRoute(
+      path: '/search',
+      builder: (context, state) =>
+          const WordListScreen(initialFocusSearch: true),
     ),
     GoRoute(
       path: '/account',

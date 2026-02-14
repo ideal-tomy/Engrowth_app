@@ -9,7 +9,9 @@ import '../providers/word_provider.dart';
 import '../models/word.dart';
 
 class WordListScreen extends ConsumerStatefulWidget {
-  const WordListScreen({super.key});
+  final bool initialFocusSearch;
+
+  const WordListScreen({super.key, this.initialFocusSearch = false});
 
   @override
   ConsumerState<WordListScreen> createState() => _WordListScreenState();
@@ -17,6 +19,7 @@ class WordListScreen extends ConsumerStatefulWidget {
 
 class _WordListScreenState extends ConsumerState<WordListScreen> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   Timer? _debounceTimer;
   List<Word> _searchSuggestions = [];
   bool _showSuggestions = false;
@@ -25,6 +28,11 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    if (widget.initialFocusSearch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchFocusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -32,6 +40,7 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
     _debounceTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -101,6 +110,7 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
               children: [
                 TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
                   decoration: InputDecoration(
                     hintText: '単語や意味で検索',
                     prefixIcon: const Icon(Icons.search),

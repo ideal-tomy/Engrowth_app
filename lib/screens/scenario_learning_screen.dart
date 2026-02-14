@@ -21,6 +21,22 @@ class ScenarioLearningScreen extends ConsumerWidget {
         return Icons.hotel;
       case 'flight':
         return Icons.flight;
+      case 'shopping_bag':
+        return Icons.shopping_bag;
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'local_pharmacy':
+        return Icons.local_pharmacy;
+      case 'local_hospital':
+        return Icons.local_hospital;
+      case 'card_travel':
+        return Icons.card_travel;
+      case 'waving_hand':
+        return Icons.waving_hand;
+      case 'account_balance':
+        return Icons.account_balance;
+      case 'directions':
+        return Icons.directions;
       default:
         return Icons.place;
     }
@@ -28,7 +44,7 @@ class ScenarioLearningScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dataAsync = ref.watch(conversationsByCategoryProvider);
+    final dataAsync = ref.watch(conversationsByCategoryWithSubsectionsProvider);
 
     return Scaffold(
       backgroundColor: EngrowthColors.background,
@@ -43,19 +59,33 @@ class ScenarioLearningScreen extends ConsumerWidget {
         ],
       ),
       body: dataAsync.when(
-        data: (byCategory) => ListView.builder(
-          padding: const EdgeInsets.only(top: 16, bottom: 24),
-          itemCount: kScenarioCategories.length,
-          itemBuilder: (context, index) {
-            final category = kScenarioCategories[index];
-            final conversations = byCategory[category.id] ?? [];
-            return _ScenarioSection(
-              category: category,
-              icon: _iconForCategory(category.iconName),
-              conversations: conversations,
-            );
-          },
-        ),
+        data: (byCategory) {
+          final items = <Widget>[];
+          for (final category in kScenarioCategories) {
+            final subsections = byCategory[category.id] ?? [];
+            for (final sub in subsections) {
+              items.add(_ScenarioSection(
+                category: category,
+                icon: _iconForCategory(category.iconName),
+                subTitle: sub.subTitle,
+                conversations: sub.conversations,
+              ));
+            }
+            // カテゴリに会話がない場合も空状態を1つ表示
+            if (subsections.isEmpty) {
+              items.add(_ScenarioSection(
+                category: category,
+                icon: _iconForCategory(category.iconName),
+                subTitle: null,
+                conversations: [],
+              ));
+            }
+          }
+          return ListView(
+            padding: const EdgeInsets.only(top: 16, bottom: 24),
+            children: items,
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
@@ -76,15 +106,17 @@ class ScenarioLearningScreen extends ConsumerWidget {
   }
 }
 
-/// セクション: タイトル + 横スクロールの会話カード行
+/// セクション: タイトル + 横スクロールの会話カード行（最大10件）
 class _ScenarioSection extends StatelessWidget {
   final ScenarioCategory category;
   final IconData icon;
+  final String? subTitle;
   final List<Conversation> conversations;
 
   const _ScenarioSection({
     required this.category,
     required this.icon,
+    this.subTitle,
     required this.conversations,
   });
 
@@ -99,12 +131,16 @@ class _ScenarioSection extends StatelessWidget {
             children: [
               Icon(icon, size: 24, color: EngrowthColors.primary),
               const SizedBox(width: 8),
-              Text(
-                category.displayName,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: EngrowthColors.onBackground,
+              Expanded(
+                child: Text(
+                  subTitle != null
+                      ? '${category.displayName} - $subTitle'
+                      : category.displayName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: EngrowthColors.onBackground,
+                  ),
                 ),
               ),
             ],

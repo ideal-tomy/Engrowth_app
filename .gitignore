@@ -70,8 +70,6 @@ UPDATE_*.sql
 words_import.csv
 
 # インストーラー
-*.exe
-
-# PowerShellスクリプト（一時的なもの）
+*.exe# PowerShellスクリプト（一時的なもの）
 install_*.ps1
 set_*.ps1
