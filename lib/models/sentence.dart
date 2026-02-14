@@ -1,4 +1,4 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/env_config.dart';
 
 class Sentence {
   final String id;
@@ -82,15 +82,14 @@ class Sentence {
     }
 
     // Group名から画像URLを生成（未アップロード時は400エラーが出るため、ENABLE_GROUP_IMAGE_URLS=true の時のみ有効）
-    final enableGroupUrls = dotenv.env['ENABLE_GROUP_IMAGE_URLS']?.toLowerCase();
-    if (enableGroupUrls != 'true' && enableGroupUrls != '1') {
+    if (!EnvConfig.enableGroupImageUrls) {
       return null;
     }
 
     if (group != null && group!.isNotEmpty) {
       try {
-        final supabaseUrl = dotenv.env['SUPABASE_URL'];
-        if (supabaseUrl != null && supabaseUrl.isNotEmpty) {
+        final supabaseUrl = EnvConfig.supabaseUrl;
+        if (supabaseUrl.isNotEmpty) {
           return '$supabaseUrl/storage/v1/object/public/sentences-images/$group.png';
         }
       } catch (e) {

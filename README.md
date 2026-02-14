@@ -101,6 +101,25 @@ lib/
 scripts/             # データインポートスクリプト
 ```
 
+## 🌐 Vercel デプロイ
+
+Flutter Web を Vercel にデプロイする場合：
+
+1. **環境変数の設定**  
+   Vercel ダッシュボード → プロジェクト → Settings → Environment Variables で以下を設定：
+   - `SUPABASE_URL`: Supabase プロジェクトの URL
+   - `SUPABASE_ANON_KEY`: Supabase の anon key
+   - `ENABLE_GROUP_IMAGE_URLS`: （任意）例文画像を Group 名から生成する場合は `true`
+
+2. **ビルド設定**  
+   `vercel.json` で以下を自動設定しています：
+   - Build Command: `flutter pub get && flutter build web --release --dart-define=...`
+   - Output Directory: `build/web`
+   - SPA ルーティング用の rewrites
+
+3. **Flutter のビルド環境**  
+   Vercel のデフォルト環境に Flutter が含まれていない場合、プロジェクト設定の Install Command に Flutter のセットアップを追加するか、[felixangelov/flutter-vercel](https://github.com/felixangelov/flutter-vercel) などのテンプレートを参照してください。
+
 ## 🤝 コントリビューション
 
 コントリビューションを歓迎します！詳細は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。

@@ -1,0 +1,11 @@
+{
+  "buildCommand": "touch .env 2>/dev/null || true && flutter pub get && flutter build web --release --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY --dart-define=ENABLE_GROUP_IMAGE_URLS=${ENABLE_GROUP_IMAGE_URLS:-false}",
+  "outputDirectory": "build/web",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!_next/|api/|static/|assets/|canvaskit/|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
