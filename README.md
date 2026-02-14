@@ -101,24 +101,49 @@ lib/
 scripts/             # データインポートスクリプト
 ```
 
-## 🌐 Vercel デプロイ
+## 🌐 Firebase Hosting デプロイ（推奨）
 
-Flutter Web を Vercel にデプロイする場合：
+Flutter Web を Firebase Hosting にデプロイする方法です。**ローカルでビルド**するため、サーバーに Flutter を入れる必要がなく、確実にデプロイできます。
 
-1. **環境変数の設定**  
-   Vercel ダッシュボード → プロジェクト → Settings → Environment Variables で以下を設定：
-   - `SUPABASE_URL`: Supabase プロジェクトの URL
-   - `SUPABASE_ANON_KEY`: Supabase の anon key
-   - `ENABLE_GROUP_IMAGE_URLS`: （任意）例文画像を Group 名から生成する場合は `true`
+### 初回セットアップ
 
-2. **ビルド設定**  
-   `vercel.json` で以下を自動設定しています：
-   - Build Command: `flutter pub get && flutter build web --release --dart-define=...`
-   - Output Directory: `build/web`
-   - SPA ルーティング用の rewrites
+1. **Firebase CLI のインストール**
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   ```
 
-3. **Flutter のビルド環境**  
-   Vercel のデフォルト環境に Flutter が含まれていない場合、プロジェクト設定の Install Command に Flutter のセットアップを追加するか、[felixangelov/flutter-vercel](https://github.com/felixangelov/flutter-vercel) などのテンプレートを参照してください。
+2. **Firebase プロジェクトの紐付け**（初回のみ）
+   ```bash
+   firebase init hosting
+   ```
+   - 既存の Firebase プロジェクトを選択するか新規作成
+   - 「What do you want to use as your public directory?」→ `build/web`
+   - 既存の `firebase.json` がある場合、上書きせず **No** を選ぶ
+
+### デプロイ手順
+
+1. **環境変数の準備**  
+   `.env` に `SUPABASE_URL` と `SUPABASE_ANON_KEY` を設定済みであること。
+
+2. **デプロイ実行**
+   ```bash
+   # macOS / Linux
+   ./scripts/deploy_firebase.sh
+
+   # Windows (PowerShell)
+   .\scripts\deploy_firebase.ps1
+   ```
+
+   または手動で：
+   ```bash
+   flutter build web --release \
+     --dart-define=SUPABASE_URL=あなたのURL \
+     --dart-define=SUPABASE_ANON_KEY=あなたのキー
+   firebase deploy --only hosting
+   ```
+
+3. デプロイ後、`https://プロジェクトID.web.app` で公開されます。
 
 ## 🤝 コントリビューション
 
