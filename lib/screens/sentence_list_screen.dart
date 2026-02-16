@@ -49,7 +49,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('例文リスト'),
+        title: const Text('センテンス一覧'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -66,7 +66,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: '例文、タグ、シーンで検索',
+                hintText: '例文、「道を尋ねる」「接客」などで検索',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(

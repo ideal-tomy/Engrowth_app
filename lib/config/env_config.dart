@@ -9,6 +9,7 @@ class EnvConfig {
   static String? _supabaseUrl;
   static String? _supabaseAnonKey;
   static String? _enableGroupImageUrls;
+  static String? _googleTtsApiKey;
 
   /// dotenv をロード（.env が無い場合はスキップ）
   static Future<void> load() async {
@@ -32,6 +33,15 @@ class EnvConfig {
           ? const String.fromEnvironment('SUPABASE_ANON_KEY')
           : dotenv.env['SUPABASE_ANON_KEY'] ?? '');
 
+  /// Google Cloud Text-to-Speech API キー（未設定時はデバイスTTSを使用）
+  static String? get googleTtsApiKey =>
+      _googleTtsApiKey ??
+      (const String.fromEnvironment('GOOGLE_TTS_API_KEY', defaultValue: '').isNotEmpty
+          ? const String.fromEnvironment('GOOGLE_TTS_API_KEY')
+          : (dotenv.env['GOOGLE_TTS_API_KEY']?.trim().isNotEmpty == true
+              ? dotenv.env['GOOGLE_TTS_API_KEY']!.trim()
+              : null));
+
   /// ENABLE_GROUP_IMAGE_URLS が true か
   static bool get enableGroupImageUrls {
     if (_enableGroupImageUrls != null) {
@@ -52,9 +62,11 @@ class EnvConfig {
     String? supabaseUrl,
     String? supabaseAnonKey,
     String? enableGroupImageUrls,
+    String? googleTtsApiKey,
   }) {
     _supabaseUrl = supabaseUrl;
     _supabaseAnonKey = supabaseAnonKey;
     _enableGroupImageUrls = enableGroupImageUrls;
+    _googleTtsApiKey = googleTtsApiKey;
   }
 }

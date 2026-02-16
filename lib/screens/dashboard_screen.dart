@@ -209,9 +209,9 @@ class _ResumeLearningCard extends StatelessWidget {
 class _MainTilesGrid extends StatelessWidget {
   static const _items = [
     _GridItem('会話トレーニング', Icons.record_voice_over, '/scenario-learning'),
-    _GridItem('1000単語特訓', Icons.style, '/words'),
+    _GridItem('単語検索', Icons.search, '/words'),
     _GridItem('瞬間英作文', Icons.bolt, '/study'),
-    _GridItem('単語・例文検索', Icons.search, '/search'),
+    _GridItem('センテンス一覧', Icons.format_list_bulleted, '/sentences'),
     _GridItem('学習進捗', Icons.bar_chart, '/progress'),
     _GridItem('お気に入り', Icons.favorite_border, '/favorites'),
     _GridItem('本日の復習', Icons.history, '/study'),
@@ -242,10 +242,10 @@ class _MainTilesGrid extends StatelessWidget {
               HapticFeedback.selectionClick();
               if (item.route == 'drawer') {
                 Scaffold.of(context).openDrawer();
-              } else if (item.route == '/search') {
-                context.push('/search');
               } else if (item.route == '/progress' || item.route == '/words') {
                 context.go(item.route);
+              } else if (item.route == '/sentences') {
+                context.push(item.route);
               } else if (item.route == '/favorites') {
                 context.push('/words'); // お気に入りは単語一覧へ
               } else {
@@ -372,6 +372,14 @@ class _SettingsDrawer extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 // プレースホルダー
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.record_voice_over),
+              title: const Text('講師用ダッシュボード'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/consultant');
               },
             ),
             const Divider(),

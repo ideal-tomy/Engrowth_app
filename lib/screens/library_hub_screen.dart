@@ -23,8 +23,8 @@ class LibraryHubScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _LibraryCard(
-              title: '例文集',
-              subtitle: 'テキストで例文を確認',
+              title: 'センテンス一覧',
+              subtitle: '道を尋ねる・接客など便利フレーズを検索',
               icon: Icons.article_outlined,
               onTap: () {
                 HapticFeedback.selectionClick();

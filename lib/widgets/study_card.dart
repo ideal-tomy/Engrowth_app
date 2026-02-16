@@ -8,6 +8,7 @@ import '../services/thinking_timer.dart';
 import 'hint_display.dart';
 import 'optimized_image.dart';
 import 'audio_controls.dart';
+import 'bottom_interaction_bar.dart';
 import '../providers/hint_settings_provider.dart';
 
 class StudyCard extends ConsumerStatefulWidget {
@@ -39,9 +40,11 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
   Timer? _answerTimer;
   Timer? _autoNextTimer;
   int _autoNextSecondsRemaining = 0;
+  late String _sessionId;
 
   @override
   void initState() {
+    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
@@ -410,23 +413,14 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
           AudioControls(
             englishText: widget.sentence.englishText,
             japaneseText: widget.sentence.japaneseText,
+            sentenceId: widget.sentence.id,
+            sessionId: _sessionId,
           ),
         
-          // ボタンエリア（画面下部に固定）
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
+          // ボタンエリア（画面下部に固定・共通UX規約）
+          BottomInteractionBar(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
@@ -473,7 +467,6 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                 ],
               ),
             ),
-          ),
         ],
         ),
         // 視覚的フィードバック（画面の光る効果）

@@ -14,6 +14,7 @@ import '../screens/scenario_study_screen.dart';
 import '../screens/conversation_list_screen.dart';
 import '../screens/conversation_study_screen.dart';
 import '../screens/scenario_learning_screen.dart';
+import '../screens/consultant_dashboard_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/home',
@@ -109,6 +110,10 @@ final appRouter = GoRouter(
         final situationType = state.uri.queryParameters['type'];
         return ConversationListScreen(situationType: situationType);
       },
+    ),
+    GoRoute(
+      path: '/consultant',
+      builder: (context, state) => const ConsultantDashboardScreen(),
     ),
     GoRoute(
       path: '/conversation/:id',

@@ -48,8 +48,10 @@ dependencies:
   
   # 音声機能
   flutter_tts: ^4.0.0
+  http: ^1.2.0
   record: ^5.0.0
   speech_to_text: ^7.0.0
+  just_audio: ^0.9.36
 
 dev_dependencies:
   flutter_test:
