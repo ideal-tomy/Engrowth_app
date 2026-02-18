@@ -11,7 +11,6 @@ import '../services/conversation_learning_events_service.dart';
 
 import '../theme/engrowth_theme.dart';
 import '../widgets/audio_controls.dart';
-import '../widgets/next_action_prompt.dart';
 import '../widgets/bottom_interaction_bar.dart';
 import '../widgets/scenario_background.dart';
 
@@ -47,7 +46,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   bool _isCountdownActive = false;  // 3秒カウントダウン中
   int _countdownValue = 3;  // カウントダウン表示用
   bool _stopPlaybackRequested = false;  // 再生停止フラグ
-  bool _showNextActionPrompt = false;  // 会話全体再生後のCTA表示
+  ValueNotifier<int>? _transcriptCurrentIndexNotifier;  // 英語シート用：再生中のフレーズインデックス
+  ValueNotifier<bool>? _transcriptIsPlayingNotifier;  // 英語シート用：再生中フラグ（同期用）
   Timer? _autoAdvanceTimer;
   int? _autoAdvanceSecondsRemaining;  // 残り秒（表示用）
   late AnimationController _pulseController;
@@ -72,6 +72,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
   @override
   void dispose() {
+    _transcriptCurrentIndexNotifier?.dispose();
+    _transcriptCurrentIndexNotifier = null;
+    _transcriptIsPlayingNotifier?.dispose();
+    _transcriptIsPlayingNotifier = null;
     _autoAdvanceTimer?.cancel();
     _pulseController.dispose();
     _progressController.dispose();
@@ -112,6 +116,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     });
   }
 
+  /// インデックスを進め、自分の番/相手の番に応じて再生・録音待機を自動切り替え
+  /// ・自分の番：UIが録音待機を表示（onRecordingComplete → _scheduleAdvanceAfterRecording）
+  /// ・相手の番：TTS再生 → 終了後 _scheduleAdvanceAfterOpponentTts で再帰的に進行
   void _doAdvance(List<ConversationUtterance> utterances) {
     _cancelAutoAdvance();
     if (_currentUtteranceIndex >= utterances.length - 1) {
@@ -124,6 +131,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if ((_mode == 'roleA' || _mode == 'roleB') && !_isMyRole(next)) {
       _playOpponentAndScheduleAdvance(utterances, _currentUtteranceIndex);
     }
+    // 自分の番の場合は何もしない（録音待機UIを表示）
   }
 
   Future<void> _playOpponentAndScheduleAdvance(List<ConversationUtterance> utterances, int index) async {
@@ -243,20 +251,33 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   Future<void> _stopPlayback() async {
     _stopPlaybackRequested = true;
     await _ttsService.stop();
+    if (mounted) {
+      setState(() => _isPlaying = false);
+      _transcriptIsPlayingNotifier?.value = false;
+    }
+    // _stopPlaybackRequested はループ終了時にクリア（wasStopped 判定のためここでは触らない）
   }
 
-  Future<void> _playAllConversation(List<ConversationUtterance> utterances, {bool showPromptOnComplete = true}) async {
+  /// 会話全体を再生。startIndex 指定時はその位置から（再開時は一つ前からで文脈を思い出せるように）
+  Future<void> _playAllConversation(
+    List<ConversationUtterance> utterances, {
+    bool showPromptOnComplete = true,
+    int? startIndex,
+  }) async {
     if (_isPlaying) return;
 
     _stopPlaybackRequested = false;
+    final fromIndex = startIndex ?? 0;
     setState(() => _isPlaying = true);
+    _transcriptIsPlayingNotifier?.value = true;
 
-    for (var i = 0; i < utterances.length; i++) {
+    for (var i = fromIndex; i < utterances.length; i++) {
       if (!mounted) break;
       if (_stopPlaybackRequested) break;
 
       final utterance = utterances[i];
       setState(() => _currentUtteranceIndex = i);
+      _transcriptCurrentIndexNotifier?.value = i;  // 英語シートのハイライト同期
 
       // プログレスバーをゆっくり進行させる（フレーズ再生中）
       _progressController.forward(from: 0);
@@ -293,21 +314,31 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     }
 
     if (mounted) {
+      final wasStoppedByUser = _stopPlaybackRequested;
       setState(() {
         _isPlaying = false;
         _stopPlaybackRequested = false;
-        _hasListenedToAll = true;  // ①完了
-        if (showPromptOnComplete) _showNextActionPrompt = true;  // 次アクションCTAを自動表示
+        if (!wasStoppedByUser) _hasListenedToAll = true;
       });
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId != null && showPromptOnComplete) {
-        _learningEvents.logListenCompleted(
-          userId: userId,
-          conversationId: widget.conversationId,
-          sessionId: _sessionId,
-        );
+      _transcriptIsPlayingNotifier?.value = false;
+      if (!wasStoppedByUser && showPromptOnComplete) {
+        _showNextActionDialog(utterances);
+        final userId = Supabase.instance.client.auth.currentUser?.id;
+        if (userId != null) {
+          _learningEvents.logListenCompleted(
+            userId: userId,
+            conversationId: widget.conversationId,
+            sessionId: _sessionId,
+          );
+        }
       }
     }
+  }
+
+  /// 再開用：一つ前のフレーズから再生（文脈を思い出す余白）
+  void _resumeAllConversation(List<ConversationUtterance> utterances) {
+    final startIndex = _currentUtteranceIndex > 0 ? _currentUtteranceIndex - 1 : 0;
+    _playAllConversation(utterances, showPromptOnComplete: true, startIndex: startIndex);
   }
 
   /// 役モード時は音のみを原則。テキストは「どうしても」の場合のみ
@@ -323,13 +354,101 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         _mode == 'roleB' && utterance.speakerRole == 'B';
   }
 
-  /// 相手役の最初の発話インデックスを取得
-  int _findFirstOpponentIndex(List<ConversationUtterance> utterances) {
-    final myRole = _mode == 'roleA' ? 'A' : 'B';
-    for (var i = 0; i < utterances.length; i++) {
-      if (utterances[i].speakerRole != myRole) return i;
-    }
-    return 0;
+  void _showNextActionDialog(List<ConversationUtterance> utterances) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '次はどうする？',
+                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _playAllConversation(utterances);
+                  },
+                  icon: const Icon(Icons.replay, size: 20),
+                  label: const Text('もう一度全体を聴く'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: EngrowthColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _startRolePractice('roleA', utterances);
+                  },
+                  icon: const Icon(Icons.person, size: 18),
+                  label: const Text('A役でトレーニング'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: EngrowthColors.roleA),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _startRolePractice('roleB', utterances);
+                  },
+                  icon: const Icon(Icons.person_outline, size: 18),
+                  label: const Text('B役でトレーニング'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: EngrowthColors.roleB),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  'タップして閉じる',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _startRolePractice(String role, List<ConversationUtterance> utterances) async {
@@ -351,11 +470,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       );
     }
 
-    final opponentIndex = _findFirstOpponentIndex(utterances);
-    setState(() {
-      _currentUtteranceIndex = opponentIndex;
-      _isCountdownActive = true;
-    });
+    setState(() => _isCountdownActive = true);
 
     // 3秒カウントダウン
     for (var i = 3; i >= 1; i--) {
@@ -366,56 +481,80 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if (!mounted) return;
     setState(() => _isCountdownActive = false);
 
-    // 相手の発話をTTS再生
-    final opponentUtterance = utterances[opponentIndex];
-    setState(() => _isPlaying = true);
-    _progressController.forward(from: 0);
-    await _ttsService.speakEnglish(opponentUtterance.englishText);
-    if (!mounted) return;
-    _progressController.value = 1.0;
-    setState(() => _isPlaying = false);
-
-    // 再生履歴を記録
-    final playbackUserId = Supabase.instance.client.auth.currentUser?.id;
-    if (playbackUserId != null && _sessionId != null) {
-      await _playbackService.recordPlayback(
-        userId: playbackUserId,
-        conversationId: widget.conversationId,
-        utteranceId: opponentUtterance.id,
-        sessionId: _sessionId!,
-        playbackType: 'tts',
-      );
-    }
-
-    // 相手TTS終了→0.6秒後→ユーザーターンへ
-    if (opponentIndex + 1 < utterances.length) {
-      _scheduleAdvanceAfterOpponentTts(utterances);
+    // 最初の発話（index 0）が自分の番か相手の番かで分岐
+    setState(() => _currentUtteranceIndex = 0);
+    final first = utterances[0];
+    if (_isMyRole(first)) {
+      // 自分の番から開始 → 即座に録音待機（A役で最初がA、B役で最初がB のとき）
     } else {
-      setState(() => _currentUtteranceIndex = opponentIndex);
+      // 相手の番から開始 → TTS再生後に自動で自分の録音待機へ
+      _playOpponentAndScheduleAdvance(utterances, 0);
     }
   }
 
-  /// ④英語ボタン用：全文トランスクリプト（EN+JP）＋フレーズ飛び＋自動再生
+  /// ④英語ボタン用：全文トランスクリプト（EN+JP）＋フレーズ飛び＋再生（メイン画面と同期）
   void _showEnglishTranscriptSheet(List<ConversationUtterance> utterances) {
+    _transcriptCurrentIndexNotifier?.dispose();
+    _transcriptIsPlayingNotifier?.dispose();
+    _transcriptCurrentIndexNotifier = ValueNotifier<int>(_currentUtteranceIndex);
+    _transcriptIsPlayingNotifier = ValueNotifier<bool>(_isPlaying);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _buildEnglishTranscriptSheet(
-        ctx,
-        utterances,
-        _currentUtteranceIndex,
-        (index) {
-          setState(() => _currentUtteranceIndex = index);
-          _playUtterance(utterances[index]);  // タップしたフレーズを再生
-        },
-        _stopPlayback,
-      ),
-    );
-    // シート表示と同時に会話全体を自動再生（シート内のためCTA非表示）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAllConversation(utterances, showPromptOnComplete: false);
+      barrierColor: Colors.black54,
+      enableDrag: true,
+      builder: (ctx) {
+        final screenH = MediaQuery.of(ctx).size.height;
+        final barrierHeight = screenH * 0.28;  // シート上の余白（外側タップ領域）
+        return Stack(
+          children: [
+            // シート本体（下に配置）
+            Positioned.fill(
+              child: _buildEnglishTranscriptSheet(
+                ctx,
+                utterances,
+                _transcriptCurrentIndexNotifier!,
+                _transcriptIsPlayingNotifier!,
+                (index) {
+                  setState(() => _currentUtteranceIndex = index);
+                  _transcriptCurrentIndexNotifier?.value = index;
+                  _playUtterance(utterances[index]);  // タップしたフレーズを再生
+                },
+                _stopPlayback,
+                () => _resumeAllConversation(utterances),
+                () => _playAllConversation(utterances, showPromptOnComplete: false),
+                _hasListenedToAll,
+              ),
+            ),
+            // 外側タップで閉じる（シートの上・背景部分を手前に配置）
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: barrierHeight,
+              child: GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                behavior: HitTestBehavior.opaque,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      _transcriptCurrentIndexNotifier?.dispose();
+      _transcriptCurrentIndexNotifier = null;
+      _transcriptIsPlayingNotifier?.dispose();
+      _transcriptIsPlayingNotifier = null;
     });
+    // 最初から聴く場合のみ自動再生（途中停止後の再開時はボタンで続きを聴く）
+    if (_currentUtteranceIndex == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _playAllConversation(utterances, showPromptOnComplete: false);
+      });
+    }
   }
 
   @override
@@ -466,46 +605,6 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
             ),
           ),
         ),
-        // 会話全体再生後の次アクションCTA（外側タップで閉じる）
-        if (_showNextActionPrompt && _mode == 'listen')
-          Positioned.fill(
-            child: NextActionPrompt(
-              useDarkTheme: true,
-              title: '次はどうする？',
-              actions: [
-                NextActionItem(
-                  label: 'もう一度全体を聴く',
-                  icon: Icons.replay,
-                  style: NextActionStyle.primary,
-                  onPressed: () {
-                    setState(() => _showNextActionPrompt = false);
-                    _playAllConversation(utterances);
-                  },
-                ),
-                NextActionItem(
-                  label: 'A役でトレーニング',
-                  icon: Icons.person,
-                  style: NextActionStyle.outlined,
-                  color: EngrowthColors.roleA,
-                  onPressed: () {
-                    setState(() => _showNextActionPrompt = false);
-                    _startRolePractice('roleA', utterances);
-                  },
-                ),
-                NextActionItem(
-                  label: 'B役でトレーニング',
-                  icon: Icons.person_outline,
-                  style: NextActionStyle.outlined,
-                  color: EngrowthColors.roleB,
-                  onPressed: () {
-                    setState(() => _showNextActionPrompt = false);
-                    _startRolePractice('roleB', utterances);
-                  },
-                ),
-              ],
-              onDismiss: () => setState(() => _showNextActionPrompt = false),
-            ),
-          ),
         // 3秒カウントダウンオーバーレイ
         if (_isCountdownActive)
           Positioned.fill(
@@ -903,6 +1002,123 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     );
   }
 
+  Widget _buildRolePracticeButtons(BuildContext context, List<ConversationUtterance> utterances) {
+    final canStart = _hasListenedToAll && !_isPlaying && !_isCountdownActive;
+    void onTapLocked() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('まず会話全体を聴いてから練習しましょう'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Opacity(
+            opacity: canStart ? 1.0 : 0.5,
+            child: OutlinedButton.icon(
+              onPressed: canStart
+                  ? () => _startRolePractice('roleA', utterances)
+                  : onTapLocked,
+              icon: Icon(canStart ? Icons.person : Icons.lock_outline, size: 18),
+              label: const Text('A役で練習', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: canStart ? Colors.white : Colors.grey[400],
+                side: BorderSide(
+                  color: canStart ? EngrowthColors.roleA : Colors.grey,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Opacity(
+            opacity: canStart ? 1.0 : 0.5,
+            child: OutlinedButton.icon(
+              onPressed: canStart
+                  ? () => _startRolePractice('roleB', utterances)
+                  : onTapLocked,
+              icon: Icon(canStart ? Icons.person_outline : Icons.lock_outline, size: 18),
+              label: const Text('B役で練習', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: canStart ? Colors.white : Colors.grey[400],
+                side: BorderSide(
+                  color: canStart ? EngrowthColors.roleB : Colors.grey,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListenAllButton(List<ConversationUtterance> utterances) {
+    final isStoppedMidway = !_hasListenedToAll && _currentUtteranceIndex > 0 && !_isPlaying;
+    final isCompleted = _hasListenedToAll && !_isPlaying;
+
+    String label;
+    VoidCallback? onPressed;
+    IconData icon = Icons.play_circle_filled;
+
+    if (_isPlaying) {
+      label = '再生中...';
+      onPressed = null;
+      icon = Icons.graphic_eq;
+    } else if (isCompleted) {
+      label = '最初から聴き直す';
+      onPressed = () => _playAllConversation(utterances);
+    } else if (isStoppedMidway) {
+      label = '続きを聴く（一つ前のフレーズから）';
+      onPressed = () => _resumeAllConversation(utterances);
+    } else {
+      label = '会話全体を聴く';
+      onPressed = () => _playAllConversation(utterances);
+    }
+
+    return Row(
+      children: [
+        if (_isPlaying) ...[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _stopPlayback,
+              icon: const Icon(Icons.stop, size: 22),
+              label: const Text('停止'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          flex: _isPlaying ? 1 : 2,
+          child: ElevatedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 24),
+            label: Text(label),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isPlaying ? Colors.grey : EngrowthColors.primary,
+              foregroundColor: EngrowthColors.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBottomButtons(
     BuildContext context,
     List<ConversationUtterance> utterances,
@@ -990,43 +1206,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 ),
               ),
             ),
-          // 会話全体を聴く（③再生中は停止ボタン表示）
-          Row(
-            children: [
-              if (_isPlaying) ...[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _stopPlayback,
-                    icon: const Icon(Icons.stop, size: 22),
-                    label: const Text('停止'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                flex: _isPlaying ? 1 : 2,
-                child: ElevatedButton.icon(
-              onPressed: _isPlaying ? null : () => _playAllConversation(utterances),
-              icon: Icon(_isPlaying ? Icons.graphic_eq : Icons.play_circle_filled, size: 24),
-              label: Text(_isPlaying ? '再生中...' : '会話全体を聞く'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isPlaying ? Colors.grey : EngrowthColors.primary,
-                foregroundColor: EngrowthColors.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 4,
-              ),
-            ),
-              ),
-            ],
-          ),
+          // 会話全体を聴く（状況に応じてボタン文言・動作を切り替え）
+          _buildListenAllButton(utterances),
           const SizedBox(height: 12),
           // ①会話全体を聞いていない場合は案内
           if (!_hasListenedToAll)
@@ -1052,44 +1233,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 ),
               ),
             ),
-          // A役/B役として練習（①完了後のみ有効）
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _hasListenedToAll && !_isPlaying && !_isCountdownActive
-                      ? () => _startRolePractice('roleA', utterances)
-                      : null,
-                  icon: const Icon(Icons.person, size: 18),
-                  label: const Text('A役で練習', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(
-                      color: _hasListenedToAll ? EngrowthColors.roleA : Colors.white38,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _hasListenedToAll && !_isPlaying && !_isCountdownActive
-                      ? () => _startRolePractice('roleB', utterances)
-                      : null,
-                  icon: const Icon(Icons.person_outline, size: 18),
-                  label: const Text('B役で練習', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(
-                      color: _hasListenedToAll ? EngrowthColors.roleB : Colors.white38,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // A役/B役として練習（未完了時は半透明でロック表示、タップでスナックバー）
+          _buildRolePracticeButtons(context, utterances),
           const SizedBox(height: 12),
           // 現在の発話のみ再生 + 前へ/次へ
           Row(
@@ -1239,56 +1384,116 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   Widget _buildEnglishTranscriptSheet(
     BuildContext ctx,
     List<ConversationUtterance> utterances,
-    int currentIndex,
+    ValueNotifier<int> currentIndexNotifier,
+    ValueNotifier<bool> isPlayingNotifier,
     void Function(int) onJumpTo,
     VoidCallback onStop,
+    VoidCallback onResume,
+    VoidCallback onPlayFromStart,
+    bool hasListenedToAll,
   ) {
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
       maxChildSize: 0.95,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onStop,
-                  icon: const Icon(Icons.stop, size: 22),
-                  label: const Text('再生を停止'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: EngrowthColors.primary,
-                    side: BorderSide(color: EngrowthColors.primary),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+      builder: (context, scrollController) => ValueListenableBuilder<bool>(
+        valueListenable: isPlayingNotifier,
+        builder: (context, isPlaying, __) {
+          return ValueListenableBuilder<int>(
+            valueListenable: currentIndexNotifier,
+            builder: (context, currentIndex, _) {
+              // 再生中のフレーズが画面内に収まるようスクロール
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (scrollController.hasClients && currentIndex < utterances.length) {
+                  const approxItemHeight = 110.0;
+                  final targetOffset = (currentIndex * approxItemHeight)
+                      .clamp(0.0, scrollController.position.maxScrollExtent);
+                  scrollController.animateTo(
+                    targetOffset,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
+
+              final showResumeButton = !isPlaying && currentIndex > 0 && !hasListenedToAll;
+              final showPlayFromStartButton = !isPlaying && (currentIndex == 0 || hasListenedToAll);
+
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Column(
+                        children: [
+                          if (isPlaying)
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: onStop,
+                                icon: const Icon(Icons.stop, size: 22),
+                                label: const Text('再生を停止'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: EngrowthColors.primary,
+                                  side: BorderSide(color: EngrowthColors.primary),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            )
+                          else if (showResumeButton)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: onResume,
+                                icon: const Icon(Icons.play_arrow, size: 22),
+                                label: const Text('続きを聴く（一つ前のフレーズから）'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: EngrowthColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            )
+                          else if (showPlayFromStartButton)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: onPlayFromStart,
+                                icon: const Icon(Icons.play_circle_filled, size: 22),
+                                label: Text(hasListenedToAll ? '最初から聴き直す' : '会話全体を聴く'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: EngrowthColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 itemCount: utterances.length,
                 itemBuilder: (context, i) {
                   final u = utterances[i];
                   final roleLabel = u.speakerRole == 'A' ? 'A（お客様）' : u.speakerRole == 'B' ? 'B（店員）' : u.speakerRole;
-                  final isCurrent = i == currentIndex;
+                  final isCurrent = i == currentIndex;  // 再生中のフレーズと同期
                   return InkWell(
                     onTap: () => onJumpTo(i),
                     borderRadius: BorderRadius.circular(12),
@@ -1358,6 +1563,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
             ),
           ],
         ),
+      );
+            },
+          );
+        },
       ),
     );
   }
