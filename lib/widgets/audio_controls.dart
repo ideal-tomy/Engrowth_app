@@ -27,6 +27,8 @@ class AudioControls extends StatefulWidget {
   final VoidCallback? onPlayFullEnglish;
   /// 会話モード時：録音完了時のコールバック（自動進行用）
   final VoidCallback? onRecordingComplete;
+  /// 録音完了後のSnackBarメッセージ（例文学習向けに簡潔な案内を指定可能）
+  final String? recordingCompleteMessage;
 
   const AudioControls({
     super.key,
@@ -40,6 +42,7 @@ class AudioControls extends StatefulWidget {
     this.hideJapaneseButton = false,
     this.onPlayFullEnglish,
     this.onRecordingComplete,
+    this.recordingCompleteMessage,
   });
 
   @override
@@ -178,9 +181,12 @@ class _AudioControlsState extends State<AudioControls> {
               if (mounted && submission != null) {
                 _lastSubmissionId = submission.id;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('練習として保存しました。聴き直して「先生に送る」で提出できます。'),
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: Text(
+                      widget.recordingCompleteMessage ??
+                          '練習として保存しました。聴き直して「先生に送る」で提出できます。',
+                    ),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               }

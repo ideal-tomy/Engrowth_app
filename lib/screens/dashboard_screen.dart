@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
+import '../providers/sentence_provider.dart';
 import '../widgets/scenario_background.dart';
 
 /// Dashboard（Home タブ）
@@ -27,6 +28,8 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     const _ResumeLearningCard(),
+                    const SizedBox(height: 6),
+                    const _RecommendedCard(),
                     const SizedBox(height: 6),
                     _MainTilesGrid(),
                   ],
@@ -113,6 +116,93 @@ class _DashboardHeader extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RecommendedCard extends ConsumerWidget {
+  const _RecommendedCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recommendedAsync = ref.watch(recommendedSentenceProvider);
+    return recommendedAsync.when(
+      data: (sentence) {
+        if (sentence == null) return const SizedBox.shrink();
+        final preview = sentence.englishText.length > 30
+            ? '${sentence.englishText.substring(0, 30)}...'
+            : sentence.englishText;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.push('/study?sentenceId=${sentence.id}');
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: EngrowthColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, size: 20, color: Colors.amber[700]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '次に学習: $preview',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: EngrowthColors.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      context.push('/study?sentenceId=${sentence.id}');
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      '学習を始める',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: EngrowthColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

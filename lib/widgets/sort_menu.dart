@@ -10,7 +10,6 @@ class SortMenu extends ConsumerWidget {
     final sortOrder = ref.watch(wordSortOrderProvider);
 
     return PopupMenuButton<WordSortOrder>(
-      icon: const Icon(Icons.sort),
       tooltip: 'ソート',
       onSelected: (value) {
         ref.read(wordSortOrderProvider.notifier).state = value;

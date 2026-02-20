@@ -8,10 +8,12 @@ import '../providers/conversation_provider.dart';
 import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
+import '../services/learning_completion_orchestrator.dart';
 
 import '../theme/engrowth_theme.dart';
 import '../widgets/audio_controls.dart';
 import '../widgets/bottom_interaction_bar.dart';
+import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 
 /// 会話学習画面（音声メイン）
@@ -210,6 +212,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         sessionId: _sessionId,
         role: _mode == 'roleA' ? 'A' : 'B',
       );
+      unawaited(LearningCompletionOrchestrator.onLearningCompleted(ref, context));
     }
   }
 
@@ -322,7 +325,6 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       });
       _transcriptIsPlayingNotifier?.value = false;
       if (!wasStoppedByUser && showPromptOnComplete) {
-        _showNextActionDialog(utterances);
         final userId = Supabase.instance.client.auth.currentUser?.id;
         if (userId != null) {
           _learningEvents.logListenCompleted(
@@ -330,7 +332,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
             conversationId: widget.conversationId,
             sessionId: _sessionId,
           );
+          await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
         }
+        if (mounted) _showNextActionDialog(utterances);
       }
     }
   }
@@ -581,13 +585,18 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
     return Stack(
       children: [
-        // 背景画像（全シチュエーションで仮設定）
+        // 背景画像（thumbnail_urlがあれば会話に合わせた画像、なければデフォルト）
         Positioned.fill(
-            child: Image.asset(
-            kScenarioBgAsset,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
-          ),
+          child: conversation.thumbnailUrl != null
+              ? OptimizedImage(
+                  imageUrl: conversation.thumbnailUrl!,
+                  fit: BoxFit.cover,
+                )
+              : Image.asset(
+                  kScenarioBgAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+                ),
         ),
         // 暗いオーバーレイ（テキスト可読性向上）
         Positioned.fill(
@@ -644,7 +653,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
           child: Column(
             children: [
               // AppBar + プログレスバー（アニメーション付き）
-              _buildAppBar(context),
+              _buildAppBar(context, conversation.title),
               _buildProgressBar(total),
               // 中央：現在の発話のみ表示（スクロール不要）
               Expanded(
@@ -669,7 +678,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context, String conversationTitle) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
@@ -710,7 +719,18 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
               ),
             ),
           ],
-          const Spacer(),
+          Expanded(
+            child: Text(
+              conversationTitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
           // 役モードでは音のみ学習のためテキスト表示は下部のフォールバックのみ
           if (_mode == 'listen')
             IconButton(

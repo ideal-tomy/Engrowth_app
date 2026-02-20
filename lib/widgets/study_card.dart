@@ -387,17 +387,26 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                           ),
                         ),
                   
-                      // 操作ボタンエリア（画像の下）
+                      // 操作ボタンエリア（画像の下）- まず音声から想起を促す
                       if (!_showAnswer)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          child: TextButton.icon(
-                            onPressed: _onAnswerShown,
-                            icon: const Icon(Icons.translate),
-                            label: const Text('答えを見る'),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            ),
+                          child: Column(
+                            children: [
+                              Text(
+                                '思い出せなかったら',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                              const SizedBox(height: 4),
+                              TextButton.icon(
+                                onPressed: _onAnswerShown,
+                                icon: const Icon(Icons.translate, size: 18),
+                                label: const Text('答えを見る'),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       
@@ -409,12 +418,30 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
               ),
             ),
         
-          // 音声操作エリア（ボタンエリアの上）
-          AudioControls(
-            englishText: widget.sentence.englishText,
-            japaneseText: widget.sentence.japaneseText,
-            sentenceId: widget.sentence.id,
-            sessionId: _sessionId,
+          // 音声操作エリア（音声ファースト導線：聞く→思い出す→録音→次へ）
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!_showAnswer)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(
+                    '聞く → 思い出す → 録音 → 次へ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              AudioControls(
+                englishText: widget.sentence.englishText,
+                japaneseText: widget.sentence.japaneseText,
+                sentenceId: widget.sentence.id,
+                sessionId: _sessionId,
+                recordingCompleteMessage: '録音完了。次へ進むか「覚えた！」で完了',
+                hideJapaneseButton: true,
+              ),
+            ],
           ),
         
           // ボタンエリア（画面下部に固定・共通UX規約）

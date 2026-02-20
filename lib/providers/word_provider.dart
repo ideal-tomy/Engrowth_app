@@ -43,7 +43,8 @@ enum WordFilterType {
 }
 
 final wordFilterProvider = StateProvider<WordFilterType>((ref) => WordFilterType.all);
-final selectedPartOfSpeechProvider = StateProvider<String?>((ref) => null);
+/// アルファベット頭文字で絞り込み（'a'～'z'、null で全件）
+final selectedLetterProvider = StateProvider<String?>((ref) => null);
 final selectedGroupProvider = StateProvider<String?>((ref) => null);
 
 // ソート順
@@ -61,20 +62,19 @@ final wordSortOrderProvider = StateProvider<WordSortOrder>((ref) => WordSortOrde
 // フィルタリングとソートを適用した単語リスト
 final filteredAndSortedWordsProvider = FutureProvider<List<Word>>((ref) async {
   final searchQuery = ref.watch(debouncedSearchProvider);
-  // final filterType = ref.watch(wordFilterProvider); // 将来的に使用
-  final partOfSpeech = ref.watch(selectedPartOfSpeechProvider);
+  final letter = ref.watch(selectedLetterProvider);
   final group = ref.watch(selectedGroupProvider);
   final sortOrder = ref.watch(wordSortOrderProvider);
 
-  // 単語を取得
   var words = await SupabaseService.getWords(
     searchQuery: searchQuery,
     wordGroup: group,
   );
 
-  // 品詞フィルタ
-  if (partOfSpeech != null && partOfSpeech.isNotEmpty) {
-    words = words.where((w) => w.partOfSpeech == partOfSpeech).toList();
+  // アルファベット頭文字フィルタ
+  if (letter != null && letter.isNotEmpty) {
+    final lower = letter.toLowerCase();
+    words = words.where((w) => w.word.isNotEmpty && w.word[0].toLowerCase() == lower).toList();
   }
 
   // 学習状況フィルタ（将来的に実装）
@@ -103,14 +103,29 @@ final filteredAndSortedWordsProvider = FutureProvider<List<Word>>((ref) async {
   return words;
 });
 
-// 品詞リスト
-final partOfSpeechListProvider = FutureProvider<List<String>>((ref) async {
+/// 頭文字でフィルタ可能なアルファベット一覧（単語に存在する頭文字のみ）
+final availableLettersProvider = FutureProvider<List<String>>((ref) async {
   final words = await ref.watch(wordsProvider.future);
-  final partOfSpeeches = words
-      .where((w) => w.partOfSpeech != null && w.partOfSpeech!.isNotEmpty)
-      .map((w) => w.partOfSpeech!)
+  final letters = words
+      .where((w) => w.word.isNotEmpty)
+      .map((w) => w.word[0].toLowerCase())
       .toSet()
       .toList();
-  partOfSpeeches.sort();
-  return partOfSpeeches;
+  letters.sort();
+  return letters;
+});
+
+/// フィルタ・ソート済み単語を頭文字でグループ化（アコーディオン用）
+final wordsGroupedByLetterProvider = FutureProvider<Map<String, List<Word>>>((ref) async {
+  final words = await ref.watch(filteredAndSortedWordsProvider.future);
+  final map = <String, List<Word>>{};
+  for (final w in words) {
+    if (w.word.isEmpty) continue;
+    final letter = w.word[0].toLowerCase();
+    map.putIfAbsent(letter, () => []).add(w);
+  }
+  for (final list in map.values) {
+    list.sort((a, b) => a.word.compareTo(b.word));
+  }
+  return map;
 });

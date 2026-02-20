@@ -9,6 +9,7 @@ import '../providers/progress_provider.dart';
 import '../providers/user_stats_provider.dart';
 import '../services/scenario_service.dart';
 import '../services/learning_service.dart';
+import '../services/learning_completion_orchestrator.dart';
 import '../models/hint_phase.dart';
 
 /// シナリオ学習画面
@@ -97,7 +98,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
           }
 
           if (_currentIndex >= sentences.length) {
-            _markScenarioCompleted();
+            _markScenarioCompleted(sentences.length - 1);
             return SafeArea(
               child: Center(
                 child: Column(
@@ -131,11 +132,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
           return SafeArea(
             child: StudyCard(
             sentence: currentSentence,
-            onMastered: () {
-              // ストリークとミッション進捗を更新
-              ref.read(userStatsNotifierProvider.notifier).updateStreak();
-              ref.read(userStatsNotifierProvider.notifier).incrementDailyDone();
-              
+            onMastered: () async {
               _logLearning(
                 sentenceId: currentSentence.id,
                 hintPhase: HintPhase.none,
@@ -144,11 +141,20 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
                 mastered: true,
                 answerShown: false,
               );
-              progressNotifier.updateProgress(
+              await progressNotifier.updateProgress(
                 sentenceId: currentSentence.id,
                 isMastered: true,
               );
-              _nextSentence(sentences.length);
+
+              // 最後の文の場合、シナリオ完了を先にDB反映
+              final isLastSentence = _currentIndex == sentences.length - 1;
+              if (isLastSentence) {
+                await _markScenarioCompleted(sentences.length - 1);
+              }
+
+              await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+
+              if (mounted) _nextSentence(sentences.length);
             },
             onNext: () {
               _logLearning(
@@ -210,7 +216,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
     }
   }
 
-  Future<void> _markScenarioCompleted() async {
+  Future<void> _markScenarioCompleted([int? stepIndex]) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
@@ -219,7 +225,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
       await service.updateProgress(
         userId: userId,
         scenarioId: widget.scenarioId,
-        stepIndex: _currentIndex,
+        stepIndex: stepIndex ?? _currentIndex,
         completed: true,
       );
     } catch (e) {

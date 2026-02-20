@@ -74,11 +74,17 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/study',
-      builder: (context, state) => const StudyScreen(),
+      builder: (context, state) {
+        final sentenceId = state.uri.queryParameters['sentenceId'];
+        return StudyScreen(initialSentenceId: sentenceId);
+      },
     ),
     GoRoute(
       path: '/sentences',
-      builder: (context, state) => const SentenceListScreen(),
+      builder: (context, state) {
+        final word = state.uri.queryParameters['word'];
+        return SentenceListScreen(initialWord: word);
+      },
     ),
     GoRoute(
       path: '/search',

@@ -19,6 +19,15 @@ final masteredCountProvider = FutureProvider<int>((ref) async {
   return await SupabaseService.getMasteredCount(userId);
 });
 
+/// 既習可視化用: 習得済み sentence IDs の Set
+final masteredSentenceIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final progressList = await ref.watch(userProgressProvider.future);
+  return progressList
+      .where((p) => p.isMastered)
+      .map((p) => p.sentenceId)
+      .toSet();
+});
+
 final progressNotifierProvider = StateNotifierProvider<ProgressNotifier, AsyncValue<void>>((ref) {
   return ProgressNotifier(ref);
 });

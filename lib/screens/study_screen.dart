@@ -7,15 +7,14 @@ import '../widgets/review_card.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/user_stats_provider.dart';
-import '../providers/achievement_provider.dart';
 import '../services/learning_service.dart';
-import '../services/achievement_service.dart';
-import '../services/scenario_service.dart';
-import '../widgets/achievement_unlock_dialog.dart';
+import '../services/learning_completion_orchestrator.dart';
 import '../models/hint_phase.dart';
 
 class StudyScreen extends ConsumerStatefulWidget {
-  const StudyScreen({super.key});
+  final String? initialSentenceId;
+
+  const StudyScreen({super.key, this.initialSentenceId});
 
   @override
   ConsumerState<StudyScreen> createState() => _StudyScreenState();
@@ -44,7 +43,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sentencesAsync = ref.watch(studySentencesProvider);
+    final sentencesAsync = ref.watch(studySentencesFromProvider(widget.initialSentenceId));
     final progressNotifier = ref.read(progressNotifierProvider.notifier);
 
     return Scaffold(
@@ -58,6 +57,11 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           tooltip: '終了',
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.home),
+            onPressed: () => context.go('/home'),
+            tooltip: 'Home へ',
+          ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () {
@@ -144,6 +148,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           Expanded(
             child: sentencesAsync.when(
               data: (sentences) {
+                // studySentencesFromProvider が sentenceId に応じて既に並べ替え済み。常に _currentIndex=0 から開始。
                 if (sentences.isEmpty) {
                   return const Center(
                     child: Column(
@@ -181,12 +186,8 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                 return StudyCard(
                   sentence: currentSentence,
                   onMastered: () async {
-                    // ストリークとミッション進捗を更新
-                    ref.read(userStatsNotifierProvider.notifier).updateStreak();
-                    ref.read(userStatsNotifierProvider.notifier).incrementDailyDone();
-                    
                     final usedHint = _learningLogs[currentSentence.id]?['used_hint'] ?? false;
-                    
+
                     _logLearning(
                       sentenceId: currentSentence.id,
                       hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
@@ -195,16 +196,15 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                       mastered: true,
                       answerShown: false,
                     );
-                    progressNotifier.updateProgress(
+                    await progressNotifier.updateProgress(
                       sentenceId: currentSentence.id,
                       isMastered: true,
                     );
-                    
-                    // バッジ解除チェック
-                    await _checkAchievements(context, usedHint: usedHint);
-                    
-                    _showSnackBar(context, '覚えた！');
-                    _nextSentence(sentences.length);
+
+                    await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+
+                    if (mounted) _showSnackBar(context, '覚えた！');
+                    if (mounted) _nextSentence(sentences.length);
                   },
                   onNext: () {
                     _logLearning(
@@ -303,70 +303,6 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
         duration: const Duration(seconds: 1),
       ),
     );
-  }
-
-  Future<void> _checkAchievements(BuildContext context, {required bool usedHint}) async {
-    try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
-
-      // 統計情報を取得
-      final stats = await ref.read(userStatsProvider.future);
-      
-      // 進捗情報を取得
-      final progressList = await ref.read(userProgressProvider.future);
-      final masteredCount = progressList.where((p) => p.isMastered).length;
-      
-      // シナリオ完了数を取得
-      final scenarioService = ScenarioService();
-      final scenarios = await scenarioService.getScenarios();
-      int completedScenarios = 0;
-      for (final scenario in scenarios) {
-        final progress = await scenarioService.getUserProgress(userId, scenario.id);
-        if (progress?.isCompleted == true) {
-          completedScenarios++;
-        }
-      }
-      
-      // ヒントなし正解数を取得（簡易版：user_progressから取得）
-      final hintFreeCount = progressList
-          .where((p) => p.isMastered && !p.usedHintToMaster)
-          .length;
-
-      // バッジ解除チェック
-      final achievementService = AchievementService();
-      final newlyUnlocked = await achievementService.checkAndUnlockAchievements(
-        userId: userId,
-        streakCount: stats.streakCount,
-        sentenceCount: masteredCount,
-        scenarioCount: completedScenarios,
-        hintFreeCount: hintFreeCount,
-      );
-
-      // 新しく解除されたバッジがあれば演出を表示
-      if (newlyUnlocked.isNotEmpty && mounted) {
-        final achievements = await ref.read(achievementsProvider.future);
-        
-        for (final achievementId in newlyUnlocked) {
-          final achievement = achievements.firstWhere((a) => a.id == achievementId);
-          if (mounted) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AchievementUnlockDialog(achievement: achievement),
-            );
-            // 2秒後に自動で閉じる
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted && Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-            });
-          }
-        }
-      }
-    } catch (e) {
-      print('Error checking achievements: $e');
-    }
   }
 
   void _showExitConfirmation(BuildContext context) {
