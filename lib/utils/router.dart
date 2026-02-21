@@ -15,6 +15,7 @@ import '../screens/scenario_study_screen.dart';
 import '../screens/conversation_list_screen.dart';
 import '../screens/conversation_study_screen.dart';
 import '../screens/scenario_learning_screen.dart';
+import '../screens/story_study_screen.dart';
 import '../screens/consultant_dashboard_screen.dart';
 
 final appRouter = GoRouter(
@@ -139,6 +140,13 @@ final appRouter = GoRouter(
         final conversationId = state.pathParameters['id']!;
         final mode = state.uri.queryParameters['mode'] ?? 'listen';  // listen, roleA, roleB
         return ConversationStudyScreen(conversationId: conversationId, initialMode: mode);
+      },
+    ),
+    GoRoute(
+      path: '/story/:id',
+      builder: (context, state) {
+        final storyId = state.pathParameters['id']!;
+        return StoryStudyScreen(storyId: storyId);
       },
     ),
     GoRoute(

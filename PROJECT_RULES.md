@@ -80,3 +80,12 @@
 - タグを使用してバージョン管理
 - リリースノートを作成
 - 変更内容を明確に記載
+
+## 3分英会話ストーリー生成（参照ルール）
+
+3分英会話を生成する際は以下に従う。詳細は `docs/prompts/3min_story_generation_rules.md` を参照。
+
+- **単語リスト**: `Engrowthアプリ英単語データ - 本番用 (1).csv` または `assets/csv/words_master_1000.csv`、`words_slot_*.csv`
+- **仕様**: 1ストーリー＝約300〜450語、指定単語から10〜15語を自然に組み込む
+- **出力**: story_sequences → conversations（story_sequence_id, story_order）→ conversation_utterances の INSERT SQL
+- **スロット管理**: 50語単位で区切り、重複を抑制。`docs/slot_usage_template.csv` で使用済みを記録

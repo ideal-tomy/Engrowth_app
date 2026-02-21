@@ -50,5 +50,4 @@
 - 複雑なビジネスルールは、該当ファイルの先頭か関数直上に短いコメントで理由を残すとよい。
 
 # 3分英会話ストーリー生成
-- 単語リスト（`assets/csv/words_master_1000.csv` または `words_slot_*.csv`）を元に、3分英会話を生成する際は `docs/prompts/3min_story_generation_rules.md` を必ず参照する。
-- 出力は story_sequences → conversations → conversation_utterances の INSERT SQL 形式とし、Supabase SQL Editor で実行可能にする。
+- ルールは PROJECT_RULES.md（プロジェクトルール）の「3分英会話ストーリー生成」セクションを参照。

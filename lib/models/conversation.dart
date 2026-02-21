@@ -2,6 +2,8 @@
 class Conversation {
   final String id;
   final String? scenarioId;
+  final String? storySequenceId;  // 3分ストーリーに属する場合
+  final int? storyOrder;           // ストーリー内の順序（1,2,3...）
   final String title;
   final String? description;
   final String? situationType;  // 'student', 'business'
@@ -14,6 +16,8 @@ class Conversation {
   Conversation({
     required this.id,
     this.scenarioId,
+    this.storySequenceId,
+    this.storyOrder,
     required this.title,
     this.description,
     this.situationType,
@@ -24,10 +28,15 @@ class Conversation {
     required this.updatedAt,
   });
 
+  /// 3分ストーリーの1チャンクかどうか
+  bool get isPartOfStory => storySequenceId != null && storySequenceId!.isNotEmpty;
+
   factory Conversation.fromJson(Map<String, dynamic> json) {
     return Conversation(
       id: json['id'] as String,
       scenarioId: json['scenario_id'] as String?,
+      storySequenceId: json['story_sequence_id'] as String?,
+      storyOrder: json['story_order'] as int?,
       title: json['title'] as String,
       description: json['description'] as String?,
       situationType: json['situation_type'] as String?,
@@ -43,6 +52,8 @@ class Conversation {
     return {
       'id': id,
       'scenario_id': scenarioId,
+      'story_sequence_id': storySequenceId,
+      'story_order': storyOrder,
       'title': title,
       'description': description,
       'situation_type': situationType,

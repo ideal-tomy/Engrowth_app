@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
+import '../providers/story_provider.dart';
 import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
@@ -58,8 +59,14 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   @override
   void initState() {
     super.initState();
-    // ①会話を聞いてから②A/B役の流れを徹底するため、常に listen から開始
-    _mode = 'listen';
+    // 次のパートから遷移した場合は roleA/roleB を維持し、それ以外は listen から開始
+    final m = widget.initialMode;
+    if (m == 'roleA' || m == 'roleB') {
+      _mode = m;
+      _hasListenedToAll = true;
+    } else {
+      _mode = 'listen';
+    }
     _initializeSession();
     _ttsService.initialize();
     _pulseController = AnimationController(
@@ -214,6 +221,49 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       );
       unawaited(LearningCompletionOrchestrator.onLearningCompleted(ref, context));
     }
+    unawaited(_maybeShowStoryNextPartDialog());
+  }
+
+  Future<String?> _getNextConversationIdInStory() async {
+    try {
+      final cwu = await ref.read(conversationWithUtterancesProvider(widget.conversationId).future);
+      final conv = cwu.conversation;
+      if (!conv.isPartOfStory || conv.storySequenceId == null) return null;
+      final list = await ref.read(storyConversationsProvider(conv.storySequenceId!).future);
+      final idx = list.indexWhere((c) => c.id == conv.id);
+      if (idx >= 0 && idx < list.length - 1) return list[idx + 1].id;
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _maybeShowStoryNextPartDialog() async {
+    final nextId = await _getNextConversationIdInStory();
+    if (!mounted) return;
+    if (nextId == null) return;
+    final roleMode = _mode;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('このパート完了'),
+        content: const Text(
+          '次のパートに進んで、3分間通しで練習できます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ストーリー完了'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.push('/conversation/$nextId?mode=$roleMode');
+            },
+            child: const Text('次のパートへ'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _initializeSession() {
@@ -324,7 +374,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         if (!wasStoppedByUser) _hasListenedToAll = true;
       });
       _transcriptIsPlayingNotifier?.value = false;
-      if (!wasStoppedByUser && showPromptOnComplete) {
+        if (!wasStoppedByUser && showPromptOnComplete) {
         final userId = Supabase.instance.client.auth.currentUser?.id;
         if (userId != null) {
           _learningEvents.logListenCompleted(
@@ -334,7 +384,17 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
           );
           await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
         }
-        if (mounted) _showNextActionDialog(utterances);
+        String? nextId;
+        try {
+          final cwu = await ref.read(conversationWithUtterancesProvider(widget.conversationId).future);
+          final conv = cwu.conversation;
+          if (conv.isPartOfStory && conv.storySequenceId != null) {
+            final list = await ref.read(storyConversationsProvider(conv.storySequenceId!).future);
+            final idx = list.indexWhere((c) => c.id == conv.id);
+            if (idx >= 0 && idx < list.length - 1) nextId = list[idx + 1].id;
+          }
+        } catch (_) {}
+        if (mounted) _showNextActionDialog(utterances, nextConversationId: nextId);
       }
     }
   }
@@ -358,7 +418,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         _mode == 'roleB' && utterance.speakerRole == 'B';
   }
 
-  void _showNextActionDialog(List<ConversationUtterance> utterances) {
+  void _showNextActionDialog(List<ConversationUtterance> utterances, {String? nextConversationId}) {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -387,18 +447,74 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 20),
+              if (nextConversationId != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      context.push('/conversation/$nextConversationId?mode=listen');
+                    },
+                    icon: const Icon(Icons.skip_next, size: 20),
+                    label: const Text('次のパートを聴く（3分連続）'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: EngrowthColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      context.push('/conversation/$nextConversationId?mode=roleA');
+                    },
+                    icon: const Icon(Icons.person, size: 18),
+                    label: const Text('次のパートでA役'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: EngrowthColors.roleA),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      context.push('/conversation/$nextConversationId?mode=roleB');
+                    },
+                    icon: const Icon(Icons.person_outline, size: 18),
+                    label: const Text('次のパートでB役'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: EngrowthColors.roleB),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: () {
                     Navigator.of(ctx).pop();
                     _playAllConversation(utterances);
                   },
                   icon: const Icon(Icons.replay, size: 20),
                   label: const Text('もう一度全体を聴く'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: EngrowthColors.primary,
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white38),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),

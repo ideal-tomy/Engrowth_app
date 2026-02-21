@@ -173,13 +173,12 @@ class _QuickStartCtaBar extends ConsumerWidget {
         Expanded(
           child: _QuickStartButton(
             label: '3分',
-            sublabel: '集中学習',
+            sublabel: '英会話',
             icon: Icons.auto_stories,
             onTap: () {
               HapticFeedback.selectionClick();
-              ref.read(sessionModeProvider.notifier).state = LearningSessionMode.focus3;
               ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'focus3');
-              context.push('/study?sessionMode=focus3');
+              context.push('/scenario-learning');
             },
           ),
         ),

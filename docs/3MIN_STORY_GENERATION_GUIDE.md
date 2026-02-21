@@ -2,10 +2,18 @@
 
 1000単語マスターリストを前提に、重複を抑えつつ3分英会話を生成し、Supabase に投入するまでの手順です。
 
+## 3分英会話の趣旨（建て付け）
+
+- **メイン**: **3分間続く1本の英会話**を、1つのシチュエーションで作成する。ユーザーはその一続きの会話を音声で聴き・暗記し、英会話に慣れて習得していく。
+- **1ストーリー = 1シチュエーション = 約3分（300〜450語）の連続したやり取り**。例: 「カフェでの注文」「初めての挨拶」など、場面が一つに決まっている一続きの対話。
+- **チャンク（分割）について**: データ上は1ストーリーを **3〜5個のチャンク**（conversations）に分けて登録している。**全部つなげると約3分の1本**になる。チャンクは「3分を一度に覚えにくい人向けに、区切って聴いたり練習したりする」ための分割であり、**本質はあくまで3分の一続きの会話**である。
+- アプリの「3分ストーリー」では、**1枚のカード = 1本の3分ストーリー**。タップするとそのストーリーの最初（または続き）から再生でき、「次のパートを聴く」で最後まで聴けば3分通しになる。
+
 ## 前提
 
-- 単語リスト: [assets/csv/words_master_1000.csv](../assets/csv/words_master_1000.csv) に1000語を登録
+- 単語リスト: `Engrowthアプリ英単語データ - 本番用 (1).csv`（プロジェクトルート）または [assets/csv/words_master_1000.csv](../assets/csv/words_master_1000.csv)
 - プロンプト定義: [docs/prompts/3min_story_generation_rules.md](prompts/3min_story_generation_rules.md)
+- プロジェクトルール: [PROJECT_RULES.md](../PROJECT_RULES.md) の「3分英会話ストーリー生成」セクション
 - DB: `story_sequences`, `conversations`, `conversation_utterances` テーブル（マイグレーション済み）
 
 ## クイックスタート
@@ -46,8 +54,20 @@ dart run scripts/split_words_into_slots.dart
 ### 5. Supabaseへ投入
 
 1. Supabase Dashboard → SQL Editor を開く
-2. 生成された INSERT SQL を貼り付け
-3. 実行
+2. 生成された INSERT SQL を貼り付け、または `supabase/migrations/seed_story_*.sql` を実行
+3. 1本ずつ実行し、一覧表示・再生・再開が崩れないか確認後、残りを投入
+
+**注意**: 「3分ストーリー」として表示されるのは、**story_sequences に登録し、その story_sequence_id を付けた conversations（チャンク）だけ**です。30秒程度の単発会話を conversations にだけ入れても story_sequence_id が無いと3分ストーリー一覧には出ません。**必ず「1本の3分会話」として story_sequences 1件 + 複数 conversations（チャンク）をセットで投入**してください。
+
+**9本一括投入の手順（推奨）**
+
+1. Supabase Dashboard → SQL Editor を開く
+2. 次の順に1本ずつ実行し、アプリで一覧・再生・再開を確認してから次へ：
+   - 既存: `supabase/migrations/seed_story_coffee_shop.sql`（カフェ01）
+   - 挨拶: `seed_story_greeting_01.sql`, `02.sql`, `03.sql`
+   - ホテル: `seed_story_hotel_01.sql`, `02.sql`, `03.sql`
+   - カフェ: `seed_story_cafe_02.sql`, `03.sql`
+3. 全9本投入後、ストーリー一覧に表示されることを確認
 
 ## スロット管理
 
@@ -70,7 +90,47 @@ dart run scripts/split_words_into_slots.dart
 出力は各ストーリーについて、JSON と Supabase用 INSERT SQL を生成してください。
 ```
 
+## 雛形運用（差し替え項目リスト）
+
+`seed_story_coffee_shop.sql` を基準に、次を差し替えて新規ストーリーを作成する。
+
+| 項目 | 例 | 説明 |
+|------|-----|------|
+| ストーリータイトル | カフェでの注文 | story_sequences.title |
+| ストーリー説明 | カフェでコーヒーとサンドイッチを... | story_sequences.description |
+| 使用単語レンジ | 30-155 | コメント・検証用 |
+| チャンク1〜4の title | 挨拶と注文の開始 等 | conversations.title |
+| チャンク1〜4の description | 店に入り、注文を始める 等 | conversations.description |
+| theme | 挨拶 / ホテル / カフェ | conversations.theme |
+| situation_type | student | conversations.situation_type |
+| 会話本文（A/B役） | english_text, japanese_text | conversation_utterances |
+
+### 命名規約
+- `seed_story_<theme>_<nn>.sql`（例: seed_story_greeting_01.sql, seed_story_hotel_02.sql）
+
+### テーマ別単語レンジ割当（重複抑制）
+- 挨拶01: 1-50、挨拶02: 51-100、挨拶03: 101-150
+- ホテル01: 151-200、ホテル02: 201-250、ホテル03: 251-300
+- カフェ01: 既存（30-155）、カフェ02: 301-350、カフェ03: 351-400
+
+## 9本ストーリー検証結果（テーマ別3分英会話量産）
+
+| ファイル | テーマ | 単語レンジ | 形式 | チャンク数 |
+|----------|--------|------------|------|------------|
+| seed_story_coffee_shop.sql | カフェ | 30-155 | OK | 4 |
+| seed_story_greeting_01.sql | 挨拶 | 1-50 | OK | 4 |
+| seed_story_greeting_02.sql | 挨拶 | 51-100 | OK | 4 |
+| seed_story_greeting_03.sql | 挨拶 | 101-150 | OK | 4 |
+| seed_story_hotel_01.sql | ホテル | 151-200 | OK | 4 |
+| seed_story_hotel_02.sql | ホテル | 201-250 | OK | 4 |
+| seed_story_hotel_03.sql | ホテル | 251-300 | OK | 4 |
+| seed_story_cafe_02.sql | カフェ | 301-350 | OK | 4 |
+| seed_story_cafe_03.sql | カフェ | 351-400 | OK | 4 |
+
+**形式チェック**: story_sequences 1件、conversations 4件、utterance_order 連番、theme 一致済み。
+
 ## 関連ファイル
 
 - [docs/prompts/3min_story_generation_rules.md](prompts/3min_story_generation_rules.md) - AI向けルール定義
 - [assets/csv/README_WORDS_MASTER.md](../assets/csv/README_WORDS_MASTER.md) - 単語リストの説明
+- [supabase/migrations/seed_story_coffee_shop.sql](../supabase/migrations/seed_story_coffee_shop.sql) - 基準雛形

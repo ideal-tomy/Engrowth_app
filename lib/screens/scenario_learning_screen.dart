@@ -224,7 +224,7 @@ class _StorySequenceCard extends ConsumerWidget {
         return conversationsAsync.when(
           data: (conversations) {
             if (conversations.isEmpty) {
-              return _buildCard(context, '準備中', hasResume: false, conversationId: null);
+              return _buildCard(context, '準備中', hasResume: false, conversationId: null, storyId: story.id);
             }
             final firstId = conversations.first.id;
             final resumeId = hasResume ? progress!.lastConversationId! : firstId;
@@ -233,14 +233,15 @@ class _StorySequenceCard extends ConsumerWidget {
               story.title,
               hasResume: hasResume,
               conversationId: resumeId,
+              storyId: story.id,
             );
           },
-          loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null),
-          error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null),
+          loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
+          error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
         );
       },
-      loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null),
-      error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null),
+      loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
+      error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
     );
   }
 
@@ -249,14 +250,13 @@ class _StorySequenceCard extends ConsumerWidget {
     String title, {
     required bool hasResume,
     required String? conversationId,
+    required String storyId,
   }) {
     return GestureDetector(
-      onTap: conversationId != null
-          ? () {
-              HapticFeedback.selectionClick();
-              context.push('/conversation/$conversationId?mode=listen');
-            }
-          : null,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        context.push('/story/$storyId');
+      },
       child: Container(
         width: 160,
         decoration: BoxDecoration(
