@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voice_submission.dart';
+import '../models/feedback_template.dart';
 import '../services/voice_submission_service.dart';
+import '../providers/coach_provider.dart';
 import '../theme/engrowth_theme.dart';
 
 /// コンサルタント用ダッシュボード
@@ -392,6 +394,12 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
             ),
             if (!isReviewed) ...[
               const SizedBox(height: 12),
+              _QuickFeedbackTemplates(
+                onSelect: (text) {
+                  controller.text = text;
+                },
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: controller,
                 maxLines: 3,
@@ -433,5 +441,34 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
     if (diff.inHours < 1) return '${diff.inMinutes}分前';
     if (diff.inDays < 1) return '${diff.inHours}時間前';
     return '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// クイック返信テンプレート（1タップで挿入）
+class _QuickFeedbackTemplates extends ConsumerWidget {
+  final void Function(String text) onSelect;
+
+  const _QuickFeedbackTemplates({required this.onSelect});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(feedbackTemplatesProvider);
+    return async.when(
+      data: (templates) {
+        if (templates.isEmpty) return const SizedBox.shrink();
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: templates.map((t) {
+            return ActionChip(
+              label: Text(t.name, style: const TextStyle(fontSize: 12)),
+              onPressed: () => onSelect(t.content),
+            );
+          }).toList(),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 }

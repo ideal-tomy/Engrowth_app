@@ -1,0 +1,54 @@
+# Project Context
+このプロジェクトは Flutter (Dart) と Supabase を使用した英語学習アプリ「ENGROWTH」です。
+
+# Technology Stack
+- Frontend: Flutter (Riverpod / Provider パターン)
+- Backend: Supabase (PostgreSQL, Auth, Edge Functions, Realtime)
+- Infrastructure: Firebase (Hosting)
+- 環境: EnvConfig で Supabase URL/anon key を管理（.env / dart-define）
+
+# Coding Rules
+- 状態管理は Riverpod (Provider パターン) を基本とする。`lib/providers/` に集約する。
+- 新規 Widget は `lib/widgets/` に配置し、再利用性を高める。画面は `lib/screens/`。
+- ロジックは `lib/services/` または `lib/providers/` に集約し、Widget からは呼ぶだけにする。
+- 型定義は厳密に行い、`dynamic` の使用は避ける。必要なら `Map<String, dynamic>` を明示する。
+- 非同期処理は `Future` / `Stream` を適切に使い、try/catch または `.catchError` でエラーハンドリングを必ず行う。
+- Flutter: 変更のない Widget には `const` を付ける。リストアイテムには必要に応じて `Key` を指定する。
+- UI の色・余白・フォントは `lib/theme/engrowth_theme.dart`（EngrowthTheme）を参照し、ハードコードを避ける。
+- Supabase: クエリは `.order()` の前に `.gte()` / `.lte()` / `.eq()` などのフィルタを適用する（Postgrest のビルダー順序に注意）。
+
+# File & Naming
+- ファイル名: スネークケース（例: `voice_submission_service.dart`）。
+- クラス/型: パスカルケース。Widget は PascalCase、ファイル名と一致させることを推奨。
+- 定数・enum は lowerCamelCase または UPPER_SNAKE（定数のみ）。
+- 新規サービスは `lib/services/`、モデルは `lib/models/`、ルートは `lib/app.dart` 周辺を参照して追加する。
+
+# Security & Environment
+- API キー・シークレットはソースに直書きしない。`EnvConfig` と .env / dart-define を使用する。
+- .env は .gitignore 済みである前提で、サンプルのみ .env.example で共有する。
+
+# Efficiency & Token Saving（Cursor 活用）
+- 修正提案は**変更箇所のみ**、または**差分（diff）形式**を優先する。全文を書き直さない。
+- 既に分かっている背景説明は省略し、**具体的な実装コード**を優先して出力する。
+- 変更対象が明確なときは「〇〇ファイルの△△行付近を…」とスコープを限定して指示すると効率的。
+- 大きな変更は「まず設計・手順を簡潔に」→「必要ならファイル単位で実装」の順を推奨。
+- UI の微調整時は `lib/theme/engrowth_theme.dart` および既存の `Theme.of(context)` の使い方を参照する。
+
+# Cursor 運用のコツ（上級者向け）
+- **@ メンション**: 特定ファイル（`@lib/services/foo.dart`）やフォルダを指定すると、コンテキストが絞られ精度が上がる。
+- **スコープを狭める**: 「このファイルだけ」「この関数だけ」と指定すると無駄な読み込みが減る。
+- **差分で返してほしいとき**: 「diff で」「変更部分だけ」と明示すると、長い全文出力を避けられる。
+- **複数ファイルを触る場合**: 一度に全部ではなく「1ファイルずつ」「まず〇〇から」と段階指定すると失敗が減る。
+- **既存パターンに合わせる**: 「〇〇と同じパターンで」「△△を参考に」と書くと、プロジェクトの一貫性が保たれやすい。
+
+# Testing & Debugging
+- テストを書く場合は `test/` に配置し、既存のテストの書き方に合わせる。
+- デバッグ時は `debugPrint` やロガーを活用し、本番ではログレベルを落とす設計を推奨。
+
+# Documentation
+- 公開 API（サービス・Provider・モデルの主要メソッド）には Dart の `///` ドキュメントコメントを付けると、Cursor の補完・説明が効きやすい。
+- 複雑なビジネスルールは、該当ファイルの先頭か関数直上に短いコメントで理由を残すとよい。
+
+# 3分英会話ストーリー生成
+- 単語リスト（`assets/csv/words_master_1000.csv` または `words_slot_*.csv`）を元に、3分英会話を生成する際は `docs/prompts/3min_story_generation_rules.md` を必ず参照する。
+- 出力は story_sequences → conversations → conversation_utterances の INSERT SQL 形式とし、Supabase SQL Editor で実行可能にする。

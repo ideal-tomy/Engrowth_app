@@ -9,10 +9,11 @@ final userStatsServiceProvider = Provider<UserStatsService>((ref) {
 });
 
 /// ユーザー統計情報プロバイダ
+/// 匿名時はデフォルト値を返し、ダッシュボードが正常表示されるようにする
 final userStatsProvider = FutureProvider<UserStats>((ref) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) {
-    throw Exception('ユーザーがログインしていません');
+    return UserStats.anonymous();
   }
 
   final service = ref.read(userStatsServiceProvider);
@@ -37,7 +38,7 @@ class UserStatsNotifier extends StateNotifier<AsyncValue<UserStats>> {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) {
-        state = const AsyncValue.error('ユーザーがログインしていません', StackTrace.empty);
+        state = AsyncValue.data(UserStats.anonymous());
         return;
       }
 

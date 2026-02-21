@@ -53,6 +53,35 @@ class VoiceSubmissionService {
     }).eq('id', submissionId);
   }
 
+  /// ユーザーの音声提出一覧を取得（日付で絞り込み可能）
+  Future<List<VoiceSubmission>> getUserSubmissions({
+    required String userId,
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    try {
+      var query = _client
+          .from('voice_submissions')
+          .select()
+          .eq('user_id', userId);
+
+      if (fromDate != null) {
+        query = query.gte('created_at', fromDate.toIso8601String());
+      }
+      if (toDate != null) {
+        query = query.lte('created_at', toDate.toIso8601String());
+      }
+
+      final response = await query.order('created_at', ascending: false);
+      return (response as List)
+          .map((e) => VoiceSubmission.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('VoiceSubmissionService.getUserSubmissions error: $e');
+      return [];
+    }
+  }
+
   /// 音声の再生用URLを取得（signed URL、1時間有効）
   Future<String?> getSignedPlaybackUrl(String storagePathOrUrl) async {
     if (storagePathOrUrl.startsWith('http')) return storagePathOrUrl;

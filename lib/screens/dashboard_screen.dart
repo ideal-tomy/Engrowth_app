@@ -6,7 +6,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/sentence_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/user_plan_provider.dart';
+import '../providers/session_mode_provider.dart';
+import '../providers/last_study_resume_provider.dart';
+import '../providers/analytics_provider.dart';
+import '../models/learning_session_mode.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
+import '../widgets/dashboard_sections/coach_banner.dart';
+import '../widgets/dashboard_sections/todays_mission_card.dart';
 
 /// Dashboard（Home タブ）
 /// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
@@ -15,6 +24,9 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authStage = ref.watch(authStageProvider);
+    final userPlan = ref.watch(userPlanProvider);
+
     return Scaffold(
       backgroundColor: EngrowthColors.background,
       drawer: const _SettingsDrawer(),
@@ -23,15 +35,32 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             _DashboardHeader(),
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
+                primary: true,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   children: [
-                    const _ResumeLearningCard(),
+                    if (authStage == AuthStage.anonymous) ...[
+                      const AnonymousDataSaveBanner(),
+                      const SizedBox(height: 6),
+                    ],
+                    if (userPlan == UserPlan.coaching) ...[
+                      const CoachBanner(),
+                      const SizedBox(height: 6),
+                      const TodaysMissionCard(),
+                      const SizedBox(height: 6),
+                    ],
+                    const _QuickStartCtaBar(),
                     const SizedBox(height: 6),
+                    SizedBox(
+                      height: 100,
+                      child: const _ResumeLearningCard(),
+                    ),
+                    const SizedBox(height: 4),
                     const _RecommendedCard(),
-                    const SizedBox(height: 6),
-                    _MainTilesGrid(),
+                    const SizedBox(height: 4),
+                    const _MainTilesGrid(),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -115,6 +144,115 @@ class _DashboardHeader extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickStartCtaBar extends ConsumerWidget {
+  const _QuickStartCtaBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickStartButton(
+            label: '30秒',
+            sublabel: '隙間時間',
+            icon: Icons.timer,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(sessionModeProvider.notifier).state = LearningSessionMode.quick30;
+              ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'quick30');
+              context.push('/study?sessionMode=quick30');
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickStartButton(
+            label: '3分',
+            sublabel: '集中学習',
+            icon: Icons.auto_stories,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(sessionModeProvider.notifier).state = LearningSessionMode.focus3;
+              ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'focus3');
+              context.push('/study?sessionMode=focus3');
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickStartButton extends StatelessWidget {
+  final String label;
+  final String sublabel;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _QuickStartButton({
+    required this.label,
+    required this.sublabel,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        splashColor: EngrowthColors.primary.withOpacity(0.2),
+        highlightColor: EngrowthColors.primary.withOpacity(0.08),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: EngrowthColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 6,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 22, color: EngrowthColors.primary),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: EngrowthColors.onSurface,
+                    ),
+                  ),
+                  Text(
+                    sublabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: EngrowthColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -207,19 +345,33 @@ class _RecommendedCard extends ConsumerWidget {
   }
 }
 
-class _ResumeLearningCard extends StatelessWidget {
+class _ResumeLearningCard extends ConsumerWidget {
   const _ResumeLearningCard();
 
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: 2,
-      child: Material(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resumeState = ref.watch(lastStudyResumeProvider);
+    final recommendedAsync = ref.watch(recommendedSentenceProvider);
+    final hasResume = resumeState.sentenceId != null;
+
+    return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
-            context.push('/study');
+            ref.read(analyticsServiceProvider).logResumeCardTap(
+                  source: hasResume ? 'resume' : 'recommended',
+                );
+            if (hasResume) {
+              context.push('/study?sentenceId=${resumeState.sentenceId}');
+            } else {
+              final sentence = recommendedAsync.valueOrNull;
+              if (sentence != null) {
+                context.push('/study?sentenceId=${sentence.id}');
+              } else {
+                context.push('/study');
+              }
+            }
           },
           borderRadius: BorderRadius.circular(16),
           splashColor: EngrowthColors.primary.withOpacity(0.2),
@@ -267,7 +419,7 @@ class _ResumeLearningCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '前回の学習を再開',
+                            hasResume ? '続きから再開' : '前回の学習を再開',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -276,7 +428,7 @@ class _ResumeLearningCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '1タップで続きから',
+                            hasResume ? '1タップで続きから' : '1タップで学習開始',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.9),
@@ -291,12 +443,13 @@ class _ResumeLearningCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
 class _MainTilesGrid extends StatelessWidget {
+  const _MainTilesGrid();
+
   static const _items = [
     _GridItem('会話トレーニング', Icons.record_voice_over, '/scenario-learning'),
     _GridItem('単語検索', Icons.search, '/words'),
@@ -310,10 +463,14 @@ class _MainTilesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      flex: 3,
+    final width = MediaQuery.of(context).size.width - 24;
+    final tileWidth = (width - 12) / 4;
+    final tileHeight = tileWidth / 0.9;
+
+    return SizedBox(
+      height: tileHeight * 2 + 4,
       child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,
           mainAxisSpacing: 4,
           crossAxisSpacing: 4,

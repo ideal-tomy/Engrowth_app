@@ -7,6 +7,7 @@ import '../services/tts_service.dart';
 import '../services/recording_service.dart';
 import '../services/voice_submission_service.dart';
 import '../services/recording_consent_service.dart';
+import '../services/analytics_service.dart';
 import 'recording_waveform.dart';
 
 /// 音声操作コントロール
@@ -266,6 +267,7 @@ class _AudioControlsState extends State<AudioControls> {
     setState(() => _isSubmitting = true);
     try {
       await _submissionService.markAsSubmitted(_lastSubmissionId!);
+      AnalyticsService().logVoiceSubmit();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/progress_provider.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/achievement_provider.dart';
+import '../providers/analytics_provider.dart';
 import '../services/user_stats_service.dart';
 import '../services/achievement_service.dart';
 import '../services/scenario_service.dart';
@@ -38,8 +39,14 @@ class LearningCompletionOrchestrator {
       // 2. 日次ミッション進捗
       await statsNotifier.incrementDailyDone();
 
-      // 3. 統計取得（ストリーク更新後）
+      // 2.5  analytics
+      ref.read(analyticsServiceProvider).logStudyComplete();
       final stats = await statsService.getOrCreateUserStats(userId);
+      if (stats.isMissionCompleted) {
+        ref.read(analyticsServiceProvider).logMissionComplete();
+      }
+
+      // 3. 統計取得（ストリーク更新後）
 
       // 3.5 ストリークマイルストーン（7日/30日）演出
       const milestones = [7, 30];

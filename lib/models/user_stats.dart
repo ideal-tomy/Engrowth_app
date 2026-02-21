@@ -93,4 +93,21 @@ class UserStats {
 
   /// 今日のミッションが達成されたか
   bool get isMissionCompleted => dailyDoneCount >= dailyGoalCount;
+
+  /// 匿名ユーザー用のデフォルト値
+  static UserStats anonymous() {
+    final now = DateTime.now();
+    return UserStats(
+      id: '',
+      userId: 'anonymous',
+      streakCount: 0,
+      dailyGoalCount: 3,
+      dailyDoneCount: 0,
+      dailyResetDate: null,
+      lastStudyDate: null,
+      timezone: 'Asia/Tokyo',
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
 }

@@ -15,7 +15,11 @@ class StudyCard extends ConsumerStatefulWidget {
   final Sentence sentence;
   final VoidCallback? onMastered;
   final VoidCallback? onNext;
-  final Function(HintPhase, int)? onHintUsed; // ヒント使用時のコールバック
+  final Function(HintPhase, int)? onHintUsed;
+  /// セッション内の残り問数（Quick30/Focus3時に表示）
+  final int? remainingCount;
+  /// セッション内の総問数
+  final int? totalInSession;
 
   const StudyCard({
     super.key,
@@ -23,6 +27,8 @@ class StudyCard extends ConsumerStatefulWidget {
     this.onMastered,
     this.onNext,
     this.onHintUsed,
+    this.remainingCount,
+    this.totalInSession,
   });
 
   @override
@@ -387,26 +393,19 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                           ),
                         ),
                   
-                      // 操作ボタンエリア（画像の下）- まず音声から想起を促す
+                      // 操作ボタンエリア（コンパクト化）
                       if (!_showAnswer)
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          child: Column(
-                            children: [
-                              Text(
-                                '思い出せなかったら',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 4),
-                              TextButton.icon(
-                                onPressed: _onAnswerShown,
-                                icon: const Icon(Icons.translate, size: 18),
-                                label: const Text('答えを見る'),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                ),
-                              ),
-                            ],
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          child: TextButton.icon(
+                            onPressed: _onAnswerShown,
+                            icon: const Icon(Icons.visibility_outlined, size: 18),
+                            label: const Text('答えを見る'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                           ),
                         ),
                       
@@ -418,19 +417,40 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
               ),
             ),
         
-          // 音声操作エリア（音声ファースト導線：聞く→思い出す→録音→次へ）
+          // 音声操作エリア（音声ファースト導線：聞く→発話→聴き直し→次へ）
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (!_showAnswer)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Text(
-                    '聞く → 思い出す → 録音 → 次へ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '聞く → 発話 → 聴き直し → 次へ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (widget.remainingCount != null && widget.totalInSession != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '残り${widget.remainingCount}問',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               AudioControls(
@@ -438,7 +458,7 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                 japaneseText: widget.sentence.japaneseText,
                 sentenceId: widget.sentence.id,
                 sessionId: _sessionId,
-                recordingCompleteMessage: '録音完了。次へ進むか「覚えた！」で完了',
+                recordingCompleteMessage: '録音完了。「聴き直す」でお手本と比較→次へ',
                 hideJapaneseButton: true,
               ),
             ],

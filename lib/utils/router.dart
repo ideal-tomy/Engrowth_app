@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/library_hub_screen.dart';
 import '../screens/word_list_screen.dart';
@@ -18,6 +19,13 @@ import '../screens/consultant_dashboard_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/home',
+  redirect: (context, state) {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (state.matchedLocation == '/consultant' && session == null) {
+      return '/home';
+    }
+    return null;
+  },
   routes: [
     // メイン4タブ: Home / Library / Stats / Search
     StatefulShellRoute.indexedStack(
@@ -76,7 +84,11 @@ final appRouter = GoRouter(
       path: '/study',
       builder: (context, state) {
         final sentenceId = state.uri.queryParameters['sentenceId'];
-        return StudyScreen(initialSentenceId: sentenceId);
+        final sessionMode = state.uri.queryParameters['sessionMode'];
+        return StudyScreen(
+          initialSentenceId: sentenceId,
+          initialSessionModeParam: sessionMode,
+        );
       },
     ),
     GoRoute(

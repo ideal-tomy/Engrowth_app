@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/progress_indicator.dart';
+import '../widgets/ring_progress_indicator.dart';
 import '../widgets/streak_display.dart';
+import '../widgets/audio_comparison_player.dart';
 import '../models/achievement.dart';
 import '../widgets/achievement_display.dart' show AchievementBadge;
 import '../providers/progress_provider.dart';
@@ -40,9 +42,11 @@ class ProgressScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 上部：連続日数・今日の達成率・次のメダルまでを集約
+            // 上部：連続日数・リング進捗・今日の達成率・次のメダルまでを集約
             const StreakDisplay(),
+            const _RingProgressSection(),
             const _ProgressSummarySection(),
+            const AudioComparisonPlayer(),
             // バッジ・称号（解除済み/次に狙うを分けて表示）
             achievementsAsync.when(
               data: (achievements) {
@@ -241,6 +245,39 @@ class ProgressScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// リング型の今日の達成率（Nike Run Club風）
+class _RingProgressSection extends ConsumerWidget {
+  const _RingProgressSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(userStatsProvider);
+
+    return statsAsync.when(
+      data: (stats) {
+        final progress = stats.missionProgress;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              RingProgressIndicator(
+                progress: progress,
+                label: '${stats.dailyDoneCount}/${stats.dailyGoalCount}',
+                sublabel: '今日の達成',
+                size: 100,
+                strokeWidth: 10,
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

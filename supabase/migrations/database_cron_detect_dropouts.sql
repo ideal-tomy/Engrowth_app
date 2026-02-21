@@ -1,0 +1,20 @@
+-- pg_cron で detect-dropouts Edge Function を日次実行
+-- 事前: pg_cron, pg_net 拡張を有効化
+-- Supabase Dashboard > Database > Extensions で pg_cron, pg_net を有効にしてください
+--
+-- スケジュール登録例（SQL Editor で実行、プロジェクト固有の URL と KEY に置換）:
+--
+-- SELECT cron.schedule(
+--   'detect-dropouts-daily',
+--   '0 9 * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/detect-dropouts',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY'
+--     ),
+--     body := '{}'
+--   ) AS request_id;
+--   $$
+-- );

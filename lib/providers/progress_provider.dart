@@ -1,11 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_progress.dart';
 import '../services/supabase_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-final currentUserIdProvider = Provider<String?>((ref) {
-  return Supabase.instance.client.auth.currentUser?.id;
-});
+import 'auth_provider.dart';
 
 final userProgressProvider = FutureProvider<List<UserProgress>>((ref) async {
   final userId = ref.watch(currentUserIdProvider);

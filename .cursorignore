@@ -1,0 +1,21 @@
+# ビルド生成物（これらは非常に重く、AIが読む必要はありません）
+build/
+windows/flutter/
+windows/runner/
+.firebase/
+.dart_tool/
+
+# 外部ライブラリ
+node_modules/
+vendor/
+
+# 過去の記録・アーカイブ（古い仕様に引きずられないようにするため）
+docs/archive/
+
+# その他、バイナリやキャッシュ
+*.ico
+*.png
+*.jpg
+*.jpeg
+*.cache
+.git/# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
