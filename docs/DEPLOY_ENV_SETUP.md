@@ -1,15 +1,28 @@
 # デプロイ環境での Supabase 接続について
 
+## クイックチェック（デプロイ後データが出ない場合）
+
+| 確認項目 | ローカル | デプロイ |
+|----------|----------|----------|
+| 単語・センテンス・会話データが表示される | ✓ | ✗ |
+| 3分ストーリーが表示される | ✓ | ✗ |
+| シナリオ学習で「Null check」エラー | - | ✓ |
+
+**→ ほぼ確実に「ビルド時に Supabase の URL/キーが埋め込まれていない」ことが原因です。**
+
+---
+
 ## 現象
 
-- **ローカル** (`flutter run`): データが表示される
-- **デプロイ後** (Firebase Hosting など): 「例文がまだ登録されていません」「単語が見つかりません」など、データが表示されない
+- **ローカル** (`flutter run`): データが表示される（.env を読むため）
+- **デプロイ後** (Firebase Hosting など): 「単語が見つかりません」「センテンスがありません」「3分英会話は準備中です」「Null check operator used on a null value」など
 
 ## 原因
 
 Flutter Web では、Supabase の接続情報（URL・APIキー）を**ビルド時**にコードに埋め込む必要があります。
 
-`flutter build web` を単体で実行すると:
+- `.env` は**ローカル専用**。デプロイ後の Web アプリでは `.env` は読み込まれません。
+- `flutter build web` を単体で実行すると:
 
 - `--dart-define` で渡していない場合、`String.fromEnvironment` は空文字のまま
 - `.env` はアセットとしてビルドに含まれるが、**デプロイ環境では読み込まれない**ことが多い
@@ -97,4 +110,8 @@ flutter build web --release --dart-define=SUPABASE_URL=$env:SUPABASE_URL --dart-
 
 ### Null check エラー
 
-「Null check operator used on a null value」は、Supabase から取得したデータが null のときに `!` でアクセスしている箇所で発生します。デプロイ後も null を前提としたフォールバック処理を入れておくと安全です。
+「Null check operator used on a null value」は、Supabase の接続失敗時や、取得データが null の場合に発生することがあります。コード側で null を前提としたフォールバック処理を追加済みです。根本解決は、**正しいビルドスクリプトで Supabase の URL/キーを埋め込むこと**です。
+
+### 次回デプロイから起動時にエラー表示
+
+`main.dart` にチェックを追加済みです。Supabase の URL/キーが空のままビルドした場合、アプリ起動時に「Supabase の接続情報が設定されていません」というメッセージを表示します。

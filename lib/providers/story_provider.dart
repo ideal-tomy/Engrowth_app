@@ -15,6 +15,13 @@ final storySequencesProvider = FutureProvider<List<StorySequence>>((ref) async {
   return service.getStorySequences();
 });
 
+/// テーマ別にグルーピングした3分ストーリー（専用ページ用）
+final storySequencesByThemeProvider =
+    FutureProvider<Map<String, List<StorySequence>>>((ref) async {
+  final service = ref.read(storyServiceProvider);
+  return service.getStorySequencesGroupedByTheme();
+});
+
 /// ストーリー内の会話一覧
 final storyConversationsProvider =
     FutureProvider.family<List<Conversation>, String>((ref, storyId) async {

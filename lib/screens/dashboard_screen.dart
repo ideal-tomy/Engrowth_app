@@ -8,10 +8,8 @@ import '../providers/user_stats_provider.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_plan_provider.dart';
-import '../providers/session_mode_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
-import '../models/learning_session_mode.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
@@ -163,9 +161,7 @@ class _QuickStartCtaBar extends ConsumerWidget {
             icon: Icons.timer,
             onTap: () {
               HapticFeedback.selectionClick();
-              ref.read(sessionModeProvider.notifier).state = LearningSessionMode.quick30;
-              ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'quick30');
-              context.push('/study?sessionMode=quick30');
+              context.push('/scenario-learning');
             },
           ),
         ),
@@ -178,7 +174,7 @@ class _QuickStartCtaBar extends ConsumerWidget {
             onTap: () {
               HapticFeedback.selectionClick();
               ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'focus3');
-              context.push('/scenario-learning');
+              context.push('/story-training');
             },
           ),
         ),
@@ -450,9 +446,9 @@ class _MainTilesGrid extends StatelessWidget {
   const _MainTilesGrid();
 
   static const _items = [
-    _GridItem('会話トレーニング', Icons.record_voice_over, '/scenario-learning'),
+    _GridItem('会話トレーニング', Icons.record_voice_over, '/conversation-training'),
     _GridItem('単語検索', Icons.search, '/words'),
-    _GridItem('瞬間英作文', Icons.bolt, '/study'),
+    _GridItem('瞬間英作文', Icons.bolt, '/instant-composition'),
     _GridItem('センテンス一覧', Icons.format_list_bulleted, '/sentences'),
     _GridItem('学習進捗', Icons.bar_chart, '/progress'),
     _GridItem('お気に入り', Icons.favorite_border, '/favorites'),

@@ -6,6 +6,7 @@ import '../screens/library_hub_screen.dart';
 import '../screens/word_list_screen.dart';
 import '../screens/sentence_list_screen.dart';
 import '../screens/study_screen.dart';
+import '../screens/instant_composition_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/hint_settings_screen.dart';
 import '../screens/playback_speed_settings_screen.dart';
@@ -15,7 +16,9 @@ import '../screens/scenario_study_screen.dart';
 import '../screens/conversation_list_screen.dart';
 import '../screens/conversation_study_screen.dart';
 import '../screens/scenario_learning_screen.dart';
+import '../screens/conversation_training_choice_screen.dart';
 import '../screens/story_study_screen.dart';
+import '../screens/story_training_screen.dart';
 import '../screens/consultant_dashboard_screen.dart';
 
 final appRouter = GoRouter(
@@ -82,6 +85,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const PlaybackSpeedSettingsScreen(),
     ),
     GoRoute(
+      path: '/instant-composition',
+      builder: (context, state) => const InstantCompositionScreen(),
+    ),
+    GoRoute(
       path: '/study',
       builder: (context, state) {
         final sentenceId = state.uri.queryParameters['sentenceId'];
@@ -113,8 +120,16 @@ final appRouter = GoRouter(
       builder: (context, state) => const ScenarioListScreen(),
     ),
     GoRoute(
+      path: '/conversation-training',
+      builder: (context, state) => const ConversationTrainingChoiceScreen(),
+    ),
+    GoRoute(
       path: '/scenario-learning',
       builder: (context, state) => const ScenarioLearningScreen(),
+    ),
+    GoRoute(
+      path: '/story-training',
+      builder: (context, state) => const StoryTrainingScreen(),
     ),
     GoRoute(
       path: '/scenario/:id',

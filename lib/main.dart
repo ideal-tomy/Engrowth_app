@@ -12,11 +12,21 @@ void main() async {
   // 環境変数の読み込み（.env または dart-define）
   await EnvConfig.load();
 
+  // デプロイ時に Supabase の URL/キーが空だとデータ取得に失敗する
+  final url = EnvConfig.supabaseUrl;
+  final key = EnvConfig.supabaseAnonKey;
+  if (url.isEmpty || key.isEmpty) {
+    throw FlutterError(
+      'Supabase の接続情報が設定されていません。\n\n'
+      'デプロイ時は、ビルド時に --dart-define で渡してください:\n'
+      '  .\\scripts\\build_for_deploy.ps1  （Windows）\n'
+      '  ./scripts/build_for_deploy.sh    （Mac/Linux）\n\n'
+      '詳細: docs/DEPLOY_ENV_SETUP.md',
+    );
+  }
+
   // Supabase初期化
-  await Supabase.initialize(
-    url: EnvConfig.supabaseUrl,
-    anonKey: EnvConfig.supabaseAnonKey,
-  );
+  await Supabase.initialize(url: url, anonKey: key);
 
   // 音声再生速度をローカルから読み込み
   final speed = await PlaybackSpeedService.getSpeed();

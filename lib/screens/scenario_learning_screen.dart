@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/scenario_categories.dart';
 import '../models/conversation.dart';
-import '../models/story_sequence.dart';
 import '../providers/conversation_provider.dart';
-import '../providers/story_provider.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
@@ -63,9 +61,6 @@ class ScenarioLearningScreen extends ConsumerWidget {
       body: dataAsync.when(
         data: (byCategory) {
           final items = <Widget>[];
-          // 3分ストーリーセクション（最上段・再開ファースト）
-          items.add(const _StorySectionHeader());
-          items.add(const SizedBox(height: 16));
           for (final category in kScenarioCategories) {
             final subsections = byCategory[category.id] ?? [];
             for (final sub in subsections) {
@@ -105,248 +100,6 @@ class ScenarioLearningScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 3分ストーリーセクション（再開ファースト）
-class _StorySectionHeader extends ConsumerWidget {
-  const _StorySectionHeader();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final storiesAsync = ref.watch(storySequencesProvider);
-
-    return storiesAsync.when(
-      data: (sequences) {
-        if (sequences.isEmpty) {
-          return _buildPlaceholder(context);
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.auto_stories, size: 24, color: EngrowthColors.primary),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '3分ストーリー',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: EngrowthColors.onBackground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 180,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                physics: const BouncingScrollPhysics(),
-                itemCount: sequences.length,
-                itemBuilder: (context, index) {
-                  final story = sequences[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: _StorySequenceCard(story: story),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-      loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildPlaceholder(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(
-          color: EngrowthColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.auto_stories, size: 32, color: EngrowthColors.onSurfaceVariant),
-              const SizedBox(height: 8),
-              Text(
-                '3分ストーリー（準備中）',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: EngrowthColors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ストーリーシーケンスカード（再開・続きからを最優先表示）
-class _StorySequenceCard extends ConsumerWidget {
-  final StorySequence story;
-
-  const _StorySequenceCard({required this.story});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final progressAsync = ref.watch(storyProgressProvider(story.id));
-    final conversationsAsync = ref.watch(storyConversationsProvider(story.id));
-
-    return progressAsync.when(
-      data: (progress) {
-        final hasResume = progress != null &&
-            progress.lastConversationId != null &&
-            progress.completedAt == null;
-        return conversationsAsync.when(
-          data: (conversations) {
-            if (conversations.isEmpty) {
-              return _buildCard(context, '準備中', hasResume: false, conversationId: null, storyId: story.id);
-            }
-            final firstId = conversations.first.id;
-            final resumeId = hasResume ? progress!.lastConversationId! : firstId;
-            return _buildCard(
-              context,
-              story.title,
-              hasResume: hasResume,
-              conversationId: resumeId,
-              storyId: story.id,
-            );
-          },
-          loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
-          error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
-        );
-      },
-      loading: () => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
-      error: (_, __) => _buildCard(context, story.title, hasResume: false, conversationId: null, storyId: story.id),
-    );
-  }
-
-  Widget _buildCard(
-    BuildContext context,
-    String title, {
-    required bool hasResume,
-    required String? conversationId,
-    required String storyId,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        context.push('/story/$storyId');
-      },
-      child: Container(
-        width: 160,
-        decoration: BoxDecoration(
-          color: EngrowthColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: SizedBox(
-                    height: 100,
-                    width: double.infinity,
-                    child: story.thumbnailUrl != null
-                        ? OptimizedImage(
-                            imageUrl: story.thumbnailUrl!,
-                            width: double.infinity,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            kScenarioBgAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.grey[300]),
-                          ),
-                  ),
-                ),
-                if (hasResume)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: EngrowthColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        '続きから',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: EngrowthColors.onSurface,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '約${story.totalDurationMinutes}分',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: EngrowthColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -495,6 +248,23 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
     super.dispose();
   }
 
+  Widget _buildThumbnail() {
+    final url = widget.conversation.thumbnailUrl;
+    if (url != null && url.isNotEmpty) {
+      return OptimizedImage(
+        imageUrl: url,
+        width: double.infinity,
+        height: 100,
+        fit: BoxFit.cover,
+      );
+    }
+    return Image.asset(
+      kScenarioBgAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -532,19 +302,7 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
                 child: SizedBox(
                   height: 100,
                   width: double.infinity,
-                  child: widget.conversation.thumbnailUrl != null
-                      ? OptimizedImage(
-                          imageUrl: widget.conversation.thumbnailUrl!,
-                          width: double.infinity,
-                          height: 100,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.asset(
-                          kScenarioBgAsset,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Container(color: Colors.grey[300]),
-                        ),
+                  child: _buildThumbnail(),
                 ),
               ),
               Expanded(

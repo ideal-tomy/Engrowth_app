@@ -86,6 +86,14 @@ final recommendedSentenceProvider = FutureProvider<Sentence?>((ref) async {
   return unmastered.first;
 });
 
+/// 瞬間英作文用: ランダムシャッフルしたセンテンス一覧
+final instantCompositionSentencesProvider = FutureProvider<List<Sentence>>((ref) async {
+  final sentences = await SupabaseService.getSentences();
+  if (sentences.isEmpty) return [];
+  final shuffled = List<Sentence>.from(sentences)..shuffle();
+  return shuffled;
+});
+
 // カテゴリリスト
 final categoryListProvider = FutureProvider<List<String>>((ref) async {
   final sentences = await ref.watch(sentencesProvider.future);

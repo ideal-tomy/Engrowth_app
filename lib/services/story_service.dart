@@ -22,6 +22,48 @@ class StoryService {
     }
   }
 
+  /// テーマ別にストーリーシーケンスをグルーピング
+  /// 戻り値: theme -> [StorySequence]（display_order でソート）
+  Future<Map<String, List<StorySequence>>> getStorySequencesGroupedByTheme() async {
+    try {
+      final stories = await getStorySequences();
+      if (stories.isEmpty) return {};
+
+      final convRes = await _client
+          .from('conversations')
+          .select('story_sequence_id, theme, story_order')
+          .not('story_sequence_id', 'is', null);
+
+      // 各 story_sequence_id について story_order 最小の会話の theme を取得
+      final storyToTheme = <String, String>{};
+      final minOrder = <String, int>{};
+      for (final row in convRes as List) {
+        final map = row as Map<String, dynamic>;
+        final sid = map['story_sequence_id'] as String?;
+        if (sid == null) continue;
+        final theme = map['theme'] as String?;
+        if (theme == null || theme.isEmpty) continue;
+        final order = map['story_order'] as int? ?? 999;
+        if (!minOrder.containsKey(sid) || minOrder[sid]! > order) {
+          minOrder[sid] = order;
+          storyToTheme[sid] = theme;
+        }
+      }
+
+      final byTheme = <String, List<StorySequence>>{};
+      for (final s in stories) {
+        final theme = storyToTheme[s.id] ?? 'その他';
+        byTheme.putIfAbsent(theme, () => []).add(s);
+      }
+      for (final list in byTheme.values) {
+        list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+      }
+      return byTheme;
+    } catch (_) {
+      return {};
+    }
+  }
+
   /// ストーリー内の会話を順序付きで取得
   Future<List<Conversation>> getStoryConversations(String storySequenceId) async {
     try {
