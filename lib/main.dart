@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/env_config.dart';
 import 'app.dart';
+import 'services/auth_service.dart';
 import 'services/playback_speed_service.dart';
 import 'services/tts_service.dart';
 
@@ -27,6 +29,14 @@ void main() async {
 
   // Supabase初期化
   await Supabase.initialize(url: url, anonKey: key);
+
+  // 匿名サインイン（未ログイン時のみ）
+  try {
+    await AuthService().ensureSignedIn();
+  } catch (e) {
+    // Supabase で匿名認証が無効な場合などは、そのまま未ログイン状態で起動
+    debugPrint('Anonymous sign-in skipped: $e');
+  }
 
   // 音声再生速度をローカルから読み込み
   final speed = await PlaybackSpeedService.getSpeed();

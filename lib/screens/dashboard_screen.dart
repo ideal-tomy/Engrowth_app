@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/user_plan_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
@@ -572,11 +574,13 @@ class _MainTile extends StatelessWidget {
   }
 }
 
-class _SettingsDrawer extends StatelessWidget {
+class _SettingsDrawer extends ConsumerWidget {
   const _SettingsDrawer();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final devViewAsSignedIn = ref.watch(devViewAsSignedInProvider);
+
     return Drawer(
       child: SafeArea(
         child: ListView(
@@ -591,6 +595,26 @@ class _SettingsDrawer extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+            ),
+            if (kDebugMode) ...[
+              SwitchListTile(
+                secondary: const Icon(Icons.bug_report_outlined),
+                title: const Text('開発: ログイン済み画面'),
+                subtitle: const Text('匿名のままログイン後UIを表示'),
+                value: devViewAsSignedIn,
+                onChanged: (_) {
+                  ref.read(devViewAsSignedInProvider.notifier).toggle();
+                },
+              ),
+              const Divider(),
+            ],
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('アカウント'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/account');
+              },
             ),
             ListTile(
               leading: const Icon(Icons.timer_outlined),
