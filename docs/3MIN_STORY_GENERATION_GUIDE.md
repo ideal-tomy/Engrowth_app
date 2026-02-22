@@ -20,7 +20,22 @@
 
 ### 1. 単語リストの準備
 
-既存のDBからエクスポートするか、`assets/csv/words_master_1000.csv` に `word,meaning,part_of_speech` 形式で1000語を登録。
+**Engrowthアプリ英単語データを使用する場合（推奨）**:
+
+```bash
+# Engrowth CSV を words_master_1000.csv に変換
+dart run scripts/import_engrowth_vocab.dart
+
+# 使用台帳を生成
+dart run scripts/build_vocab_ledger.dart
+```
+
+または、Engrowth CSV から直接台帳を生成:
+```bash
+dart run scripts/build_vocab_ledger.dart "Engrowthアプリ英単語データ - 本番用 (1).csv"
+```
+
+**手動で用意する場合**: `assets/csv/words_master_1000.csv` に `word,meaning,part_of_speech` 形式で1000語を登録し、`build_vocab_ledger.dart` を実行。
 
 ### 2. スロット分割（任意）
 
@@ -129,8 +144,101 @@ dart run scripts/split_words_into_slots.dart
 
 **形式チェック**: story_sequences 1件、conversations 4件、utterance_order 連番、theme 一致済み。
 
+## タスクチェックリスト
+
+**85本分の進捗管理**: [docs/3MIN_STORY_TASK_CHECKLIST.md](3MIN_STORY_TASK_CHECKLIST.md)
+
+シチュエーション別に完了チェック・次着手タスクが一覧化されています。順次進める際の参照用です。
+
+### ファイル配置ルール
+
+| 状態 | 保存先 |
+|------|--------|
+| 新規生成・未実行 | `supabase/migrations/seed_story_<theme>_<nn>.sql` |
+| 実行済み・アーカイブ | `docs/archive/seed_stories/` |
+| 雛形（参照用） | `docs/archive/seed_stories/seed_story_coffee_shop.sql` |
+
+Supabaseで実行したSQLは `docs/archive/seed_stories/` へ移動し、**次に実行すべきSQLが migrations にだけ残る**ようにすると管理しやすくなります。
+
+---
+
+## 85本量産フロー（重複抑制・台帳運用）
+
+全17シチュエーション × 各5本 = 85本を、Engrowth 1000語の網羅率を高めつつ非重要語の重複を抑えて生成する運用。
+
+### 準備
+
+1. **単語台帳を構築**
+
+```bash
+dart run scripts/build_vocab_ledger.dart
+```
+
+`assets/csv/words_usage_ledger.csv` が生成される（word_id, word, is_core, used_count, used_in_story_ids）。
+
+2. **シチュエーション台帳の確認**
+
+`docs/story_generation_manifest.csv` に全17シチュエーションが登録されている。
+
+### 生成サイクル（1本ごと）
+
+1. **プロンプト生成**
+
+```bash
+dart run scripts/generate_batch_prompt.dart <situation_id> <story_index>
+```
+
+例: `dart run scripts/generate_batch_prompt.dart 1 1` → greeting_biz の1本目
+
+2. **CursorでSQLを生成**
+
+出力されたプロンプトを Cursor に貼り付け、生成された SQL を `supabase/migrations/seed_story_<theme>_<nn>.sql` に保存。（雛形は `docs/archive/seed_stories/seed_story_coffee_shop.sql` を参照）
+
+3. **検証**
+
+```bash
+dart run scripts/validate_story_batch.dart supabase/migrations/seed_story_<theme>_<nn>.sql
+```
+
+語数（300〜450）、チャンク数（3〜5）、utterance_order 連番を確認。NG なら生成をやり直す。
+
+4. **Supabaseへ投入**
+
+Supabase Dashboard → SQL Editor で該当 SQL を実行。アプリで一覧・再生・チャンク遷移を確認。実行後、必要に応じて `docs/archive/seed_stories/` へ移動。
+
+5. **単語台帳を更新**
+
+```bash
+dart run scripts/word_allocator.dart <theme_slug> <story_index> --update <theme_slug>_<nn>
+```
+
+例: `dart run scripts/word_allocator.dart greeting_biz 1 --update greeting_biz_01`
+
+これにより次回の割当で未使用語が優先される。
+
+### テーマ単位の投入順序（推奨）
+
+シチュエーション1→2→…→17 の順に、各テーマ5本を連続で生成・投入してから次テーマへ。同一テーマ内で文脈の一貫性を保ちやすい。
+
+### タスク一覧の確認
+
+```bash
+dart run scripts/run_batch_generation.dart --list
+```
+
+85本分のタスク一覧が表示される。
+
+### 量産用プロンプトテンプレート
+
+[docs/prompts/3min_story_batch_generation_template.md](prompts/3min_story_batch_generation_template.md) を参照。
+
+---
+
 ## 関連ファイル
 
 - [docs/prompts/3min_story_generation_rules.md](prompts/3min_story_generation_rules.md) - AI向けルール定義
+- [docs/prompts/3min_story_batch_generation_template.md](prompts/3min_story_batch_generation_template.md) - 量産用プロンプト
+- [docs/story_generation_manifest.csv](story_generation_manifest.csv) - シチュエーション台帳
+- [assets/csv/words_usage_ledger.csv](../assets/csv/words_usage_ledger.csv) - 単語使用台帳
 - [assets/csv/README_WORDS_MASTER.md](../assets/csv/README_WORDS_MASTER.md) - 単語リストの説明
-- [supabase/migrations/seed_story_coffee_shop.sql](../supabase/migrations/seed_story_coffee_shop.sql) - 基準雛形
+- [docs/archive/seed_stories/seed_story_coffee_shop.sql](archive/seed_stories/seed_story_coffee_shop.sql) - 基準雛形

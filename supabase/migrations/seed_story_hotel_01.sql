@@ -1,63 +1,59 @@
--- 3分ストーリー: ホテルのチェックイン
--- Engrowthアプリ英単語データ（単語151-200）を使用
--- 使用単語例: consider, appear, buy, wait, serve, send, expect, build, stay, fall, reach, remain, suggest, pass, require, report, decide, return, explain, hope
+-- 3分ストーリー: ホテル（1本目）
+-- 使用単語: blood, upon, agency, push, nature, color, no, recently, store, reduce, sound, note
+-- theme_slug: hotel | situation_type: common | theme: ホテル
 
 WITH new_seq AS (
   INSERT INTO story_sequences (title, description, total_duration_minutes, display_order)
   VALUES (
-    'ホテルのチェックイン',
-    'ホテルに到着し、フロントでチェックインする会話。宿泊時の基本表現を学べます。',
+    'ホテルチェックイン',
+    '海外ホテルでチェックインし、部屋の希望を伝える会話。',
     3,
-    4
+    31
   )
   RETURNING id
 ),
 conv1 AS (
   INSERT INTO conversations (story_sequence_id, story_order, title, description, situation_type, theme)
-  SELECT id, 1, 'フロントへ', 'ホテルに到着しフロントに歩いていく', 'student', 'ホテル'
+  SELECT id, 1, 'チェックイン開始', 'フロントで手続き', 'common', 'ホテル'
   FROM new_seq
   RETURNING id
 ),
 conv2 AS (
   INSERT INTO conversations (story_sequence_id, story_order, title, description, situation_type, theme)
-  SELECT id, 2, '予約の確認', '名前と予約内容を確認する', 'student', 'ホテル'
+  SELECT id, 2, '部屋の希望', '階数と眺め', 'common', 'ホテル'
   FROM new_seq
   RETURNING id
 ),
 conv3 AS (
   INSERT INTO conversations (story_sequence_id, story_order, title, description, situation_type, theme)
-  SELECT id, 3, '部屋とアメニティ', '部屋の詳細や設備について聞く', 'student', 'ホテル'
+  SELECT id, 3, '施設の案内', 'レストランとプール', 'common', 'ホテル'
   FROM new_seq
   RETURNING id
 ),
 conv4 AS (
   INSERT INTO conversations (story_sequence_id, story_order, title, description, situation_type, theme)
-  SELECT id, 4, 'キーを受け取り退室', 'チェックインを終え部屋へ向かう', 'student', 'ホテル'
+  SELECT id, 4, 'ルームキー受け取り', 'エレベーターの案内', 'common', 'ホテル'
   FROM new_seq
   RETURNING id
 )
 INSERT INTO conversation_utterances (conversation_id, speaker_role, utterance_order, english_text, japanese_text)
--- チャンク1
-SELECT id, 'A', 1, 'Excuse me. I just reached the hotel. I have a reservation. Where should I go?', 'すみません。ホテルに着いたばかりです。予約があります。どこへ行けばいいですか？' FROM conv1
-UNION ALL SELECT id, 'B', 2, 'Welcome! Please come to the front desk. I''ll serve you. Can you wait a moment? I''m helping another guest.', 'いらっしゃいませ。フロントまでお越しください。お手伝いします。少々お待ちいただけますか？お客様が1名おります。' FROM conv1
-UNION ALL SELECT id, 'A', 3, 'Sure, no problem. I''ll stay here. The building looks nice, by the way.', '大丈夫です。ここで待ちます。ところで、建物が素敵ですね。' FROM conv1
-UNION ALL SELECT id, 'B', 4, 'Thank you. We built it three years ago. It''s new. I''ll be with you in a second.', 'ありがとうございます。3年前に建てたものです。新しいんです。すぐ参ります。' FROM conv1
-UNION ALL SELECT id, 'A', 5, 'Take your time.', 'お急ぎなく。' FROM conv1
--- チャンク2
-UNION ALL SELECT id, 'B', 1, 'Hi! How can I help you? Do you have a reservation?', 'こんにちは。どのようなご用件でしょうか。ご予約はお取りですか？' FROM conv2
-UNION ALL SELECT id, 'A', 2, 'Yes. My name is Tanaka. I expect to stay for three nights. I sent an email to confirm last week.', 'はい。田中です。3泊の予定です。先週確認のメールを送りました。' FROM conv2
-UNION ALL SELECT id, 'B', 3, 'Let me check... Yes, I see it. Mr. Tanaka, two adults, three nights. Is that right?', '少々お待ちください... はい、確認できました。田中様、大人2名、3泊ですね。よろしいですか？' FROM conv2
-UNION ALL SELECT id, 'A', 4, 'Yes, that''s correct. I need to report a change—we decided to stay one more night. Can we add it?', 'はい、その通りです。変更の報告があり—1泊追加することにしました。追加できますか？' FROM conv2
-UNION ALL SELECT id, 'B', 5, 'I''ll check if we have room. It might require an extra charge. One moment.', '空室を確認します。追加料金が必要かもしれません。少々お待ちください。' FROM conv2
--- チャンク3
-UNION ALL SELECT id, 'B', 1, 'Good news. We can do it. I suggest a room on the fifth floor. It has a nice view.', '良いお知らせです。可能です。5階のお部屋をおすすめします。眺めが良いです。' FROM conv3
-UNION ALL SELECT id, 'A', 2, 'That sounds good. What about breakfast? I hope you serve it. I read good things online.', 'いいですね。朝食はどうですか？出してくれるといいのですが。ネットで評判を読みました。' FROM conv3
-UNION ALL SELECT id, 'B', 3, 'Yes, we serve breakfast from seven to ten. You can buy vouchers at the desk or use our cafe. Let me explain the options.', 'はい、7時から10時まで提供しています。デスクで券をお買い求めいただくか、カフェをご利用いただけます。オプションをご説明します。' FROM conv3
-UNION ALL SELECT id, 'A', 4, 'I''ll consider it. For now, can we just get the keys? We want to rest. It was a long trip.', '検討します。まず鍵だけいただけますか？休みたいんです。長い旅だったので。' FROM conv3
-UNION ALL SELECT id, 'B', 5, 'Of course. Your room will remain ready. Here are two key cards. Pass them over the sensor to enter.', 'もちろんです。お部屋はご利用可能です。キーカードが2枚です。センサーにかざしてお入れください。' FROM conv3
--- チャンク4
-UNION ALL SELECT id, 'A', 1, 'Thank you. Where is the elevator? I don''t want to fall carrying these bags.', 'ありがとう。エレベーターはどこですか？この荷物を持って転んだりしたくないので。' FROM conv4
-UNION ALL SELECT id, 'B', 2, 'To your right. The elevator will return you to this floor if you need anything. We''re here twenty-four hours.', '右手です。何か必要でしたらエレベーターでこの階に戻れます。24時間対応しております。' FROM conv4
-UNION ALL SELECT id, 'A', 3, 'Great. One more thing—do you appear on the door when housekeeping comes? I mean, do you leave a sign?', 'ありがとう。もう一つ—ハウスキーピングの人はドアに何か表示するんですか？お札を置くとか。' FROM conv4
-UNION ALL SELECT id, 'B', 4, 'Yes, they put a card under the door. If you want them to wait, just hang the "Do Not Disturb" sign. Have a nice stay!', 'はい、カードをドアの下に置きます。お待ちいただきたい場合は「お静かに」の札をかけてください。素敵なご滞在を。' FROM conv4
-UNION ALL SELECT id, 'A', 5, 'Thanks! We''ll see you.', 'ありがとう。また。' FROM conv4;
+SELECT id, 'A', 1, 'Hello. I have a reservation. Name is Sato. I booked through the travel agency. Two nights. Arriving upon the date we confirmed.', 'こんにちは。予約があります。佐藤です。旅行会社経由で予約。2泊。確認した日付通りに到着。' FROM conv1
+UNION ALL SELECT id, 'B', 2, 'Welcome. Let me pull up your booking. Yes. Sato. Two nights. I note you requested a quiet room. We have one. High floor. No street sound.', 'ようこそ。予約を表示します。はい。佐藤様。2泊。静かな部屋のご希望をメモしています。あります。高層。街の音なし。' FROM conv1
+UNION ALL SELECT id, 'A', 3, 'Perfect. That sounds good. I need to reduce stress. Business trip. The agency said this hotel is quiet. Good for rest.', '完璧。いいですね。ストレスを減らしたい。出張。旅行会社がこのホテルは静かと言ってた。休息に良い。' FROM conv1
+UNION ALL SELECT id, 'B', 4, 'Yes. We recently renovated. New windows. They reduce outside noise. The room color is soft blue. Calm. Good for sleep.', 'はい。最近リノベーションしました。新しい窓。外の音を減らします。部屋の色はソフトブルー。落ち着く。睡眠に良い。' FROM conv1
+UNION ALL SELECT id, 'A', 5, 'Blue. I like that. Nature tone. Can I request a room with a view? Garden or park? The agency did not note that.', 'ブルー。好きです。ナチュラルなトーン。眺めの部屋をリクエストできますか？庭か公園？旅行会社はメモしてなかった。' FROM conv1
+UNION ALL SELECT id, 'B', 1, 'Let me check. We have a room. Eighth floor. Garden view. No extra charge. Upon arrival we can upgrade if you like. Just push the button for front desk.', '確認します。お部屋があります。8階。庭園眺め。追加料金なし。到着時にアップグレードも。フロントのボタンを押すだけ。' FROM conv2
+UNION ALL SELECT id, 'A', 2, 'Eighth floor. Garden view. No extra cost. Sounds perfect. Does the room have a store? Mini bar? I need water. Blood orange juice in the morning.', '8階。庭園眺め。追加料金なし。完璧に聞こえる。部屋にストアは？ミニバー？水が要る。朝はブラッドオレンジジュース。' FROM conv2
+UNION ALL SELECT id, 'B', 3, 'Yes. Mini bar. We have juice. Blood orange. Regular orange. Water. No problem. The store on the first floor has more. Open twenty-four hours.', 'はい。ミニバー。ジュースがある。ブラッドオレンジ。通常オレンジ。水。問題ない。1階のストアにもっと。24時間営業。' FROM conv2
+UNION ALL SELECT id, 'A', 4, 'Good. I will note that. So room 801? Garden view. Quiet. Blue color. Mini bar. I am all set.', 'いいですね。メモする。801号室？庭園眺め。静か。ブルーの色。ミニバー。準備できた。' FROM conv2
+UNION ALL SELECT id, 'B', 5, 'Room 812 actually. Same floor. Same view. Slightly larger. The agency booked a standard. We upgraded. No charge. Upon our recent campaign.', '実は812号室。同じ階。同じ眺め。少し広い。旅行会社はスタンダードを予約。アップグレード。料金なし。最近のキャンペーンで。' FROM conv2
+UNION ALL SELECT id, 'A', 1, 'Thank you. That is kind. So 812. Eighth floor. How do I get there? Elevator? I do not want to push my bags up stairs.', 'ありがとう。親切ですね。812。8階。どう行く？エレベーター？階段で荷物を押し上げたくない。' FROM conv3
+UNION ALL SELECT id, 'B', 2, 'Elevator to your right. Push floor eight. The room is left from the elevator. You will see the sign. Blue color on the door. Soft. Easy to spot.', '右のエレベーター。8階のボタンを押して。部屋はエレベーターから左。看板が見える。ドアはブルー。ソフト。見つけやすい。' FROM conv3
+UNION ALL SELECT id, 'A', 3, 'Got it. Breakfast? What time? The agency note said seven to ten. Is that still the rule?', 'わかりました。朝食は？何時？旅行会社のメモに7時から10時と。まだそのルール？' FROM conv3
+UNION ALL SELECT id, 'B', 4, 'Yes. Seven to ten. First floor. Restaurant. Great spread. Blood orange juice. Fresh. Reduce the price if you book tonight. Twenty percent off.', 'はい。7時から10時。1階。レストラン。豪華なブッフェ。ブラッドオレンジジュース。フレッシュ。今夜予約すれば料金減。20%オフ。' FROM conv3
+UNION ALL SELECT id, 'A', 5, 'I will book. Thank you. The nature of this hotel is very welcoming. I feel relaxed already. No stress. Just sound sleep ahead.', '予約する。ありがとう。このホテルの性質はとても歓迎的。もうリラックス。ストレスなし。快眠が待ってる。' FROM conv3
+UNION ALL SELECT id, 'B', 1, 'Thank you. Here is your key. Room 812. Eighth floor. Upon check out just leave the key in the room. Or drop at the desk. No need to push the bell.', 'ありがとう。キーです。812号室。8階。チェックアウト時は部屋にキーを。またはフロントに。ベルを押す必要なし。' FROM conv4
+UNION ALL SELECT id, 'A', 2, 'Understood. Thank you for everything. The agency chose well. I will note this for my next trip. Good hotel.', '承知。全てありがとう。旅行会社は良い選択。次の旅行用にメモする。良いホテル。' FROM conv4
+UNION ALL SELECT id, 'B', 3, 'You are welcome. Enjoy your stay. Goodbye.', 'どういたしまして。ご滞在を。さようなら。' FROM conv4
+UNION ALL SELECT id, 'A', 4, 'Goodbye. Thank you.', 'さようなら。ありがとう。' FROM conv4
+UNION ALL SELECT id, 'B', 5, 'Bye.', 'バイバイ。' FROM conv4;
