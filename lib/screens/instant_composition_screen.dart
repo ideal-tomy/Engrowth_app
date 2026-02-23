@@ -121,11 +121,12 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
       appBar: AppBar(
         title: const Text('瞬間英作文'),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             HapticFeedback.selectionClick();
             _showExitDialog(context);
           },
+          tooltip: '戻る',
         ),
         actions: [
           IconButton(

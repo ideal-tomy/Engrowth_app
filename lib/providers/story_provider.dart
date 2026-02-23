@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../constants/story_theme_categories.dart';
 import '../models/story_sequence.dart';
 import '../models/conversation.dart';
 import '../services/story_service.dart';
@@ -48,4 +49,20 @@ final storyProgressProvider =
   if (userId == null) return null;
   final service = ref.read(storyServiceProvider);
   return service.getStoryProgress(userId, storyId);
+});
+
+/// オートスクロール用：最初に未クリアのストーリーID（テーマ順）
+final firstIncompleteStoryIdProvider = FutureProvider<String?>((ref) async {
+  final byTheme = await ref.watch(storySequencesByThemeProvider.future);
+  final sorted =
+      byTheme.keys.toList()
+        ..sort((a, b) => orderForTheme(a).compareTo(orderForTheme(b)));
+  for (final theme in sorted) {
+    final stories = byTheme[theme] ?? [];
+    for (final story in stories) {
+      final progress = await ref.read(storyProgressProvider(story.id).future);
+      if (progress?.completedAt == null) return story.id;
+    }
+  }
+  return null;
 });

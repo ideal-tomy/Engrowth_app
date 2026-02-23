@@ -72,11 +72,11 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
       appBar: AppBar(
         title: const Text('学習モード'),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             _showExitConfirmation(context);
           },
-          tooltip: '終了',
+          tooltip: '戻る',
         ),
         actions: [
           IconButton(

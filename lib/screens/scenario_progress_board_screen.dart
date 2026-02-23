@@ -7,16 +7,26 @@ import '../models/scenario.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/scenario_provider.dart';
+import '../providers/section_nudge_provider.dart';
 import '../theme/engrowth_theme.dart';
+import '../utils/learning_path_geometry.dart';
+import '../widgets/continuous_path_segment.dart';
+import '../widgets/debug_completion_fab.dart';
+import '../widgets/optimized_image.dart';
+import '../widgets/scroll_target_wrapper.dart';
+import '../widgets/scenario_background.dart';
 
 /// シナリオ学習のすごろく進捗ボード
 /// 各シナリオをマスとして表示し、タップで学習へ遷移
 class ScenarioProgressBoardScreen extends ConsumerWidget {
-  const ScenarioProgressBoardScreen({super.key});
+  const ScenarioProgressBoardScreen({super.key, this.scrollToNext = false});
+
+  final bool scrollToNext;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scenariosAsync = ref.watch(scenariosProvider);
+    final targetIdAsync = ref.watch(firstIncompleteScenarioIdProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     return Scaffold(
@@ -26,6 +36,7 @@ class ScenarioProgressBoardScreen extends ConsumerWidget {
         backgroundColor: EngrowthColors.surface,
         foregroundColor: EngrowthColors.onBackground,
       ),
+      floatingActionButton: const DebugCompletionFab(track: 'scenario'),
       body: scenariosAsync.when(
         data: (scenarios) {
           if (scenarios.isEmpty) {
@@ -33,15 +44,99 @@ class ScenarioProgressBoardScreen extends ConsumerWidget {
               scenarios: _sampleScenariosForEmptyState(),
               userId: userId,
               isSamplePlaceholder: true,
+              scrollToNext: scrollToNext,
+              targetId: null,
             );
           }
-          return _ScenarioBoardBody(scenarios: scenarios, userId: userId);
+          return _ScenarioBoardBody(
+            scenarios: scenarios,
+            userId: userId,
+            scrollToNext: scrollToNext,
+            targetId: targetIdAsync.valueOrNull,
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ScenarioBoardBody(
           scenarios: _sampleScenariosForEmptyState(),
           userId: userId,
           isSamplePlaceholder: true,
+          scrollToNext: scrollToNext,
+          targetId: null,
+        ),
+      ),
+    );
+  }
+}
+
+/// 継続のナッジ：「あと1つでこの章がクリアです！」（クールダウン付き）
+class _ScenarioSectionNudge extends ConsumerWidget {
+  final List<Scenario> scenarios;
+
+  const _ScenarioSectionNudge({required this.scenarios});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (scenarios.length <= 1) return const SizedBox.shrink();
+    int completed = 0;
+    for (final s in scenarios) {
+      final progress = ref.watch(userScenarioProgressProvider(s.id)).valueOrNull;
+      if (progress?.isCompleted == true) completed++;
+    }
+    final oneLeft = completed == scenarios.length - 1;
+    const sectionKey = 'scenario';
+    final cooldown = ref.watch(sectionNudgeCooldownProvider);
+    final wasOneLeft = ref.watch(sectionNudgeWasOneLeftProvider);
+
+    if (!oneLeft) {
+      if (wasOneLeft[sectionKey] == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(sectionNudgeCooldownProvider.notifier).update(
+                (m) => {...m, sectionKey: DateTime.now()},
+              );
+          ref.read(sectionNudgeWasOneLeftProvider.notifier).update(
+                (m) => {...m, sectionKey: false},
+              );
+        });
+      }
+      return const SizedBox.shrink();
+    }
+
+    if (wasOneLeft[sectionKey] != true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(sectionNudgeWasOneLeftProvider.notifier).update(
+              (m) => {...m, sectionKey: true},
+            );
+      });
+    }
+    final last = cooldown[sectionKey];
+    if (last != null && DateTime.now().difference(last) < nudgeCooldown) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: EngrowthColors.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: EngrowthColors.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.emoji_events_outlined, size: 18, color: EngrowthColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'あと1つでこの章がクリアです！',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: EngrowthColors.onSurface,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -149,44 +244,6 @@ class _ScenarioDottedLinePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// マスとマスの間の点線（すごろくの道のり）
-class _ScenarioMasuWithConnector extends StatelessWidget {
-  final bool showConnectorBelow;
-  final Widget child;
-
-  const _ScenarioMasuWithConnector({
-    required this.showConnectorBelow,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (!showConnectorBelow) {
-      return Padding(padding: const EdgeInsets.only(bottom: 12), child: child);
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(padding: const EdgeInsets.only(bottom: 4), child: child),
-        SizedBox(
-          height: 12,
-          child: Center(
-            child: CustomPaint(
-              painter: _ScenarioDottedLinePainter(
-                color: EngrowthColors.silverBorder,
-                dotRadius: 1.5,
-                spacing: 3,
-              ),
-              size: const Size(2, 12),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-      ],
-    );
-  }
-}
-
 List<Scenario> _sampleScenariosForEmptyState() {
   final now = DateTime.now();
   return [
@@ -207,56 +264,234 @@ List<Scenario> _sampleScenariosForEmptyState() {
   ];
 }
 
-class _ScenarioBoardBody extends ConsumerWidget {
+class _ScenarioBoardBody extends ConsumerStatefulWidget {
   final List<Scenario> scenarios;
   final String? userId;
   final bool isSamplePlaceholder;
+  final bool scrollToNext;
+  final String? targetId;
 
   const _ScenarioBoardBody({
     required this.scenarios,
     this.userId,
     this.isSamplePlaceholder = false,
+    this.scrollToNext = false,
+    this.targetId,
+  });
+
+  @override
+  ConsumerState<_ScenarioBoardBody> createState() => _ScenarioBoardBodyState();
+}
+
+class _ScenarioBoardBodyState extends ConsumerState<_ScenarioBoardBody> {
+  @override
+  Widget build(BuildContext context) {
+    final isAnonymous = ref.watch(isAnonymousProvider);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final centerX = w / 2;
+        final amplitude = w * 0.38;
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (widget.isSamplePlaceholder) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'シナリオが登録されていません。Supabase の scenarios テーブルにデータを登録すると、ここにすごろくで表示されます。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: EngrowthColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+            _ScenarioSectionBanner(isSamplePlaceholder: widget.isSamplePlaceholder),
+            const SizedBox(height: 16),
+            _ScenarioSectionNudge(scenarios: widget.scenarios),
+            ...widget.scenarios.asMap().entries.map((entry) {
+              final index = entry.key;
+              final scenario = entry.value;
+              final showConnectorBelow = index < widget.scenarios.length - 1;
+              final isScrollTarget = widget.scrollToNext && widget.targetId == scenario.id;
+              final nextScenario = index < widget.scenarios.length - 1 ? widget.scenarios[index + 1] : null;
+              final animateConnectorRed = widget.scrollToNext && widget.targetId == nextScenario?.id;
+              final fromX = nodeXAt(index, centerX, amplitude);
+              final toX = nodeXAt(index + 1, centerX, amplitude);
+              final fromSlope = nodeSlopeAt(index, amplitude);
+              final toSlope = nodeSlopeAt(index + 1, amplitude);
+              return _SineWaveScenarioRow(
+                fromX: fromX,
+                toX: toX,
+                fromSlope: fromSlope,
+                toSlope: toSlope,
+                width: w,
+                showConnectorBelow: showConnectorBelow,
+                isScrollTarget: isScrollTarget,
+                unlockSnackBarMessage:
+                    isScrollTarget ? '次のシナリオが解放されました' : null,
+                scenario: scenario,
+                index: index + 1,
+                userId: widget.userId,
+                isSamplePlaceholder: widget.isSamplePlaceholder || scenario.id.startsWith('_sample_'),
+                animateConnectorRed: animateConnectorRed,
+              );
+            }),
+            if (isAnonymous) ...[
+              const SizedBox(height: 16),
+              _AnonymousSaveNudge(),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 正弦波レイアウトの1行：ノード位置＋連続パス区間（シナリオ用）
+class _SineWaveScenarioRow extends ConsumerWidget {
+  final double fromX;
+  final double toX;
+  final double? fromSlope;
+  final double? toSlope;
+  final double width;
+  final bool showConnectorBelow;
+  final bool isScrollTarget;
+  final String? unlockSnackBarMessage;
+  final Scenario scenario;
+  final int index;
+  final String? userId;
+  final bool isSamplePlaceholder;
+  final bool animateConnectorRed;
+
+  const _SineWaveScenarioRow({
+    required this.fromX,
+    required this.toX,
+    this.fromSlope,
+    this.toSlope,
+    required this.width,
+    required this.showConnectorBelow,
+    required this.isScrollTarget,
+    this.unlockSnackBarMessage,
+    required this.scenario,
+    required this.index,
+    this.userId,
+    required this.isSamplePlaceholder,
+    required this.animateConnectorRed,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAnonymous = ref.watch(isAnonymousProvider);
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    if (isSamplePlaceholder) {
+      return _buildRow(
+        context,
+        ref,
+        isCompleted: false,
+        isInProgress: index == 1,
+      );
+    }
+    final progressAsync = ref.watch(userScenarioProgressProvider(scenario.id));
+    final stepsAsync = ref.watch(scenarioStepsProvider(scenario.id));
+
+    return progressAsync.when(
+      data: (progress) {
+        return stepsAsync.when(
+          data: (steps) {
+            final isCompleted = progress?.isCompleted ?? false;
+            final currentStep = progress?.lastStepIndex ?? 0;
+            final isInProgress = !isCompleted && currentStep > 0;
+            return _buildRow(
+              context,
+              ref,
+              isCompleted: isCompleted,
+              isInProgress: isInProgress,
+            );
+          },
+          loading: () => _buildRow(context, ref, isCompleted: false, isInProgress: false),
+          error: (_, __) => _buildRow(context, ref, isCompleted: false, isInProgress: false),
+        );
+      },
+      loading: () => _buildRow(context, ref, isCompleted: false, isInProgress: false),
+      error: (_, __) => _buildRow(context, ref, isCompleted: false, isInProgress: false),
+    );
+  }
+
+  Widget _buildRow(BuildContext context, WidgetRef ref,
+      {required bool isCompleted, required bool isInProgress}) {
+    const nodeWidth = 100.0;
+    const nodeHeight = 110.0; // ノードカード高さ（72+6+テキスト）
+    const segmentHeight = 52.0;
+
+    final nodeChild = ScrollTargetWrapper(
+      isTarget: isScrollTarget,
+      unlockSnackBarMessage: unlockSnackBarMessage,
+      child: SizedBox(
+        width: nodeWidth,
+        child: _MasuCard(
+          scenario: scenario,
+          index: index,
+          isCompleted: isCompleted,
+          isInProgress: isInProgress,
+          onTap: isSamplePlaceholder
+              ? () {
+                  HapticFeedback.selectionClick();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('サンプル表示です。Supabase に scenarios を登録すると学習を開始できます'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              : () {
+                  HapticFeedback.selectionClick();
+                  ref.read(analyticsServiceProvider).logProgressNodeTapped(
+                        nodeId: scenario.id,
+                        track: 'scenario',
+                      );
+                  context.push('/scenario/${scenario.id}');
+                },
+        ),
+      ),
+    );
+
+    final stackNode = Stack(
+      clipBehavior: Clip.none,
       children: [
-        if (isSamplePlaceholder) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              'シナリオが登録されていません。Supabase の scenarios テーブルにデータを登録すると、ここにすごろくで表示されます。',
-              style: TextStyle(
-                fontSize: 12,
-                color: EngrowthColors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-        _ScenarioSectionBanner(isSamplePlaceholder: isSamplePlaceholder),
-        const SizedBox(height: 16),
-        ...scenarios.asMap().entries.map((entry) {
-          final index = entry.key;
-          final scenario = entry.value;
-          final showConnectorBelow = index < scenarios.length - 1;
-          return _ScenarioMasuWithConnector(
-            showConnectorBelow: showConnectorBelow,
-            child: _ScenarioMasu(
-              index: index + 1,
-              scenario: scenario,
-              userId: userId,
-              isSamplePlaceholder: isSamplePlaceholder || scenario.id.startsWith('_sample_'),
-            ),
-          );
-        }),
-        if (isAnonymous) ...[
-          const SizedBox(height: 16),
-          _AnonymousSaveNudge(),
-        ],
+        Positioned(
+          left: (fromX - nodeWidth / 2).clamp(0.0, width - nodeWidth),
+          top: 0,
+          child: nodeChild,
+        ),
       ],
+    );
+
+    if (!showConnectorBelow) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: SizedBox(height: nodeHeight, width: width, child: stackNode),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: nodeHeight, width: width, child: stackNode),
+          ContinuousPathSegment(
+            fromX: fromX,
+            toX: toX,
+            fromSlope: fromSlope,
+            toSlope: toSlope,
+            width: width,
+            height: segmentHeight,
+            isCleared: isCompleted,
+            animateToRed: animateConnectorRed,
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
     );
   }
 }
@@ -315,141 +550,11 @@ class _AnonymousSaveNudgeState extends ConsumerState<_AnonymousSaveNudge> {
   }
 }
 
-class _ScenarioMasu extends ConsumerWidget {
-  final int index;
-  final Scenario scenario;
-  final String? userId;
-  final bool isSamplePlaceholder;
-
-  const _ScenarioMasu({
-    required this.index,
-    required this.scenario,
-    this.userId,
-    this.isSamplePlaceholder = false,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (isSamplePlaceholder) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _MasuCard(
-          scenario: scenario,
-          index: index,
-          isCompleted: false,
-          isInProgress: index == 1,
-          progressText: '約${scenario.estimatedMinutes}分',
-          onTap: () {
-            HapticFeedback.selectionClick();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('サンプル表示です。Supabase に scenarios を登録すると学習を開始できます'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    final progressAsync = ref.watch(userScenarioProgressProvider(scenario.id));
-    final stepsAsync = ref.watch(scenarioStepsProvider(scenario.id));
-
-    return progressAsync.when(
-      data: (progress) {
-        return stepsAsync.when(
-          data: (steps) {
-            final totalSteps = steps.length;
-            final isCompleted = progress?.isCompleted ?? false;
-            final currentStep = progress?.lastStepIndex ?? 0;
-            final isInProgress = !isCompleted && currentStep > 0;
-            final isCurrent = !isCompleted && (currentStep == 0 || index == 1);
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _MasuCard(
-                scenario: scenario,
-                index: index,
-                isCompleted: isCompleted,
-                isInProgress: isInProgress,
-                progressText: totalSteps > 0
-                    ? '${currentStep}/${totalSteps}'
-                    : '約${scenario.estimatedMinutes}分',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  ref.read(analyticsServiceProvider).logProgressNodeTapped(
-                        nodeId: scenario.id,
-                        track: 'scenario',
-                      );
-                  context.push('/scenario/${scenario.id}');
-                },
-              ),
-            );
-          },
-          loading: () => _MasuCard(
-            scenario: scenario,
-            index: index,
-            isCompleted: false,
-            isInProgress: false,
-            progressText: '約${scenario.estimatedMinutes}分',
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(analyticsServiceProvider).logProgressNodeTapped(
-                    nodeId: scenario.id,
-                    track: 'scenario',
-                  );
-              context.push('/scenario/${scenario.id}');
-            },
-          ),
-          error: (_, __) => _MasuCard(
-            scenario: scenario,
-            index: index,
-            isCompleted: false,
-            isInProgress: false,
-            progressText: '約${scenario.estimatedMinutes}分',
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(analyticsServiceProvider).logProgressNodeTapped(
-                    nodeId: scenario.id,
-                    track: 'scenario',
-                  );
-              context.push('/scenario/${scenario.id}');
-            },
-          ),
-        );
-      },
-      loading: () => _MasuCard(
-        scenario: scenario,
-        index: index,
-        isCompleted: false,
-        isInProgress: false,
-        progressText: '約${scenario.estimatedMinutes}分',
-        onTap: () {
-          HapticFeedback.selectionClick();
-          context.push('/scenario/${scenario.id}');
-        },
-      ),
-      error: (_, __) => _MasuCard(
-        scenario: scenario,
-        index: index,
-        isCompleted: false,
-        isInProgress: false,
-        progressText: '約${scenario.estimatedMinutes}分',
-        onTap: () {
-          HapticFeedback.selectionClick();
-          context.push('/scenario/${scenario.id}');
-        },
-      ),
-    );
-  }
-}
-
 class _MasuCard extends StatefulWidget {
   final Scenario scenario;
   final int index;
   final bool isCompleted;
   final bool isInProgress;
-  final String progressText;
   final VoidCallback onTap;
 
   const _MasuCard({
@@ -457,7 +562,6 @@ class _MasuCard extends StatefulWidget {
     required this.index,
     required this.isCompleted,
     required this.isInProgress,
-    required this.progressText,
     required this.onTap,
   });
 
@@ -516,124 +620,101 @@ class _MasuCardState extends State<_MasuCard>
         color: Colors.transparent,
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(40),
           splashColor: EngrowthColors.primary.withOpacity(0.2),
           highlightColor: EngrowthColors.primary.withOpacity(0.08),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: EngrowthColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: widget.isInProgress
-                    ? EngrowthColors.primary.withOpacity(0.5)
-                    : EngrowthColors.silverBorder,
-                width: widget.isInProgress ? 2 : 1,
-              ),
-              boxShadow: EngrowthShadows.softCard,
-            ),
-            child: Row(
-              children: [
-                // Duolingo風：マス番号を台座のように表示
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: widget.isCompleted
-                        ? EngrowthColors.success.withOpacity(0.2)
-                        : widget.isInProgress
-                            ? EngrowthColors.primary.withOpacity(0.15)
-                            : EngrowthColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: EngrowthColors.silverShadow,
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 丸ノード＋シーン画像（ストーリーと統一）
+              Stack(
+                alignment: Alignment.bottomRight,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: widget.isCompleted
+                            ? EngrowthColors.primary
+                            : widget.isInProgress
+                                ? EngrowthColors.primary.withOpacity(0.6)
+                                : EngrowthColors.silverBorder,
+                        width: widget.isCompleted || widget.isInProgress ? 3 : 2,
                       ),
-                    ],
-                  ),
-                  child: Center(
-                    child: widget.isCompleted
-                        ? const Icon(Icons.check, color: EngrowthColors.success, size: 24)
-                        : Text(
-                            '${widget.index}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: widget.isInProgress
-                                  ? EngrowthColors.primary
-                                  : EngrowthColors.onSurfaceVariant,
-                            ),
+                      boxShadow: EngrowthShadows.softCard,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: widget.scenario.thumbnailUrl != null
+                        ? OptimizedImage(
+                            imageUrl: widget.scenario.thumbnailUrl!,
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.asset(
+                            kScenarioBgAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: Colors.grey[300]),
                           ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.scenario.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: EngrowthColors.onSurface,
+                  if (widget.isCompleted)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: EngrowthColors.success,
+                          shape: BoxShape.circle,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.progressText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: EngrowthColors.onSurfaceVariant,
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 14,
                         ),
                       ),
-                    ],
+                    )
+                  else if (widget.isInProgress)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: EngrowthColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: 88,
+                child: Text(
+                  widget.scenario.title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: widget.isCompleted
+                        ? EngrowthColors.onSurface
+                        : EngrowthColors.onSurfaceVariant,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                if (widget.isCompleted)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: EngrowthColors.success.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      '完了',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: EngrowthColors.success,
-                      ),
-                    ),
-                  )
-                else if (widget.isInProgress)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: EngrowthColors.primary.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '続きから',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: EngrowthColors.primary,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 14,
-                    color: EngrowthColors.onSurfaceVariant,
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

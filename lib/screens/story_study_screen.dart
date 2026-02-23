@@ -12,8 +12,17 @@ import '../theme/engrowth_theme.dart';
 /// サブ: チャンクごとに聴く・練習する
 class StoryStudyScreen extends ConsumerStatefulWidget {
   final String storyId;
+  final bool asSheet;
+  final VoidCallback? onClose;
+  final bool autoStartPlayback;
 
-  const StoryStudyScreen({super.key, required this.storyId});
+  const StoryStudyScreen({
+    super.key,
+    required this.storyId,
+    this.asSheet = false,
+    this.onClose,
+    this.autoStartPlayback = false,
+  });
 
   @override
   ConsumerState<StoryStudyScreen> createState() => _StoryStudyScreenState();
@@ -24,6 +33,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   bool _isPlaying = false;
   int _currentUtteranceIndex = 0;
   bool _stopPlaybackRequested = false;
+  bool _autoStarted = false;
 
   @override
   void initState() {
@@ -90,21 +100,19 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     }
     final title = story?.title ?? '3分ストーリー';
 
-    return Scaffold(
-      backgroundColor: EngrowthColors.background,
-      appBar: AppBar(
-        title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: utterancesAsync.when(
+    final content = utterancesAsync.when(
         data: (utterances) {
           if (utterances.isEmpty) {
             return const Center(
               child: Text('発話がありません', style: TextStyle(color: EngrowthColors.onSurface)),
             );
+          }
+          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying) {
+            _autoStarted = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _isPlaying) return;
+              _playAllUtterances(utterances);
+            });
           }
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -247,6 +255,70 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               Text('エラー: $e', textAlign: TextAlign.center, style: const TextStyle(color: EngrowthColors.onSurface)),
             ],
           ),
+        ),
+      );
+
+    if (!widget.asSheet) {
+      return Scaffold(
+        backgroundColor: EngrowthColors.background,
+        appBar: AppBar(
+          title: Text(title),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    return Material(
+      color: EngrowthColors.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              decoration: BoxDecoration(
+                color: EngrowthColors.onSurfaceVariant.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: EngrowthColors.onBackground,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: '閉じる',
+                    onPressed: () {
+                      if (widget.onClose != null) {
+                        widget.onClose!.call();
+                      } else {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: content),
+          ],
         ),
       ),
     );

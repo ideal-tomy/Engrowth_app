@@ -60,7 +60,7 @@ class ProgressMiniPopup extends ConsumerWidget {
             ref.read(analyticsServiceProvider).logProgressPopupCtaViewBoard(track: track);
             Navigator.of(context).pop();
             final ctx = parentContext ?? context;
-            if (ctx.mounted) ctx.push(route);
+            if (ctx.mounted) ctx.push(route, extra: {'scrollToNext': true});
           },
           child: Text('進捗を見る', style: TextStyle(color: EngrowthColors.primary)),
         ),

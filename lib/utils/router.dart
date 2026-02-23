@@ -173,11 +173,21 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/progress/scenario-board',
-      builder: (context, state) => const ScenarioProgressBoardScreen(),
+      builder: (context, state) {
+        final extra = state.extra;
+        return ScenarioProgressBoardScreen(
+          scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+        );
+      },
     ),
     GoRoute(
       path: '/progress/story-board',
-      builder: (context, state) => const StoryProgressBoardScreen(),
+      builder: (context, state) {
+        final extra = state.extra;
+        return StoryProgressBoardScreen(
+          scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+        );
+      },
     ),
     GoRoute(
       path: '/',

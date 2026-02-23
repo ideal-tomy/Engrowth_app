@@ -35,3 +35,18 @@ final userScenarioProgressProvider = FutureProvider.family<UserScenarioProgress?
   final service = ref.read(scenarioServiceProvider);
   return await service.getUserProgress(userId, scenarioId);
 });
+
+/// 最初の未完了シナリオID（オートスクロール用）
+final firstIncompleteScenarioIdProvider = FutureProvider<String?>((ref) async {
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null) return null;
+
+  final scenarios = await ref.watch(scenariosProvider.future);
+  final service = ref.read(scenarioServiceProvider);
+
+  for (final scenario in scenarios) {
+    final progress = await service.getUserProgress(userId, scenario.id);
+    if (progress?.isCompleted != true) return scenario.id;
+  }
+  return null;
+});

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,10 +31,12 @@ class LearningCompletionOrchestrator {
   /// [ref] RiverpodのWidgetRef（ConsumerStateから取得）
   /// [context] ダイアログ表示用のBuildContext
   /// [progressTrack] 'scenario' | 'story' のときのみ進捗ミニポップアップを検討
+  /// [forceProgressPopup] kDebugMode用：スロットリングを無視してポップアップ強制表示
   static Future<void> onLearningCompleted(
     WidgetRef ref,
     BuildContext context, {
     String? progressTrack,
+    bool forceProgressPopup = false,
   }) async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
@@ -129,7 +132,9 @@ class LearningCompletionOrchestrator {
     if (track != null && (track == 'scenario' || track == 'story')) {
       try {
         final promptNotifier = ref.read(studyProgressPromptProvider.notifier);
-        if (await promptNotifier.onCompleted(track) && context.mounted) {
+        final shouldShow = (forceProgressPopup && kDebugMode) ||
+            await promptNotifier.onCompleted(track);
+        if (shouldShow && context.mounted) {
           ref.read(analyticsServiceProvider).logProgressPopupShown(
                 reason: 'adaptive',
                 track: track,

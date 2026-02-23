@@ -58,11 +58,11 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             _showExitConfirmation(context);
           },
-          tooltip: '終了',
+          tooltip: '戻る',
         ),
         actions: [
           sentencesAsync.when(
