@@ -6,13 +6,21 @@ import 'auth_provider.dart';
 final userProgressProvider = FutureProvider<List<UserProgress>>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return [];
-  return await SupabaseService.getUserProgress(userId);
+  try {
+    return await SupabaseService.getUserProgress(userId);
+  } catch (_) {
+    return [];
+  }
 });
 
 final masteredCountProvider = FutureProvider<int>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return 0;
-  return await SupabaseService.getMasteredCount(userId);
+  try {
+    return await SupabaseService.getMasteredCount(userId);
+  } catch (_) {
+    return 0;
+  }
 });
 
 /// 既習可視化用: 習得済み sentence IDs の Set

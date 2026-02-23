@@ -9,7 +9,11 @@ import '../services/user_stats_service.dart';
 import '../services/achievement_service.dart';
 import '../services/scenario_service.dart';
 import '../services/supabase_service.dart';
+import '../providers/anonymous_conversion_provider.dart';
+import '../providers/study_progress_prompt_provider.dart';
 import '../widgets/achievement_unlock_dialog.dart';
+import '../widgets/anonymous_conversion_dialog.dart';
+import '../widgets/progress_mini_popup.dart';
 import '../widgets/streak_milestone_dialog.dart';
 
 /// 学習完了時の共通ハンドラ
@@ -25,30 +29,29 @@ class LearningCompletionOrchestrator {
   /// 学習完了時に呼び出す
   /// [ref] RiverpodのWidgetRef（ConsumerStateから取得）
   /// [context] ダイアログ表示用のBuildContext
-  static Future<void> onLearningCompleted(WidgetRef ref, BuildContext context) async {
-    try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
+  /// [progressTrack] 'scenario' | 'story' のときのみ進捗ミニポップアップを検討
+  static Future<void> onLearningCompleted(
+    WidgetRef ref,
+    BuildContext context, {
+    String? progressTrack,
+  }) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
 
+    // バックエンド連携（DB未設定時はここで失敗するが処理は続行）
+    try {
       final statsNotifier = ref.read(userStatsNotifierProvider.notifier);
       final statsService = ref.read(userStatsServiceProvider);
 
-      // 1. ストリーク更新
       await statsNotifier.updateStreak();
-
-      // 2. 日次ミッション進捗
       await statsNotifier.incrementDailyDone();
 
-      // 2.5  analytics
       ref.read(analyticsServiceProvider).logStudyComplete();
       final stats = await statsService.getOrCreateUserStats(userId);
       if (stats.isMissionCompleted) {
         ref.read(analyticsServiceProvider).logMissionComplete();
       }
 
-      // 3. 統計取得（ストリーク更新後）
-
-      // 3.5 ストリークマイルストーン（7日/30日）演出
       const milestones = [7, 30];
       if (milestones.contains(stats.streakCount) && context.mounted) {
         showDialog<void>(
@@ -62,14 +65,12 @@ class LearningCompletionOrchestrator {
         }
       }
 
-      // 進捗情報
       final progressList = await SupabaseService.getUserProgress(userId);
       final masteredCount = progressList.where((p) => p.isMastered).length;
       final hintFreeCount = progressList
           .where((p) => p.isMastered && !p.usedHintToMaster)
           .length;
 
-      // シナリオ完了数
       final scenarioService = ScenarioService();
       final scenarios = await scenarioService.getScenarios();
       int completedScenarios = 0;
@@ -80,7 +81,6 @@ class LearningCompletionOrchestrator {
         }
       }
 
-      // 4. バッジ解除チェック
       final achievementService = AchievementService();
       final newlyUnlocked = await achievementService.checkAndUnlockAchievements(
         userId: userId,
@@ -90,7 +90,6 @@ class LearningCompletionOrchestrator {
         hintFreeCount: hintFreeCount,
       );
 
-      // 5. 新規解除演出表示（キューで順次表示）
       if (newlyUnlocked.isNotEmpty) {
         final achievements = await ref.read(achievementsProvider.future);
         for (final achievementId in newlyUnlocked) {
@@ -108,7 +107,51 @@ class LearningCompletionOrchestrator {
         }
       }
 
-      // 6. provider refresh
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null && user.isAnonymous) {
+        final convNotifier = ref.read(anonymousConversionProvider.notifier);
+        await convNotifier.onCompletion();
+        if (await convNotifier.shouldShowPrompt() && context.mounted) {
+          ref.read(analyticsServiceProvider).logAnonPromptShown();
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const AnonymousConversionDialog(),
+          );
+        }
+      }
+    } catch (e) {
+      print('LearningCompletionOrchestrator backend error: $e');
+    }
+
+    // 進捗ミニポップアップはDB失敗時も表示（UI確認のため）
+    final track = progressTrack;
+    if (track != null && (track == 'scenario' || track == 'story')) {
+      try {
+        final promptNotifier = ref.read(studyProgressPromptProvider.notifier);
+        if (await promptNotifier.onCompleted(track) && context.mounted) {
+          ref.read(analyticsServiceProvider).logProgressPopupShown(
+                reason: 'adaptive',
+                track: track,
+              );
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: true,
+            builder: (ctx) => ProgressMiniPopup(
+              track: track,
+              parentContext: context,
+            ),
+          );
+          if (context.mounted) {
+            await promptNotifier.markShown(track);
+          }
+        }
+      } catch (e) {
+        print('LearningCompletionOrchestrator progress popup error: $e');
+      }
+    }
+
+    try {
       ref.invalidate(userStatsProvider);
       ref.invalidate(userStatsNotifierProvider);
       ref.invalidate(userProgressProvider);
@@ -116,8 +159,6 @@ class LearningCompletionOrchestrator {
       ref.invalidate(achievementsProvider);
       ref.invalidate(userAchievementsProvider);
       ref.invalidate(unlockedAchievementIdsProvider);
-    } catch (e) {
-      print('LearningCompletionOrchestrator error: $e');
-    }
+    } catch (_) {}
   }
 }

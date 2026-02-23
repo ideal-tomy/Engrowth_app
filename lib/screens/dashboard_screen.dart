@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,14 +9,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/sentence_provider.dart';
-import '../providers/auth_provider.dart';
 import '../providers/user_plan_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
+import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
+import '../widgets/dashboard_sections/consultant_notification_banner.dart';
 import '../widgets/dashboard_sections/todays_mission_card.dart';
 
 /// Dashboard（Home タブ）
@@ -60,6 +63,16 @@ class DashboardScreen extends ConsumerWidget {
                     const _RecommendedCard(),
                     const SizedBox(height: 4),
                     const _MainTilesGrid(),
+                    const SizedBox(height: 6),
+                    if (authStage == AuthStage.anonymous) ...[
+                      const AnonymousLpBanner(),
+                      const SizedBox(height: 6),
+                    ],
+                    if (authStage == AuthStage.signedIn ||
+                        authStage == AuthStage.coaching) ...[
+                      const ConsultantNotificationBanner(),
+                      const SizedBox(height: 6),
+                    ],
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -78,72 +91,84 @@ class _DashboardHeader extends ConsumerWidget {
     final statsAsync = ref.watch(userStatsProvider);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              Scaffold.of(context).openDrawer();
-            },
-            tooltip: '設定',
-            color: EngrowthColors.onBackground,
-          ),
-          const Spacer(),
-          Text(
-            'Engrowth',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: EngrowthColors.onBackground,
-              letterSpacing: 0.5,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: EngrowthColors.surfaceGlass,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: EngrowthColors.silverBorder),
             ),
-          ),
-          const Spacer(),
-          statsAsync.when(
-            data: (stats) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '\u{1F525}',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${stats.streakCount}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: EngrowthColors.onBackground,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    Scaffold.of(context).openDrawer();
+                  },
+                  tooltip: '設定',
+                  color: EngrowthColors.onBackground,
+                ),
+                const Spacer(),
+                Text(
+                  'Engrowth',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 22,
+                        color: EngrowthColors.onBackground,
+                      ),
+                ),
+                const Spacer(),
+                statsAsync.when(
+                  data: (stats) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '\u{1F525}',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${stats.streakCount}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: EngrowthColors.onBackground,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            loading: () => const SizedBox(width: 40, height: 24),
-            error: (_, __) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('\u{1F525}', style: TextStyle(fontSize: 18)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '0',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: EngrowthColors.onSurfaceVariant,
+                  loading: () => const SizedBox(width: 40, height: 24),
+                  error: (_, __) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('\u{1F525}', style: TextStyle(fontSize: 18)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '0',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: EngrowthColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -212,13 +237,8 @@ class _QuickStartButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: EngrowthColors.surface,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 6,
-                offset: const Offset(0, 1),
-              ),
-            ],
+            border: Border.all(color: EngrowthColors.silverBorder),
+            boxShadow: EngrowthShadows.softCard,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -280,13 +300,8 @@ class _RecommendedCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: EngrowthColors.surface,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                border: Border.all(color: EngrowthColors.silverBorder),
+                boxShadow: EngrowthShadows.softCard,
               ),
               child: Row(
                 children: [
@@ -376,13 +391,7 @@ class _ResumeLearningCard extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              boxShadow: EngrowthShadows.softCard,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -535,13 +544,8 @@ class _MainTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: EngrowthColors.surface,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
+            border: Border.all(color: EngrowthColors.silverBorder),
+            boxShadow: EngrowthShadows.softCard,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),

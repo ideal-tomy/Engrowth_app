@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,6 +22,8 @@ import '../screens/conversation_training_choice_screen.dart';
 import '../screens/story_study_screen.dart';
 import '../screens/story_training_screen.dart';
 import '../screens/consultant_dashboard_screen.dart';
+import '../screens/scenario_progress_board_screen.dart';
+import '../screens/story_progress_board_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/home',
@@ -113,7 +117,10 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/account',
-      builder: (context, state) => const AccountScreen(),
+      builder: (context, state) {
+        final provider = state.uri.queryParameters['provider'];
+        return AccountScreen(initialProvider: provider);
+      },
     ),
     GoRoute(
       path: '/scenarios',
@@ -165,6 +172,14 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/progress/scenario-board',
+      builder: (context, state) => const ScenarioProgressBoardScreen(),
+    ),
+    GoRoute(
+      path: '/progress/story-board',
+      builder: (context, state) => const StoryProgressBoardScreen(),
+    ),
+    GoRoute(
       path: '/',
       redirect: (context, state) => '/home',
     ),
@@ -185,37 +200,44 @@ class ScaffoldWithNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) {
-          navigationShell.goBranch(
-            index,
-            // 同じブランチ内の最初のルートに移動
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+      bottomNavigationBar: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: NavigationBar(
+            height: 68,
+            backgroundColor: Colors.white.withOpacity(0.78),
+            selectedIndex: navigationShell.currentIndex,
+            onDestinationSelected: (index) {
+              navigationShell.goBranch(
+                index,
+                // 同じブランチ内の最初のルートに移動
+                initialLocation: index == navigationShell.currentIndex,
+              );
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.menu_book_outlined),
+                selectedIcon: Icon(Icons.menu_book),
+                label: 'Library',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.trending_up_outlined),
+                selectedIcon: Icon(Icons.trending_up),
+                label: 'Stats',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.search_outlined),
+                selectedIcon: Icon(Icons.search),
+                label: 'Search',
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Library',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.trending_up_outlined),
-            selectedIcon: Icon(Icons.trending_up),
-            label: 'Stats',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-        ],
+        ),
       ),
     );
   }

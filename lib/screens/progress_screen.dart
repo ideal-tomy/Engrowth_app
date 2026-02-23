@@ -11,8 +11,10 @@ import '../providers/progress_provider.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/achievement_provider.dart';
+import '../providers/analytics_provider.dart';
 import '../services/scenario_service.dart';
 import '../services/supabase_service.dart';
+import '../theme/engrowth_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// 学習進捗ページ - 成長実感を中心に再構成
@@ -42,6 +44,7 @@ class ProgressScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _SugorokuBoardEntry(),
             // 上部：連続日数・リング進捗・今日の達成率・次のメダルまでを集約
             const StreakDisplay(),
             const _RingProgressSection(),
@@ -229,20 +232,113 @@ class ProgressScreen extends ConsumerWidget {
                   child: CircularProgressIndicator(),
                 ),
               ),
-              error: (error, stack) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.error, size: 48, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text('エラー: $error'),
-                    ],
-                  ),
+              error: (error, stack) => Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Text(
+                  '進捗リストを取得できませんでした（DB未設定の場合はSupabaseに user_progress テーブルを用意してください）',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// すごろく進捗ボードへの入口カード
+class _SugorokuBoardEntry extends ConsumerWidget {
+  const _SugorokuBoardEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'すごろくで進捗を見る',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _BoardEntryCard(
+                  icon: Icons.timer,
+                  label: 'シナリオ学習',
+                  onTap: () {
+                    ref.read(analyticsServiceProvider).logProgressBoardOpened(track: 'scenario');
+                    context.push('/progress/scenario-board');
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BoardEntryCard(
+                  icon: Icons.auto_stories,
+                  label: '3分英会話',
+                  onTap: () {
+                    ref.read(analyticsServiceProvider).logProgressBoardOpened(track: 'story');
+                    context.push('/progress/story-board');
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoardEntryCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BoardEntryCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: EngrowthColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: EngrowthColors.silverBorder),
+            boxShadow: EngrowthShadows.softCard,
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 28, color: EngrowthColors.primary),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: EngrowthColors.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

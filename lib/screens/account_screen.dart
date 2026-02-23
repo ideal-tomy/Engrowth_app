@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../providers/analytics_provider.dart';
+import '../providers/anonymous_conversion_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import '../theme/engrowth_theme.dart';
@@ -10,7 +12,9 @@ import '../theme/engrowth_theme.dart';
 /// 匿名時: アカウント作成（リンク）・ログイン
 /// ログイン済み: メール表示・ログアウト
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key});
+  final String? initialProvider;
+
+  const AccountScreen({super.key, this.initialProvider});
 
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
@@ -30,6 +34,14 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    if (widget.initialProvider == 'google') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _tabController.animateTo(0);
+          _signInWithGoogle();
+        }
+      });
+    }
   }
 
   @override
@@ -66,6 +78,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
     try {
       await _authService.linkAnonymousToPermanent(email: email, password: password);
       if (mounted) {
+        await ref.read(anonymousConversionProvider.notifier).resetOnConversion();
+        ref.read(analyticsServiceProvider).logAnonToRegisteredSuccess();
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('アカウントを作成しました')),
@@ -220,6 +234,35 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
     );
   }
 
+  Future<void> _signInWithGoogle() async {
+    final wasAnonymous = ref.read(isAnonymousProvider);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await _authService.signInWithGoogle();
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (wasAnonymous) {
+          await ref.read(anonymousConversionProvider.notifier).resetOnConversion();
+          ref.read(analyticsServiceProvider).logAnonToRegisteredSuccess();
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(wasAnonymous ? 'Googleでアカウントを作成しました' : 'ログインしました')),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = _formatAuthError(e);
+        });
+      }
+    }
+  }
+
   Widget _buildLinkForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -234,6 +277,32 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             ),
           ),
           const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _signInWithGoogle,
+            icon: const Icon(Icons.g_mobiledata, size: 22),
+            label: const Text('Googleでアカウントを作成'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'または',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: EngrowthColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 20),
           _buildEmailField(),
           const SizedBox(height: 16),
           _buildPasswordField(),
@@ -274,6 +343,32 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             ),
           ),
           const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _signInWithGoogle,
+            icon: const Icon(Icons.g_mobiledata, size: 22),
+            label: const Text('Googleでログイン'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'または',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: EngrowthColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 20),
           _buildEmailField(),
           const SizedBox(height: 16),
           _buildPasswordField(),

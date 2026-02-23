@@ -51,8 +51,33 @@ class AuthService {
     );
   }
 
-  /// サインアウト
+  /// Google OAuth でサインイン or 匿名ユーザーをリンク
+  /// 匿名時は linkIdentity で同一 user_id を保持、非匿名時は signInWithOAuth
+  Future<bool> signInWithGoogle() async {
+    final user = _client.auth.currentUser;
+    final isAnon = user != null && user.isAnonymous;
+    try {
+      if (isAnon) {
+        await _client.auth.linkIdentity(
+          OAuthProvider.google,
+          redirectTo: _redirectUrl,
+        );
+      } else {
+        await _client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: _redirectUrl,
+        );
+      }
+      return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// ログアウト（匿名の場合はサインアウト後、ensureSignedIn で匿名再ログイン可能）
   Future<void> signOut() async {
     await _client.auth.signOut();
   }
+
+  String get _redirectUrl => Uri.base.origin;
 }

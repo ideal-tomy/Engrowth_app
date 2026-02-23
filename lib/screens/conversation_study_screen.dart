@@ -219,9 +219,25 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         sessionId: _sessionId,
         role: _mode == 'roleA' ? 'A' : 'B',
       );
-      unawaited(LearningCompletionOrchestrator.onLearningCompleted(ref, context));
+      unawaited(_runLearningCompletedWithTrack());
     }
     unawaited(_maybeShowStoryNextPartDialog());
+  }
+
+  Future<void> _runLearningCompletedWithTrack() async {
+    String? track;
+    try {
+      final cwu = await ref.read(conversationWithUtterancesProvider(widget.conversationId).future);
+      if (cwu.conversation.isPartOfStory && cwu.conversation.storySequenceId != null) {
+        track = 'story';
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    await LearningCompletionOrchestrator.onLearningCompleted(
+      ref,
+      context,
+      progressTrack: track,
+    );
   }
 
   Future<String?> _getNextConversationIdInStory() async {
@@ -382,7 +398,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
             conversationId: widget.conversationId,
             sessionId: _sessionId,
           );
-          await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+          await _runLearningCompletedWithTrack();
         }
         String? nextId;
         try {
@@ -405,8 +421,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     _playAllConversation(utterances, showPromptOnComplete: true, startIndex: startIndex);
   }
 
-  /// 役モード時は音のみを原則。テキストは「どうしても」の場合のみ
+  /// 役モード時は音のみを原則。テキストは「どうしても」の場合のみ。
+  /// 「会話全体を聴く」再生中は発話カードを出さず、最小表示（役バッジ＋再生中）のみにする。
   bool _canShowText(ConversationUtterance utterance) {
+    if (_mode == 'listen' && _isPlaying) return false;
     if (_mode == 'roleA' || _mode == 'roleB') {
       return _revealedTextInRoleMode.contains(utterance.id);
     }

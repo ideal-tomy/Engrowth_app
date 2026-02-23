@@ -152,7 +152,11 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
                 await _markScenarioCompleted(sentences.length - 1);
               }
 
-              await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+              await LearningCompletionOrchestrator.onLearningCompleted(
+                ref,
+                context,
+                progressTrack: isLastSentence ? 'scenario' : null,
+              );
 
               if (mounted) _nextSentence(sentences.length);
             },

@@ -49,4 +49,43 @@ class AnalyticsService {
       logEvent(eventType: 'story_resume_tap', eventProperties: {'story_id': storyId});
   void logNextTaskAccepted({String? nextType}) =>
       logEvent(eventType: 'next_task_accepted', eventProperties: {'next_type': nextType});
+
+  // 匿名→登録導線
+  void logAnonPromptShown() => logEvent(eventType: 'anon_prompt_shown');
+  void logAnonPromptCtaGoogle() => logEvent(eventType: 'anon_prompt_cta_google');
+  void logAnonPromptCtaEmail() => logEvent(eventType: 'anon_prompt_cta_email');
+  void logAnonPromptDismissed() => logEvent(eventType: 'anon_prompt_dismissed');
+  void logAnonToRegisteredSuccess() =>
+      logEvent(eventType: 'anon_to_registered_success');
+
+  // 上質化UIUX追加
+  void logUiSnapUsed({String? section}) =>
+      logEvent(eventType: 'ui_snap_used', eventProperties: {'section': section});
+  void logHapticFired({String? trigger}) =>
+      logEvent(eventType: 'haptic_fired', eventProperties: {'trigger': trigger});
+  void logLottieShown({String? scene}) =>
+      logEvent(eventType: 'lottie_shown', eventProperties: {'scene': scene});
+  void logSituationAmbienceTrigger({String? storyId, String? theme}) => logEvent(
+      eventType: 'situation_ambience_trigger',
+      eventProperties: {'story_id': storyId, 'theme': theme});
+
+  // すごろく進捗UI
+  void logProgressBoardOpened({String? track}) =>
+      logEvent(eventType: 'progress_board_opened', eventProperties: {'track': track});
+  void logProgressNodeTapped({String? nodeId, String? track}) => logEvent(
+      eventType: 'progress_node_tapped',
+      eventProperties: {'node_id': nodeId, 'track': track});
+  void logProgressPopupShown({String? reason, String? track}) => logEvent(
+      eventType: 'progress_popup_shown',
+      eventProperties: {'reason': reason, 'track': track});
+  void logProgressPopupCtaContinue({String? track}) => logEvent(
+      eventType: 'progress_popup_cta_continue', eventProperties: {'track': track});
+  void logProgressPopupCtaViewBoard({String? track}) => logEvent(
+      eventType: 'progress_popup_cta_view_board', eventProperties: {'track': track});
+
+  // 匿名保存訴求
+  void logAnonSaveNudgeShown({String? source}) =>
+      logEvent(eventType: 'anon_save_nudge_shown', eventProperties: {'source': source});
+  void logAnonSaveNudgeCta({String? source}) =>
+      logEvent(eventType: 'anon_save_nudge_cta', eventProperties: {'source': source});
 }

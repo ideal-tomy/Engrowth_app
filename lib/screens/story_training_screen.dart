@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/story_theme_categories.dart';
 import '../models/story_sequence.dart';
+import '../providers/analytics_provider.dart';
 import '../providers/story_provider.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
@@ -156,6 +157,64 @@ class _StoryThemeSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    return _StoryThemeSectionBody(
+      theme: theme,
+      displayName: displayName,
+      icon: icon,
+      stories: stories,
+    );
+  }
+}
+
+class _StoryThemeSectionBody extends ConsumerStatefulWidget {
+  final String theme;
+  final String displayName;
+  final IconData icon;
+  final List<StorySequence> stories;
+
+  const _StoryThemeSectionBody({
+    required this.theme,
+    required this.displayName,
+    required this.icon,
+    required this.stories,
+  });
+
+  @override
+  ConsumerState<_StoryThemeSectionBody> createState() =>
+      _StoryThemeSectionBodyState();
+}
+
+class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> {
+  late final PageController _pageController;
+  double _currentPage = 0;
+  int _lastLoggedPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.52);
+    _pageController.addListener(() {
+      final page = _pageController.page ?? 0;
+      if (!mounted) return;
+      setState(() {
+        _currentPage = page;
+      });
+      final rounded = page.round();
+      if (rounded != _lastLoggedPage) {
+        _lastLoggedPage = rounded;
+        ref.read(analyticsServiceProvider).logUiSnapUsed(section: widget.theme);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -163,10 +222,10 @@ class _StoryThemeSection extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(icon, size: 24, color: EngrowthColors.primary),
+              Icon(widget.icon, size: 24, color: EngrowthColors.primary),
               const SizedBox(width: 8),
               Text(
-                '$displayName',
+                widget.displayName,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -175,7 +234,7 @@ class _StoryThemeSection extends ConsumerWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '（${stories.length}本）',
+                '（${widget.stories.length}本）',
                 style: TextStyle(
                   fontSize: 14,
                   color: EngrowthColors.onSurfaceVariant,
@@ -186,16 +245,27 @@ class _StoryThemeSection extends ConsumerWidget {
         ),
         SizedBox(
           height: 180,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: PageView.builder(
+            controller: _pageController,
+            padEnds: false,
             physics: const BouncingScrollPhysics(),
-            itemCount: stories.length,
+            itemCount: widget.stories.length,
             itemBuilder: (context, index) {
-              final story = stories[index];
+              final story = widget.stories[index];
+              final distance = (_currentPage - index).abs();
+              final cardScale = (1 - (distance * 0.06)).clamp(0.92, 1.0);
               return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _StorySequenceCard(story: story),
+                padding: EdgeInsets.only(
+                  left: index == 0 ? 16 : 6,
+                  right: index == widget.stories.length - 1 ? 16 : 6,
+                ),
+                child: Transform.scale(
+                  scale: cardScale,
+                  child: _StorySequenceCard(
+                    story: story,
+                    theme: widget.theme,
+                  ),
+                ),
               );
             },
           ),
@@ -206,92 +276,122 @@ class _StoryThemeSection extends ConsumerWidget {
   }
 }
 
-class _StorySequenceCard extends ConsumerWidget {
+class _StorySequenceCard extends ConsumerStatefulWidget {
   final StorySequence story;
+  final String theme;
 
-  const _StorySequenceCard({required this.story});
+  const _StorySequenceCard({
+    required this.story,
+    required this.theme,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final progressAsync = ref.watch(storyProgressProvider(story.id));
-    final conversationsAsync = ref.watch(storyConversationsProvider(story.id));
+  ConsumerState<_StorySequenceCard> createState() => _StorySequenceCardState();
+}
+
+class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final progressAsync = ref.watch(storyProgressProvider(widget.story.id));
+    final conversationsAsync = ref.watch(storyConversationsProvider(widget.story.id));
 
     return progressAsync.when(
       data: (progress) {
         final hasResume = progress != null &&
             progress.lastConversationId != null &&
             progress.completedAt == null;
+        final isCompleted = progress?.completedAt != null;
         return conversationsAsync.when(
           data: (conversations) {
             if (conversations.isEmpty) {
-              return _buildCard(context, '準備中', hasResume: false);
+              return _buildCard(context, '準備中', hasResume: false, isCompleted: false);
             }
-            return _buildCard(context, story.title, hasResume: hasResume);
+            return _buildCard(context, widget.story.title, hasResume: hasResume, isCompleted: isCompleted);
           },
-          loading: () => _buildCard(context, story.title, hasResume: false),
-          error: (_, __) => _buildCard(context, story.title, hasResume: false),
+          loading: () => _buildCard(context, widget.story.title, hasResume: false, isCompleted: false),
+          error: (_, __) => _buildCard(context, widget.story.title, hasResume: false, isCompleted: false),
         );
       },
-      loading: () => _buildCard(context, story.title, hasResume: false),
-      error: (_, __) => _buildCard(context, story.title, hasResume: false),
+      loading: () => _buildCard(context, widget.story.title, hasResume: false, isCompleted: false),
+      error: (_, __) => _buildCard(context, widget.story.title, hasResume: false, isCompleted: false),
     );
   }
 
-  Widget _buildCard(BuildContext context, String title, {required bool hasResume}) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        context.push('/story/${story.id}');
-      },
-      child: Container(
-        width: 160,
-        decoration: BoxDecoration(
-          color: EngrowthColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
+  Widget _buildCard(BuildContext context, String title, {required bool hasResume, required bool isCompleted}) {
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutBack,
+      scale: _pressed ? 0.97 : 1,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          ref.read(analyticsServiceProvider).logHapticFired(trigger: 'story_card_tap');
+          context.push('/story/${widget.story.id}');
+        },
+        child: Container(
+          width: 160,
+          height: 180,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: EngrowthColors.silverBorder),
+            boxShadow: EngrowthShadows.softCard,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: SizedBox(
-                    height: 100,
-                    width: double.infinity,
-                    child: story.thumbnailUrl != null
-                        ? OptimizedImage(
-                            imageUrl: story.thumbnailUrl!,
-                            width: double.infinity,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            kScenarioBgAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.grey[300]),
-                          ),
+                // 背景画像
+                widget.story.thumbnailUrl != null
+                    ? OptimizedImage(
+                        imageUrl: widget.story.thumbnailUrl!,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: _gradientForTheme(widget.theme),
+                        ),
+                        child: Image.asset(
+                          kScenarioBgAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: Colors.grey[300]),
+                        ),
+                      ),
+                // 下部グラデーション（テキスト可読性確保）
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.75),
+                        ],
+                        stops: const [0.0, 0.4, 1.0],
+                      ),
+                    ),
                   ),
                 ),
+                // 状態ピル（左上）
                 if (hasResume)
                   Positioned(
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: EngrowthColors.primary,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
                         '続きから',
@@ -302,41 +402,108 @@ class _StorySequenceCard extends ConsumerWidget {
                         ),
                       ),
                     ),
+                  )
+                else if (isCompleted)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: EngrowthColors.success,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        '完了',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
+                // タイトル・補足（画像上・下部）
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black45,
+                              offset: Offset(0, 1),
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.graphic_eq,
+                            size: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '約${widget.story.totalDurationMinutes}分',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: EngrowthColors.onSurface,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '約${story.totalDurationMinutes}分',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: EngrowthColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  LinearGradient _gradientForTheme(String theme) {
+    switch (theme) {
+      case 'cafe':
+        return const LinearGradient(
+          colors: [Color(0xFFEFE8E1), Color(0xFFD8DDE6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'airport':
+        return const LinearGradient(
+          colors: [Color(0xFFE6ECF5), Color(0xFFDDE2EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'office':
+        return const LinearGradient(
+          colors: [Color(0xFFECEFF3), Color(0xFFD6DBE3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      default:
+        return const LinearGradient(
+          colors: [Color(0xFFF0F1F4), Color(0xFFDDE1E8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+    }
   }
 }

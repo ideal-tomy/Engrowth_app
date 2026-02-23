@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voice_submission.dart';
+import '../providers/analytics_provider.dart';
 import '../services/voice_submission_service.dart';
 import '../theme/engrowth_theme.dart';
 
@@ -86,6 +90,8 @@ class _AudioComparisonPlayerState extends ConsumerState<AudioComparisonPlayer> {
   }
 
   Future<void> _play(VoiceSubmission s, AudioPlayer player) async {
+    HapticFeedback.selectionClick();
+    ref.read(analyticsServiceProvider).logAudioComparePlayed();
     if (player.playing) {
       await player.stop();
       if (mounted) setState(() {});
@@ -230,7 +236,85 @@ class _ComparisonPane extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        _MiniWaveform(isActive: isPlaying && submission != null),
       ],
+    );
+  }
+}
+
+class _MiniWaveform extends StatefulWidget {
+  final bool isActive;
+
+  const _MiniWaveform({required this.isActive});
+
+  @override
+  State<_MiniWaveform> createState() => _MiniWaveformState();
+}
+
+class _MiniWaveformState extends State<_MiniWaveform>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    if (widget.isActive) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiniWaveform oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+    if (!widget.isActive && _controller.isAnimating) {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 20,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(6, (index) {
+              final phase = ((_controller.value * 2 * math.pi) + (index * 0.7));
+              final factor =
+                  widget.isActive ? (0.45 + (0.55 * (math.sin(phase).abs()))) : 0.2;
+              final barHeight = 4 + (12 * factor);
+              return Container(
+                width: 3,
+                height: barHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                decoration: BoxDecoration(
+                  color: widget.isActive
+                      ? EngrowthColors.primary.withOpacity(0.8)
+                      : Colors.grey.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              );
+            }),
+          );
+        },
+      ),
     );
   }
 }

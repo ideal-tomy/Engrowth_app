@@ -41,7 +41,7 @@ class AnonymousDataSaveBanner extends ConsumerWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  'ログインで記録を保存・続きから学習',
+                  'アカウント作成で翌日以降も続きから',
                   style: TextStyle(
                     fontSize: 11,
                     color: EngrowthColors.onSurface,

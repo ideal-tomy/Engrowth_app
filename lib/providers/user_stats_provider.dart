@@ -9,15 +9,20 @@ final userStatsServiceProvider = Provider<UserStatsService>((ref) {
 });
 
 /// ユーザー統計情報プロバイダ
-/// 匿名時はデフォルト値を返し、ダッシュボードが正常表示されるようにする
+/// 匿名時はデフォルト値を返し、ダッシュボードが正常表示されるようにする。
+/// DB未設定（user_stats テーブルなし）時も匿名同様の値で表示し、進捗画面を表示可能にする。
 final userStatsProvider = FutureProvider<UserStats>((ref) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) {
     return UserStats.anonymous();
   }
 
-  final service = ref.read(userStatsServiceProvider);
-  return await service.getOrCreateUserStats(userId);
+  try {
+    final service = ref.read(userStatsServiceProvider);
+    return await service.getOrCreateUserStats(userId);
+  } catch (_) {
+    return UserStats.anonymous();
+  }
 });
 
 /// ユーザー統計情報更新用Notifier

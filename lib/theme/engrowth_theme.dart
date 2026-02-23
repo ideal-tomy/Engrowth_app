@@ -14,9 +14,14 @@ class EngrowthColors {
 
   /// 背景・オフホワイト
   static const Color background = Color(0xFFF5F5F5);
+  static const Color backgroundSoft = Color(0xFFF9F9FA);
+  static const Color backgroundElevated = Color(0xFFFCFCFD);
 
   /// サーフェス（カード等）
   static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceGlass = Color(0xCCFFFFFF);
+  static const Color silverBorder = Color(0xFFE2E5EA);
+  static const Color silverShadow = Color(0x1A9BA4B2);
 
   /// テキスト
   static const Color onPrimary = Color(0xFFFFFFFF);
@@ -49,11 +54,32 @@ class EngrowthTheme {
         error: EngrowthColors.error,
         onError: EngrowthColors.onPrimary,
       ),
-      scaffoldBackgroundColor: EngrowthColors.background,
+      scaffoldBackgroundColor: EngrowthColors.backgroundSoft,
       appBarTheme: const AppBarTheme(
-        backgroundColor: EngrowthColors.primary,
-        foregroundColor: EngrowthColors.onPrimary,
+        backgroundColor: EngrowthColors.surfaceGlass,
+        foregroundColor: EngrowthColors.onBackground,
         elevation: 0,
+      ),
+      dividerColor: EngrowthColors.silverBorder,
+      cardTheme: CardTheme(
+        color: EngrowthColors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: EngrowthColors.silverBorder),
+        ),
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          fontFamilyFallback: ['Playfair Display', 'Noto Serif JP'],
+        ),
+        headlineSmall: TextStyle(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          fontFamilyFallback: ['Playfair Display', 'Noto Serif JP'],
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -64,4 +90,20 @@ class EngrowthTheme {
       ),
     );
   }
+}
+
+class EngrowthShadows {
+  static const List<BoxShadow> softCard = [
+    BoxShadow(
+      color: EngrowthColors.silverShadow,
+      blurRadius: 22,
+      spreadRadius: 1,
+      offset: Offset(0, 10),
+    ),
+    BoxShadow(
+      color: Color(0x10FFFFFF),
+      blurRadius: 6,
+      offset: Offset(-2, -2),
+    ),
+  ];
 }
