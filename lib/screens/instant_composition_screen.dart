@@ -115,9 +115,10 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
   @override
   Widget build(BuildContext context) {
     final sentencesAsync = ref.watch(instantCompositionSentencesProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('瞬間英作文'),
         leading: IconButton(
@@ -148,7 +149,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: EngrowthColors.error),
+              Icon(Icons.error_outline, size: 48, color: colorScheme.error),
               const SizedBox(height: 16),
               Text('$e', textAlign: TextAlign.center),
             ],
@@ -159,15 +160,16 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 64, color: EngrowthColors.onSurfaceVariant),
+          Icon(Icons.inventory_2_outlined, size: 64, color: colorScheme.onSurfaceVariant),
           const SizedBox(height: 16),
           Text(
             'センテンスがありません',
-            style: TextStyle(color: EngrowthColors.onSurfaceVariant),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           TextButton(
@@ -182,6 +184,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
   Widget _buildContent(Sentence sentence, int total) {
     final imgUrl = sentence.getImageUrl();
     final showAnswer = _phase == _Phase.revealed;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
@@ -215,7 +218,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                                     kScenarioBgAsset,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
-                                        Container(color: Colors.grey[300]),
+                                        Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                                   ),
                             // 上から下へのグラデーションオーバーレイ
                             Positioned.fill(
@@ -266,7 +269,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                                     child: Container(
                                       padding: const EdgeInsets.all(20),
                                       decoration: BoxDecoration(
-                                        color: EngrowthColors.primary.withOpacity(0.85),
+                                        color: colorScheme.primary.withOpacity(0.85),
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
@@ -330,44 +333,54 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                   if (showAnswer)
                     Expanded(
                       flex: 1,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: EngrowthColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                      child: Builder(
+                        builder: (ctx) {
+                          final cs = Theme.of(ctx).colorScheme;
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Theme.of(ctx).brightness == Brightness.dark
+                                  ? Border.all(color: cs.outlineVariant)
+                                  : null,
+                              boxShadow: Theme.of(ctx).brightness == Brightness.dark
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: cs.shadow.withOpacity(0.06),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                             ),
-                          ],
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                sentence.englishText,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: EngrowthColors.onSurface,
-                                ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    sentence.englishText,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    sentence.japaneseText,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                sentence.japaneseText,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: EngrowthColors.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     )
                   else
@@ -387,8 +400,8 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                   onPressed: () => _goPrev(),
                   icon: const Icon(Icons.chevron_left),
                   style: IconButton.styleFrom(
-                    backgroundColor: EngrowthColors.surface,
-                    foregroundColor: EngrowthColors.onSurface,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    foregroundColor: colorScheme.onSurface,
                   ),
                 ),
                 Expanded(
@@ -408,7 +421,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                             icon: const Icon(Icons.volume_up),
                             label: const Text('答えを聞く'),
                             style: TextButton.styleFrom(
-                              foregroundColor: EngrowthColors.primary,
+                              foregroundColor: colorScheme.primary,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,
                                 vertical: 12,
@@ -424,14 +437,14 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                             icon: const Icon(Icons.replay),
                             label: const Text('もう一度聞く'),
                             style: TextButton.styleFrom(
-                              foregroundColor: EngrowthColors.primary,
+                              foregroundColor: colorScheme.primary,
                             ),
                           ),
                         Text(
                           '${_currentIndex + 1} / $total',
                           style: TextStyle(
                             fontSize: 12,
-                            color: EngrowthColors.onSurfaceVariant,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -442,8 +455,8 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                   onPressed: () => _goNext(),
                   icon: const Icon(Icons.chevron_right),
                   style: IconButton.styleFrom(
-                    backgroundColor: EngrowthColors.primary,
-                    foregroundColor: EngrowthColors.onPrimary,
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                   ),
                 ),
               ],

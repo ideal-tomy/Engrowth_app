@@ -16,11 +16,12 @@ class WordTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.white,
+      color: colorScheme.surface,
       borderRadius: BorderRadius.circular(10),
-      elevation: 1,
-      shadowColor: Colors.black.withOpacity(0.06),
+      elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 1,
+      shadowColor: colorScheme.shadow.withOpacity(0.06),
       child: InkWell(
         onTap: () => WordDetailSheet.show(context, word),
         borderRadius: BorderRadius.circular(10),
@@ -32,9 +33,10 @@ class WordTile extends StatelessWidget {
             children: [
               Text(
                 word.word,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -44,7 +46,7 @@ class WordTile extends StatelessWidget {
               Icon(
                 Icons.volume_up_outlined,
                 size: 16,
-                color: EngrowthColors.primary.withOpacity(0.7),
+                color: colorScheme.primary.withOpacity(0.7),
               ),
             ],
           ),

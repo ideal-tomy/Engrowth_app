@@ -67,8 +67,11 @@ class _SentenceCardState extends State<SentenceCard> {
   @override
   Widget build(BuildContext context) {
     if (widget.compact) return _buildCompactRow();
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: colorScheme.surface,
+      elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 1,
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(12),
@@ -179,9 +182,10 @@ class _SentenceCardState extends State<SentenceCard> {
                       Expanded(
                         child: Text(
                           widget.sentence.englishText,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -213,7 +217,7 @@ class _SentenceCardState extends State<SentenceCard> {
                     widget.sentence.japaneseText,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[700],
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                   
@@ -227,8 +231,8 @@ class _SentenceCardState extends State<SentenceCard> {
                         icon: const Icon(Icons.school, size: 18),
                         label: const Text('この例文で練習'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green[700],
-                          side: BorderSide(color: Colors.green[700]!),
+                          foregroundColor: colorScheme.primary,
+                          side: BorderSide(color: colorScheme.primary),
                         ),
                       ),
                     ),
@@ -244,10 +248,10 @@ class _SentenceCardState extends State<SentenceCard> {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.6),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.orange.shade200,
+                              color: Theme.of(context).colorScheme.outlineVariant,
                               width: 1,
                             ),
                           ),
@@ -255,7 +259,7 @@ class _SentenceCardState extends State<SentenceCard> {
                             trimmedWord,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.orange.shade700,
+                              color: Theme.of(context).colorScheme.onTertiaryContainer,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -273,8 +277,9 @@ class _SentenceCardState extends State<SentenceCard> {
   }
 
   Widget _buildCompactRow() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.white,
+      color: colorScheme.surface,
       child: InkWell(
         onTap: widget.onTap,
         child: Padding(
@@ -332,9 +337,10 @@ class _SentenceCardState extends State<SentenceCard> {
                       ),
                     Text(
                       widget.sentence.englishText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -397,26 +403,28 @@ class _SentenceCardState extends State<SentenceCard> {
         groupName: widget.sentence.group,
       );
     }
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      color: Colors.grey.shade200,
+      color: colorScheme.surfaceContainerHighest,
       child: Icon(
         Icons.chat_bubble_outline,
         size: 28,
-        color: Colors.grey.shade500,
+        color: colorScheme.onSurfaceVariant,
       ),
     );
   }
 
   Color _getDifficultyColor(int difficulty) {
+    final colorScheme = Theme.of(context).colorScheme;
     switch (difficulty) {
       case 1:
-        return Colors.green;
+        return colorScheme.primary;
       case 2:
-        return Colors.orange;
+        return colorScheme.tertiary;
       case 3:
-        return Colors.red;
+        return colorScheme.error;
       default:
-        return Colors.grey;
+        return colorScheme.onSurfaceVariant;
     }
   }
 }
@@ -435,8 +443,9 @@ class _AudioChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.blue.shade50,
+      color: colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onPressed,
@@ -448,14 +457,14 @@ class _AudioChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 22, color: Colors.blue.shade700),
+              Icon(icon, size: 22, color: colorScheme.onPrimaryContainer),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: Colors.blue.shade700,
+                  color: colorScheme.onPrimaryContainer,
                 ),
               ),
             ],

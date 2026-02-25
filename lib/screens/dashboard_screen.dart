@@ -62,7 +62,7 @@ class DashboardScreen extends ConsumerWidget {
                     const _RecommendedCard(),
                     const SizedBox(height: 4),
                     const _MainTilesGrid(),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 14),
                     if (authStage == AuthStage.anonymous) ...[
                       const AnonymousLpBanner(),
                       const SizedBox(height: 6),
@@ -480,7 +480,7 @@ class _MainTilesGrid extends StatelessWidget {
     final tileHeight = tileWidth / 0.9;
 
     return SizedBox(
-      height: tileHeight * 2 + 4,
+      height: tileHeight * 2 + 12,
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,

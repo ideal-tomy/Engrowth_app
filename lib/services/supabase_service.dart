@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../models/word.dart';
 import '../models/sentence.dart';
@@ -40,9 +41,11 @@ class SupabaseService {
       }
       
       return words;
-    } catch (e) {
-      print('Error fetching words: $e');
-      return [];
+    } catch (e, stack) {
+      // 例外を再スローしてUIでエラー表示・再試行できるようにする（空リストで握りつぶさない）
+      debugPrint('Error fetching words: $e');
+      debugPrint(stack.toString());
+      rethrow;
     }
   }
   

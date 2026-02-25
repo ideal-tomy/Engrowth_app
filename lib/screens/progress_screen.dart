@@ -31,6 +31,17 @@ class ProgressScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+          tooltip: '戻る',
+        ),
         title: const Text('進捗確認'),
         actions: [
           IconButton(
