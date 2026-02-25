@@ -104,7 +104,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
                 child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.check_circle, size: 64, color: Colors.green),
+                  Icon(Icons.check_circle, size: 64, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   const Text(
                     'シナリオ完了！',
@@ -179,7 +179,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error, size: 48, color: Colors.red),
+              Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
               Text('エラー: $error', style: const TextStyle(color: Colors.white)),
             ],

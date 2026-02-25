@@ -31,7 +31,6 @@ class DashboardScreen extends ConsumerWidget {
     final userPlan = ref.watch(userPlanProvider);
 
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
       drawer: const _SettingsDrawer(),
       body: SafeArea(
         child: Column(
@@ -89,6 +88,7 @@ class _DashboardHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(userStatsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -99,9 +99,9 @@ class _DashboardHeader extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
-              color: EngrowthColors.surfaceGlass,
+              color: colorScheme.surface.withOpacity(0.9),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: EngrowthColors.silverBorder),
+              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Row(
               children: [
@@ -112,14 +112,14 @@ class _DashboardHeader extends ConsumerWidget {
                     Scaffold.of(context).openDrawer();
                   },
                   tooltip: '設定',
-                  color: EngrowthColors.onBackground,
+                  color: colorScheme.onSurface,
                 ),
                 const Spacer(),
                 Text(
                   'Engrowth',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontSize: 22,
-                        color: EngrowthColors.onBackground,
+                        color: colorScheme.onSurface,
                       ),
                 ),
                 const Spacer(),
@@ -136,10 +136,10 @@ class _DashboardHeader extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           '${stats.streakCount}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: EngrowthColors.onBackground,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -158,7 +158,7 @@ class _DashboardHeader extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: EngrowthColors.onSurfaceVariant,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -230,21 +230,23 @@ class _QuickStartButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        splashColor: EngrowthColors.primary.withOpacity(0.2),
-        highlightColor: EngrowthColors.primary.withOpacity(0.08),
+        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: EngrowthColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: EngrowthColors.silverBorder),
-            boxShadow: EngrowthShadows.softCard,
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? null
+                : EngrowthShadows.softCard,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 22, color: EngrowthColors.primary),
+              Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -252,17 +254,17 @@ class _QuickStartButton extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: EngrowthColors.onSurface,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Text(
                     sublabel,
                     style: TextStyle(
                       fontSize: 10,
-                      color: EngrowthColors.onSurfaceVariant,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -298,14 +300,16 @@ class _RecommendedCard extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: EngrowthColors.surface,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: EngrowthColors.silverBorder),
-                boxShadow: EngrowthShadows.softCard,
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                boxShadow: Theme.of(context).brightness == Brightness.dark
+                    ? null
+                    : EngrowthShadows.softCard,
               ),
               child: Row(
                 children: [
-                  Icon(Icons.lightbulb_outline, size: 20, color: Colors.amber[700]),
+                  Icon(Icons.lightbulb_outline, size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -314,10 +318,10 @@ class _RecommendedCard extends ConsumerWidget {
                       children: [
                         Text(
                           '次に学習: $preview',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: EngrowthColors.onSurface,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -341,7 +345,7 @@ class _RecommendedCard extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: EngrowthColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
@@ -386,12 +390,14 @@ class _ResumeLearningCard extends ConsumerWidget {
             }
           },
           borderRadius: BorderRadius.circular(16),
-          splashColor: EngrowthColors.primary.withOpacity(0.2),
-          highlightColor: EngrowthColors.primary.withOpacity(0.08),
+          splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+          highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              boxShadow: EngrowthShadows.softCard,
+              boxShadow: Theme.of(context).brightness == Brightness.dark
+                  ? null
+                  : EngrowthShadows.softCard,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -402,7 +408,7 @@ class _ResumeLearningCard extends ConsumerWidget {
                     kScenarioBgAsset,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                        Container(color: EngrowthColors.surface),
+                        Container(color: Theme.of(context).colorScheme.surface),
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -538,14 +544,16 @@ class _MainTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        splashColor: EngrowthColors.primary.withOpacity(0.2),
-        highlightColor: EngrowthColors.primary.withOpacity(0.08),
+        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
         child: Container(
           decoration: BoxDecoration(
-            color: EngrowthColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: EngrowthColors.silverBorder),
-            boxShadow: EngrowthShadows.softCard,
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? null
+                : EngrowthShadows.softCard,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
@@ -555,15 +563,15 @@ class _MainTile extends StatelessWidget {
                 Icon(
                   icon,
                   size: 24,
-                  color: EngrowthColors.primary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w500,
-                    color: EngrowthColors.onSurface,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
@@ -654,12 +662,12 @@ class _SettingsDrawer extends ConsumerWidget {
             ),
             const Divider(),
             ListTile(
-              leading: Icon(Icons.logout, color: EngrowthColors.error),
+              leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
               title: Text(
                 'ログアウト',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: EngrowthColors.error,
+                  color: Theme.of(context).colorScheme.error,
                 ),
               ),
               onTap: () async {

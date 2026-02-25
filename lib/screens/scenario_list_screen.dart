@@ -27,15 +27,16 @@ class ScenarioListScreen extends ConsumerWidget {
       body: scenariosAsync.when(
         data: (scenarios) {
           if (scenarios.isEmpty) {
-            return const Center(
+            final colorScheme = Theme.of(context).colorScheme;
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.auto_stories, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
+                  Icon(Icons.auto_stories, size: 64, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 16),
                   Text(
                     'シナリオがまだ登録されていません',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -56,7 +57,7 @@ class ScenarioListScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error, size: 48, color: Colors.red),
+              Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
               Text('エラー: $error'),
             ],
@@ -150,13 +151,13 @@ class ScenarioCard extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                          Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           const SizedBox(width: 4),
                           Text(
                             '約${scenario.estimatedMinutes}分',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -175,9 +176,11 @@ class ScenarioCard extends ConsumerWidget {
                           const SizedBox(height: 12),
                           LinearProgressIndicator(
                             value: progress.isCompleted ? 1.0 : 0.5, // 簡易版
-                            backgroundColor: Colors.grey[200],
+                            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              progress.isCompleted ? Colors.green : Colors.blue,
+                              progress.isCompleted
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.primaryContainer,
                             ),
                             minHeight: 6,
                             borderRadius: BorderRadius.circular(3),
@@ -187,7 +190,7 @@ class ScenarioCard extends ConsumerWidget {
                             progress.isCompleted ? '完了' : '進行中',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],

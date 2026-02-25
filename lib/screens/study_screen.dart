@@ -180,15 +180,16 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                 final limitedSentences = sentences.take(maxCount).toList();
                 // studySentencesFromProvider が sentenceId に応じて既に並べ替え済み。常に _currentIndex=0 から開始。
                 if (limitedSentences.isEmpty) {
-                  return const Center(
+                  final colorScheme = Theme.of(context).colorScheme;
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.school, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
+                        Icon(Icons.school, size: 64, color: colorScheme.onSurfaceVariant),
+                        const SizedBox(height: 16),
                         Text(
                           '例文がまだ登録されていません',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -210,7 +211,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle, size: 64, color: EngrowthColors.primary),
+                        Icon(Icons.check_circle, size: 64, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 16),
                         Text(
                           mode == LearningSessionMode.quick30 ||
@@ -230,7 +231,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                               '${limitedSentences.length}問クリア',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.grey[600],
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -295,7 +296,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
                     const SizedBox(height: 16),
                     Text('エラー: $error'),
                   ],

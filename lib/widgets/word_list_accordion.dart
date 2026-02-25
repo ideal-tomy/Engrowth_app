@@ -68,24 +68,24 @@ class WordListAccordion extends StatelessWidget {
                     children: [
                       Text(
                         letter.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       Text(
                         ' (${words.length})',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const Spacer(),
                       Icon(
                         expanded ? Icons.expand_less : Icons.expand_more,
                         size: 22,
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ],
                   ),

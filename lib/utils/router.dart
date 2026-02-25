@@ -25,6 +25,12 @@ import '../screens/consultant_dashboard_screen.dart';
 import '../screens/scenario_progress_board_screen.dart';
 import '../screens/story_progress_board_screen.dart';
 
+/// 導線ポリシー:
+/// - タブルート直下（/home, /library, /progress, /words）: 戻る矢印なし
+/// - push で開く詳細/設定画面: 戻る矢印あり（GoRouterの自動 leading に任せる）
+/// - タブ切り替え: context.go('/tabPath')
+/// - 詳細・設定・学習画面へ: context.push('/path')
+/// - モーダル（全画面シート）: close アイコンで終了
 final appRouter = GoRouter(
   initialLocation: '/home',
   redirect: (context, state) {
@@ -208,6 +214,8 @@ class ScaffoldWithNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: ClipRRect(
@@ -215,7 +223,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: NavigationBar(
             height: 68,
-            backgroundColor: Colors.white.withOpacity(0.78),
+            backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.92 : 0.95),
             selectedIndex: navigationShell.currentIndex,
             onDestinationSelected: (index) {
               navigationShell.goBranch(

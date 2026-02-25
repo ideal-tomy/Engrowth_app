@@ -89,7 +89,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                 '例文を検索・再生・学習開始',
                 style: TextStyle(
                   fontSize: 12,
-                  color: EngrowthColors.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -116,7 +116,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
             ),
           ),
@@ -172,14 +172,14 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           const SizedBox(height: 16),
                           Text(
                             '例文が見つかりません',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -188,7 +188,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                             hasSearch || hasFilter
                                 ? '検索ワードを変えるか、カテゴリを外してみましょう'
                                 : '例文データがありません',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                           if (hasSearch || hasFilter)
@@ -233,14 +233,14 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
                     const SizedBox(height: 16),
                     Text('エラー: $error'),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => ref.invalidate(filteredSentencesProvider),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: EngrowthColors.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                       child: const Text('再試行'),
                     ),

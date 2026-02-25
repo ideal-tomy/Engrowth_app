@@ -125,25 +125,26 @@ class ProgressScreen extends ConsumerWidget {
             progressAsync.when(
               data: (progressList) {
                 if (progressList.isEmpty) {
+                  final colorScheme = Theme.of(context).colorScheme;
                   return Padding(
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        Icon(Icons.trending_up, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.trending_up, size: 64, color: colorScheme.onSurfaceVariant),
                         const SizedBox(height: 16),
                         Text(
                           'まだ学習を開始していません',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
+                            color: colorScheme.onSurface,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           '瞬間英作文で1問解いてみましょう',
-                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                          style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
@@ -181,7 +182,7 @@ class ProgressScreen extends ConsumerWidget {
                         ),
                       ),
                       ...masteredList.take(5).map((progress) => ListTile(
-                            leading: const Icon(Icons.check_circle, color: Colors.green),
+                            leading: Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
                             title: Text('例文ID: ${progress.sentenceId.substring(0, 8)}...'),
                             subtitle: progress.lastStudiedAt != null
                                 ? Text('学習日: ${progress.lastStudiedAt!.toString().split(' ')[0]}')
@@ -192,7 +193,7 @@ class ProgressScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(left: 16, bottom: 8),
                           child: Text(
                             '他 ${masteredList.length - 5} 件',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ),
                     ],
@@ -208,7 +209,7 @@ class ProgressScreen extends ConsumerWidget {
                         ),
                       ),
                       ...studyingList.take(5).map((progress) => ListTile(
-                            leading: const Icon(Icons.school, color: Colors.orange),
+                            leading: Icon(Icons.school, color: Theme.of(context).colorScheme.tertiary),
                             title: Text('例文ID: ${progress.sentenceId.substring(0, 8)}...'),
                             subtitle: progress.lastStudiedAt != null
                                 ? Text('学習日: ${progress.lastStudiedAt!.toString().split(' ')[0]}')
@@ -219,7 +220,7 @@ class ProgressScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(left: 16, bottom: 24),
                           child: Text(
                             '他 ${studyingList.length - 5} 件',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ),
                     ],
@@ -236,7 +237,7 @@ class ProgressScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Text(
                   '進捗リストを取得できませんでした（DB未設定の場合はSupabaseに user_progress テーブルを用意してください）',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -311,6 +312,7 @@ class _BoardEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -319,21 +321,23 @@ class _BoardEntryCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: EngrowthColors.surface,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: EngrowthColors.silverBorder),
-            boxShadow: EngrowthShadows.softCard,
+            border: Border.all(color: colorScheme.outlineVariant),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? null
+                : EngrowthShadows.softCard,
           ),
           child: Column(
             children: [
-              Icon(icon, size: 28, color: EngrowthColors.primary),
+              Icon(icon, size: 28, color: colorScheme.primary),
               const SizedBox(height: 8),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: EngrowthColors.onSurface,
+                  color: colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -495,10 +499,10 @@ class _NextMedalInfoState extends ConsumerState<_NextMedalInfo> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('今日の達成率', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('今日の達成率', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                 Text(
                   '${stats.dailyDoneCount}/${stats.dailyGoalCount}',
-                  style: TextStyle(color: Colors.grey[700]),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -506,21 +510,23 @@ class _NextMedalInfoState extends ConsumerState<_NextMedalInfo> {
             LinearProgressIndicator(
               value: dailyProgress,
               minHeight: 8,
-              backgroundColor: Colors.grey[300],
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation<Color>(
-                dailyProgress >= 1.0 ? Colors.green : Colors.blue,
+                dailyProgress >= 1.0
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.primaryContainer,
               ),
             ),
             if (remaining != null && nextMedalTitle != null) ...[
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Icon(Icons.emoji_events, size: 20, color: Colors.amber[700]),
+                  Icon(Icons.emoji_events, size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '次のメダル「$nextMedalTitle」まで あと$remaining',
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                     ),
                   ),
                 ],

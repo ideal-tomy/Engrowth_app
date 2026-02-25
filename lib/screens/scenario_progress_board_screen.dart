@@ -9,15 +9,12 @@ import '../providers/auth_provider.dart';
 import '../providers/scenario_provider.dart';
 import '../providers/section_nudge_provider.dart';
 import '../theme/engrowth_theme.dart';
-import '../utils/learning_path_geometry.dart';
-import '../widgets/continuous_path_segment.dart';
 import '../widgets/debug_completion_fab.dart';
 import '../widgets/optimized_image.dart';
-import '../widgets/scroll_target_wrapper.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/scroll_target_wrapper.dart';
 
-/// シナリオ学習のすごろく進捗ボード
-/// 各シナリオをマスとして表示し、タップで学習へ遷移
+/// シナリオ学習の進捗ボード（Speak風：セクション＋ずらしカードリスト）
 class ScenarioProgressBoardScreen extends ConsumerWidget {
   const ScenarioProgressBoardScreen({super.key, this.scrollToNext = false});
 
@@ -30,11 +27,11 @@ class ScenarioProgressBoardScreen extends ConsumerWidget {
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     return Scaffold(
-      backgroundColor: EngrowthColors.backgroundSoft,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         title: const Text('シナリオ進捗'),
-        backgroundColor: EngrowthColors.surface,
-        foregroundColor: EngrowthColors.onBackground,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       floatingActionButton: const DebugCompletionFab(track: 'scenario'),
       body: scenariosAsync.when(
@@ -68,7 +65,274 @@ class ScenarioProgressBoardScreen extends ConsumerWidget {
   }
 }
 
-/// 継続のナッジ：「あと1つでこの章がクリアです！」（クールダウン付き）
+/// Speak風：セクションヘッダー（第1部 シナリオ学習）
+class _ScenarioSectionBanner extends StatelessWidget {
+  final bool isSamplePlaceholder;
+
+  const _ScenarioSectionBanner({this.isSamplePlaceholder = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(
+            color: theme.colorScheme.primary,
+            width: 4,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_stories, size: 22, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Text(
+            '第1部',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isSamplePlaceholder ? 'シナリオ学習の道のり' : 'シナリオ学習',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Speak風：ずらしオフセット（index % 4）
+double _offsetForScenarioIndex(int globalIndex, double width) {
+  final cardWidth = width * 0.72;
+  final margin = (width - cardWidth) / 2;
+  switch (globalIndex % 4) {
+    case 0:
+      return margin;
+    case 1:
+      return (margin + 16).clamp(0.0, width - cardWidth);
+    case 2:
+      return (margin + 28).clamp(0.0, width - cardWidth);
+    case 3:
+      return (margin - 8).clamp(0.0, width - cardWidth);
+    default:
+      return margin;
+  }
+}
+
+/// Speak風：横長レッスンカード（CircleAvatar + タイトル）
+class _ScenarioLessonCard extends ConsumerWidget {
+  final Scenario scenario;
+  final int globalIndex;
+  final bool isScrollTarget;
+  final String? unlockSnackBarMessage;
+  final String? userId;
+  final bool isSamplePlaceholder;
+
+  const _ScenarioLessonCard({
+    required this.scenario,
+    required this.globalIndex,
+    required this.isScrollTarget,
+    this.unlockSnackBarMessage,
+    this.userId,
+    required this.isSamplePlaceholder,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (isSamplePlaceholder) {
+      return _buildCard(context, ref, isCompleted: false, isInProgress: globalIndex == 0);
+    }
+    final progressAsync = ref.watch(userScenarioProgressProvider(scenario.id));
+    final stepsAsync = ref.watch(scenarioStepsProvider(scenario.id));
+
+    return progressAsync.when(
+      data: (progress) {
+        return stepsAsync.when(
+          data: (steps) {
+            final isCompleted = progress?.isCompleted ?? false;
+            final currentStep = progress?.lastStepIndex ?? 0;
+            final isInProgress = !isCompleted && currentStep > 0;
+            return _buildCard(
+              context,
+              ref,
+              isCompleted: isCompleted,
+              isInProgress: isInProgress,
+            );
+          },
+          loading: () => _buildCard(context, ref, isCompleted: false, isInProgress: false),
+          error: (_, __) => _buildCard(context, ref, isCompleted: false, isInProgress: false),
+        );
+      },
+      loading: () => _buildCard(context, ref, isCompleted: false, isInProgress: false),
+      error: (_, __) => _buildCard(context, ref, isCompleted: false, isInProgress: false),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, WidgetRef ref,
+      {required bool isCompleted, required bool isInProgress}) {
+    final theme = Theme.of(context);
+    final width = MediaQuery.of(context).size.width - 32;
+    final cardWidth = width * 0.72;
+    final offset = _offsetForScenarioIndex(globalIndex, width);
+
+    final cardBg = theme.brightness == Brightness.light
+        ? EngrowthColors.cardSurfaceLight
+        : theme.colorScheme.surface;
+    final card = Material(
+      color: cardBg,
+      borderRadius: BorderRadius.circular(24),
+      elevation: theme.brightness == Brightness.light ? 2 : 0,
+      shadowColor: theme.colorScheme.shadow.withOpacity(0.08),
+      child: InkWell(
+        onTap: isSamplePlaceholder
+            ? () {
+                HapticFeedback.selectionClick();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'サンプル表示です。Supabase に scenarios を登録すると学習を開始できます'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            : () {
+                HapticFeedback.selectionClick();
+                ref.read(analyticsServiceProvider).logProgressNodeTapped(
+                      nodeId: scenario.id,
+                      track: 'scenario',
+                    );
+                context.push('/scenario/${scenario.id}');
+              },
+        borderRadius: BorderRadius.circular(24),
+        splashColor: theme.colorScheme.primary.withOpacity(0.1),
+        highlightColor: theme.colorScheme.primary.withOpacity(0.05),
+        child: Container(
+          width: cardWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: theme.brightness == Brightness.dark
+                ? Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3))
+                : null,
+          ),
+          child: Row(
+            children: [
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    child: scenario.thumbnailUrl != null
+                        ? ClipOval(
+                            child: OptimizedImage(
+                              imageUrl: scenario.thumbnailUrl!,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Image.asset(
+                            kScenarioBgAsset,
+                            fit: BoxFit.cover,
+                            width: 50,
+                            height: 50,
+                            errorBuilder: (_, __, ___) =>
+                                Icon(Icons.auto_stories, color: theme.colorScheme.outline),
+                          ),
+                  ),
+                  if (isCompleted)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.check, color: theme.colorScheme.onPrimary, size: 14),
+                      ),
+                    )
+                  else if (isInProgress)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.play_arrow, color: theme.colorScheme.onPrimary, size: 14),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  scenario.title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(Icons.chevron_right, color: theme.colorScheme.outline, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(left: offset, right: width - cardWidth - offset, bottom: 12),
+      child: ScrollTargetWrapper(
+        isTarget: isScrollTarget,
+        unlockSnackBarMessage: unlockSnackBarMessage,
+        child: card,
+      ),
+    );
+  }
+}
+
+List<Scenario> _sampleScenariosForEmptyState() {
+  final now = DateTime.now();
+  return [
+    Scenario(
+      id: '_sample_1',
+      title: '（サンプル）シナリオ1',
+      estimatedMinutes: 5,
+      createdAt: now,
+      updatedAt: now,
+    ),
+    Scenario(
+      id: '_sample_2',
+      title: '（サンプル）シナリオ2',
+      estimatedMinutes: 10,
+      createdAt: now,
+      updatedAt: now,
+    ),
+  ];
+}
+
+/// 継続のナッジ：「あと1つでこの章がクリアです！」
 class _ScenarioSectionNudge extends ConsumerWidget {
   final List<Scenario> scenarios;
 
@@ -132,7 +396,7 @@ class _ScenarioSectionNudge extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: EngrowthColors.onSurface,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -143,128 +407,7 @@ class _ScenarioSectionNudge extends ConsumerWidget {
   }
 }
 
-/// Duolingo / Speak 風：セクション見出し（第1部 シナリオ学習）＋ 点線
-class _ScenarioSectionBanner extends StatelessWidget {
-  final bool isSamplePlaceholder;
-
-  const _ScenarioSectionBanner({this.isSamplePlaceholder = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: EngrowthColors.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border(
-              left: BorderSide(
-                color: EngrowthColors.primary,
-                width: 4,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.auto_stories, size: 22, color: EngrowthColors.primary),
-              const SizedBox(width: 10),
-              Text(
-                '第1部',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: EngrowthColors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isSamplePlaceholder ? 'シナリオ学習の道のり' : 'シナリオ学習',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: EngrowthColors.onBackground,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            SizedBox(
-              width: 24,
-              child: CustomPaint(
-                painter: _ScenarioDottedLinePainter(
-                  color: EngrowthColors.silverBorder,
-                  dotRadius: 2,
-                  spacing: 4,
-                ),
-                size: const Size(24, 16),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '一歩ずつ進もう',
-              style: TextStyle(
-                fontSize: 12,
-                color: EngrowthColors.onSurfaceVariant.withOpacity(0.9),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ScenarioDottedLinePainter extends CustomPainter {
-  final Color color;
-  final double dotRadius;
-  final double spacing;
-
-  _ScenarioDottedLinePainter({
-    required this.color,
-    this.dotRadius = 2,
-    this.spacing = 4,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    double y = dotRadius;
-    while (y < size.height) {
-      canvas.drawCircle(Offset(size.width / 2, y), dotRadius, paint);
-      y += dotRadius * 2 + spacing;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-List<Scenario> _sampleScenariosForEmptyState() {
-  final now = DateTime.now();
-  return [
-    Scenario(
-      id: '_sample_1',
-      title: '（サンプル）シナリオ1',
-      estimatedMinutes: 5,
-      createdAt: now,
-      updatedAt: now,
-    ),
-    Scenario(
-      id: '_sample_2',
-      title: '（サンプル）シナリオ2',
-      estimatedMinutes: 10,
-      createdAt: now,
-      updatedAt: now,
-    ),
-  ];
-}
-
-class _ScenarioBoardBody extends ConsumerStatefulWidget {
+class _ScenarioBoardBody extends ConsumerWidget {
   final List<Scenario> scenarios;
   final String? userId;
   final bool isSamplePlaceholder;
@@ -280,238 +423,56 @@ class _ScenarioBoardBody extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_ScenarioBoardBody> createState() => _ScenarioBoardBodyState();
-}
-
-class _ScenarioBoardBodyState extends ConsumerState<_ScenarioBoardBody> {
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isAnonymous = ref.watch(isAnonymousProvider);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final centerX = w / 2;
-        final amplitude = w * 0.38;
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (widget.isSamplePlaceholder) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'シナリオが登録されていません。Supabase の scenarios テーブルにデータを登録すると、ここにすごろくで表示されます。',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: EngrowthColors.onSurfaceVariant,
-                  ),
-                ),
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (isSamplePlaceholder)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'シナリオが登録されていません。Supabase の scenarios テーブルにデータを登録すると、ここに表示されます。',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.outline,
               ),
-            ],
-            _ScenarioSectionBanner(isSamplePlaceholder: widget.isSamplePlaceholder),
-            const SizedBox(height: 16),
-            _ScenarioSectionNudge(scenarios: widget.scenarios),
-            ...widget.scenarios.asMap().entries.map((entry) {
-              final index = entry.key;
-              final scenario = entry.value;
-              final showConnectorBelow = index < widget.scenarios.length - 1;
-              final isScrollTarget = widget.scrollToNext && widget.targetId == scenario.id;
-              final nextScenario = index < widget.scenarios.length - 1 ? widget.scenarios[index + 1] : null;
-              final animateConnectorRed = widget.scrollToNext && widget.targetId == nextScenario?.id;
-              final fromX = nodeXAt(index, centerX, amplitude);
-              final toX = nodeXAt(index + 1, centerX, amplitude);
-              final fromSlope = nodeSlopeAt(index, amplitude);
-              final toSlope = nodeSlopeAt(index + 1, amplitude);
-              return _SineWaveScenarioRow(
-                fromX: fromX,
-                toX: toX,
-                fromSlope: fromSlope,
-                toSlope: toSlope,
-                width: w,
-                showConnectorBelow: showConnectorBelow,
-                isScrollTarget: isScrollTarget,
-                unlockSnackBarMessage:
-                    isScrollTarget ? '次のシナリオが解放されました' : null,
-                scenario: scenario,
-                index: index + 1,
-                userId: widget.userId,
-                isSamplePlaceholder: widget.isSamplePlaceholder || scenario.id.startsWith('_sample_'),
-                animateConnectorRed: animateConnectorRed,
-              );
-            }),
-            if (isAnonymous) ...[
-              const SizedBox(height: 16),
-              _AnonymousSaveNudge(),
-            ],
-          ],
-        );
-      },
+            ),
+          ),
+        _ScenarioSectionBanner(isSamplePlaceholder: isSamplePlaceholder),
+        const SizedBox(height: 16),
+        _ScenarioSectionNudge(scenarios: scenarios),
+        ...scenarios.asMap().entries.map((entry) {
+          final index = entry.key;
+          final scenario = entry.value;
+          final isScrollTarget = scrollToNext && targetId == scenario.id;
+          final nextScenario = index < scenarios.length - 1 ? scenarios[index + 1] : null;
+          final animateConnectorRed = scrollToNext && targetId == nextScenario?.id;
+          return _ScenarioLessonCard(
+            scenario: scenario,
+            globalIndex: index,
+            isScrollTarget: isScrollTarget,
+            unlockSnackBarMessage: isScrollTarget ? '次のシナリオが解放されました' : null,
+            userId: userId,
+            isSamplePlaceholder: isSamplePlaceholder || scenario.id.startsWith('_sample_'),
+          );
+        }),
+        if (isAnonymous) ...[
+          const SizedBox(height: 16),
+          const _AnonymousSaveNudgeScenario(),
+        ],
+      ],
     );
   }
 }
 
-/// 正弦波レイアウトの1行：ノード位置＋連続パス区間（シナリオ用）
-class _SineWaveScenarioRow extends ConsumerWidget {
-  final double fromX;
-  final double toX;
-  final double? fromSlope;
-  final double? toSlope;
-  final double width;
-  final bool showConnectorBelow;
-  final bool isScrollTarget;
-  final String? unlockSnackBarMessage;
-  final Scenario scenario;
-  final int index;
-  final String? userId;
-  final bool isSamplePlaceholder;
-  final bool animateConnectorRed;
-
-  const _SineWaveScenarioRow({
-    required this.fromX,
-    required this.toX,
-    this.fromSlope,
-    this.toSlope,
-    required this.width,
-    required this.showConnectorBelow,
-    required this.isScrollTarget,
-    this.unlockSnackBarMessage,
-    required this.scenario,
-    required this.index,
-    this.userId,
-    required this.isSamplePlaceholder,
-    required this.animateConnectorRed,
-  });
+class _AnonymousSaveNudgeScenario extends ConsumerWidget {
+  const _AnonymousSaveNudgeScenario();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (isSamplePlaceholder) {
-      return _buildRow(
-        context,
-        ref,
-        isCompleted: false,
-        isInProgress: index == 1,
-      );
-    }
-    final progressAsync = ref.watch(userScenarioProgressProvider(scenario.id));
-    final stepsAsync = ref.watch(scenarioStepsProvider(scenario.id));
-
-    return progressAsync.when(
-      data: (progress) {
-        return stepsAsync.when(
-          data: (steps) {
-            final isCompleted = progress?.isCompleted ?? false;
-            final currentStep = progress?.lastStepIndex ?? 0;
-            final isInProgress = !isCompleted && currentStep > 0;
-            return _buildRow(
-              context,
-              ref,
-              isCompleted: isCompleted,
-              isInProgress: isInProgress,
-            );
-          },
-          loading: () => _buildRow(context, ref, isCompleted: false, isInProgress: false),
-          error: (_, __) => _buildRow(context, ref, isCompleted: false, isInProgress: false),
-        );
-      },
-      loading: () => _buildRow(context, ref, isCompleted: false, isInProgress: false),
-      error: (_, __) => _buildRow(context, ref, isCompleted: false, isInProgress: false),
-    );
-  }
-
-  Widget _buildRow(BuildContext context, WidgetRef ref,
-      {required bool isCompleted, required bool isInProgress}) {
-    const nodeWidth = 100.0;
-    const nodeHeight = 110.0; // ノードカード高さ（72+6+テキスト）
-    const segmentHeight = 52.0;
-
-    final nodeChild = ScrollTargetWrapper(
-      isTarget: isScrollTarget,
-      unlockSnackBarMessage: unlockSnackBarMessage,
-      child: SizedBox(
-        width: nodeWidth,
-        child: _MasuCard(
-          scenario: scenario,
-          index: index,
-          isCompleted: isCompleted,
-          isInProgress: isInProgress,
-          onTap: isSamplePlaceholder
-              ? () {
-                  HapticFeedback.selectionClick();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('サンプル表示です。Supabase に scenarios を登録すると学習を開始できます'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              : () {
-                  HapticFeedback.selectionClick();
-                  ref.read(analyticsServiceProvider).logProgressNodeTapped(
-                        nodeId: scenario.id,
-                        track: 'scenario',
-                      );
-                  context.push('/scenario/${scenario.id}');
-                },
-        ),
-      ),
-    );
-
-    final stackNode = Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          left: (fromX - nodeWidth / 2).clamp(0.0, width - nodeWidth),
-          top: 0,
-          child: nodeChild,
-        ),
-      ],
-    );
-
-    if (!showConnectorBelow) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: SizedBox(height: nodeHeight, width: width, child: stackNode),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: nodeHeight, width: width, child: stackNode),
-          ContinuousPathSegment(
-            fromX: fromX,
-            toX: toX,
-            fromSlope: fromSlope,
-            toSlope: toSlope,
-            width: width,
-            height: segmentHeight,
-            isCleared: isCompleted,
-            animateToRed: animateConnectorRed,
-          ),
-          const SizedBox(height: 4),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnonymousSaveNudge extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_AnonymousSaveNudge> createState() => _AnonymousSaveNudgeState();
-}
-
-class _AnonymousSaveNudgeState extends ConsumerState<_AnonymousSaveNudge> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(analyticsServiceProvider).logAnonSaveNudgeShown(source: 'scenario_board');
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -524,196 +485,24 @@ class _AnonymousSaveNudgeState extends ConsumerState<_AnonymousSaveNudge> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: EngrowthColors.surface,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: EngrowthColors.silverBorder),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
-              Icon(Icons.cloud_outlined, size: 20, color: EngrowthColors.primary),
+              Icon(Icons.cloud_outlined, size: 20, color: theme.colorScheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   '進捗を端末替えても引き継ぐにはアカウント作成がおすすめです',
                   style: TextStyle(
                     fontSize: 12,
-                    color: EngrowthColors.onSurfaceVariant,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, size: 18, color: EngrowthColors.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MasuCard extends StatefulWidget {
-  final Scenario scenario;
-  final int index;
-  final bool isCompleted;
-  final bool isInProgress;
-  final VoidCallback onTap;
-
-  const _MasuCard({
-    required this.scenario,
-    required this.index,
-    required this.isCompleted,
-    required this.isInProgress,
-    required this.onTap,
-  });
-
-  @override
-  State<_MasuCard> createState() => _MasuCardState();
-}
-
-class _MasuCardState extends State<_MasuCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    if (widget.isInProgress) {
-      _pulseController.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _MasuCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isInProgress && !_pulseController.isAnimating) {
-      _pulseController.repeat(reverse: true);
-    }
-    if (!widget.isInProgress && _pulseController.isAnimating) {
-      _pulseController.stop();
-      _pulseController.reset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final scale = widget.isInProgress
-            ? 1.0 + (_pulseController.value * 0.02)
-            : 1.0;
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(40),
-          splashColor: EngrowthColors.primary.withOpacity(0.2),
-          highlightColor: EngrowthColors.primary.withOpacity(0.08),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 丸ノード＋シーン画像（ストーリーと統一）
-              Stack(
-                alignment: Alignment.bottomRight,
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: widget.isCompleted
-                            ? EngrowthColors.primary
-                            : widget.isInProgress
-                                ? EngrowthColors.primary.withOpacity(0.6)
-                                : EngrowthColors.silverBorder,
-                        width: widget.isCompleted || widget.isInProgress ? 3 : 2,
-                      ),
-                      boxShadow: EngrowthShadows.softCard,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: widget.scenario.thumbnailUrl != null
-                        ? OptimizedImage(
-                            imageUrl: widget.scenario.thumbnailUrl!,
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            kScenarioBgAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.grey[300]),
-                          ),
-                  ),
-                  if (widget.isCompleted)
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: EngrowthColors.success,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    )
-                  else if (widget.isInProgress)
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: EngrowthColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                width: 88,
-                child: Text(
-                  widget.scenario.title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: widget.isCompleted
-                        ? EngrowthColors.onSurface
-                        : EngrowthColors.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.outline),
             ],
           ),
         ),

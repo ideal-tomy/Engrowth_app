@@ -64,7 +64,6 @@ class StoryTrainingScreen extends ConsumerWidget {
     final dataAsync = ref.watch(storySequencesByThemeProvider);
 
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
       appBar: AppBar(
         title: const Text('3分会話トレーニング'),
         actions: [
@@ -103,13 +102,13 @@ class StoryTrainingScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: EngrowthColors.error),
+              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 'エラー: $error',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 14, color: EngrowthColors.onSurface),
+                style: TextStyle(
+                    fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
               ),
             ],
           ),
@@ -125,13 +124,13 @@ class StoryTrainingScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.auto_stories, size: 64, color: EngrowthColors.onSurfaceVariant),
+            Icon(Icons.auto_stories, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(
               '3分英会話は準備中です',
               style: TextStyle(
                 fontSize: 16,
-                color: EngrowthColors.onSurfaceVariant,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -338,8 +337,10 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
           height: 180,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: EngrowthColors.silverBorder),
-            boxShadow: EngrowthShadows.softCard,
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? null
+                : EngrowthShadows.softCard,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
@@ -362,7 +363,7 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
                           kScenarioBgAsset,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) =>
-                              Container(color: Colors.grey[300]),
+                              Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                         ),
                       ),
                 // 下部グラデーション（テキスト可読性確保）
@@ -390,13 +391,13 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: EngrowthColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
+                      child: Text(
                         '続きから',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -410,13 +411,13 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: EngrowthColors.success,
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
+                      child: Text(
                         '完了',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),

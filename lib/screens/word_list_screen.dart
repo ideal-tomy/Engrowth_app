@@ -133,7 +133,7 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                 '単語を検索・タップで詳細',
                 style: TextStyle(
                   fontSize: 12,
-                  color: EngrowthColors.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -167,7 +167,7 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[100],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                 ),
                 // 検索候補表示
@@ -175,11 +175,11 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                   Container(
                     margin: const EdgeInsets.only(top: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Theme.of(context).colorScheme.shadow.withOpacity(0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -230,14 +230,14 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           const SizedBox(height: 16),
                           Text(
                             '単語が見つかりません',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -246,7 +246,7 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                             hasSearch || hasFilter
                                 ? '検索ワードを変えるか、フィルタを外してみましょう'
                                 : '単語データがありません',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                           if (hasSearch || hasFilter)
@@ -292,14 +292,14 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
                     const SizedBox(height: 16),
                     Text('エラー: $error'),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => ref.invalidate(wordsGroupedByLetterProvider),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: EngrowthColors.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                       child: const Text('再試行'),
                     ),

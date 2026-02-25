@@ -97,14 +97,14 @@ class _SentenceCardState extends State<SentenceCard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
+                            color: Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             widget.sentence.categoryTag!,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.blue.shade700,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -148,19 +148,19 @@ class _SentenceCardState extends State<SentenceCard> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.location_on, size: 16, color: Colors.grey.shade600),
+                          Icon(Icons.location_on, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               widget.sentence.sceneSetting!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade700,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -305,7 +305,7 @@ class _SentenceCardState extends State<SentenceCard> {
                         child: Icon(
                           Icons.check_circle,
                           size: 20,
-                          color: Colors.green,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                   ],
@@ -325,7 +325,7 @@ class _SentenceCardState extends State<SentenceCard> {
                           widget.sentence.categoryTag!,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.blue.shade700,
+                            color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -344,7 +344,7 @@ class _SentenceCardState extends State<SentenceCard> {
                       widget.sentence.japaneseText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -371,7 +371,7 @@ class _SentenceCardState extends State<SentenceCard> {
                             onPressed: () =>
                                 widget.onStudyTap!(widget.sentence.id),
                             icon: const Icon(Icons.school_outlined, size: 22),
-                            color: Colors.green[700],
+                            color: Theme.of(context).colorScheme.primary,
                             tooltip: 'この例文で練習',
                           ),
                       ],

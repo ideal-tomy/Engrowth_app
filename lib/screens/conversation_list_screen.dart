@@ -100,15 +100,16 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
             child: conversationsAsync.when(
               data: (conversations) {
                 if (conversations.isEmpty) {
-                  return const Center(
+                  final colorScheme = Theme.of(context).colorScheme;
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
+                        Icon(Icons.chat_bubble_outline, size: 64, color: colorScheme.onSurfaceVariant),
+                        const SizedBox(height: 16),
                         Text(
                           '会話がまだ登録されていません',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -129,7 +130,7 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    Icon(Icons.error, size: 48, color: Theme.of(context).colorScheme.error),
                     const SizedBox(height: 16),
                     Text('エラー: $error'),
                   ],
@@ -195,7 +196,7 @@ class ConversationCard extends StatelessWidget {
                 : Image.asset(
                     kScenarioBgAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+                    errorBuilder: (_, __, ___) => Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                   ),
           ),
           Padding(
@@ -214,7 +215,7 @@ class ConversationCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     conversation.description!,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
                 if (conversation.theme != null) ...[
@@ -222,14 +223,14 @@ class ConversationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: EngrowthColors.primary.withOpacity(0.12),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       conversation.theme!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: EngrowthColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -246,8 +247,8 @@ class ConversationCard extends StatelessWidget {
                         label: const Text('聴く', style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          foregroundColor: EngrowthColors.primary,
-                          side: const BorderSide(color: EngrowthColors.primary),
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(color: Theme.of(context).colorScheme.primary),
                         ),
                       ),
                     ),

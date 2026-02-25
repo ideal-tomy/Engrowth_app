@@ -9,12 +9,12 @@ class LibraryHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
       appBar: AppBar(
         title: const Text('Library'),
-        backgroundColor: EngrowthColors.surface,
-        foregroundColor: EngrowthColors.onSurface,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
@@ -26,7 +26,7 @@ class LibraryHubScreen extends StatelessWidget {
                 '現在地: Library — ここから単語・例文・会話・進捗へ',
                 style: TextStyle(
                   fontSize: 12,
-                  color: EngrowthColors.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -99,11 +99,12 @@ class _LibraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: EngrowthColors.surface,
+      color: colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.08),
+      elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 2,
+      shadowColor: colorScheme.shadow.withOpacity(0.08),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -114,13 +115,13 @@ class _LibraryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: EngrowthColors.primary.withOpacity(0.1),
+                  color: colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   size: 28,
-                  color: EngrowthColors.primary,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 16),
@@ -130,10 +131,10 @@ class _LibraryCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: EngrowthColors.onSurface,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -141,7 +142,7 @@ class _LibraryCard extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 14,
-                        color: EngrowthColors.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -149,7 +150,7 @@ class _LibraryCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: EngrowthColors.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
             ],
           ),

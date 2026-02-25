@@ -47,7 +47,6 @@ class ScenarioLearningScreen extends ConsumerWidget {
     final dataAsync = ref.watch(conversationsByCategoryWithSubsectionsProvider);
 
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
       appBar: AppBar(
         title: const Text('シナリオ学習'),
         actions: [
@@ -129,17 +128,17 @@ class _ScenarioSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(icon, size: 24, color: EngrowthColors.primary),
+              Icon(icon, size: 24, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   subTitle != null
                       ? '${category.displayName} - $subTitle'
                       : category.displayName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: EngrowthColors.onBackground,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -177,11 +176,13 @@ class _ScenarioSection extends StatelessWidget {
       child: Container(
         width: 160,
         decoration: BoxDecoration(
-          color: EngrowthColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? null
+              : [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Theme.of(context).colorScheme.shadow.withOpacity(0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -194,14 +195,14 @@ class _ScenarioSection extends StatelessWidget {
               Icon(
                 Icons.hourglass_empty,
                 size: 40,
-                color: EngrowthColors.onSurfaceVariant,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 8),
               Text(
                 '準備中',
                 style: TextStyle(
                   fontSize: 14,
-                  color: EngrowthColors.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -261,7 +262,7 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
     return Image.asset(
       kScenarioBgAsset,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+      errorBuilder: (_, __, ___) => Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
     );
   }
 
@@ -286,8 +287,8 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
           height: 180,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: EngrowthColors.silverBorder),
-            boxShadow: EngrowthShadows.softCard,
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            boxShadow: Theme.of(context).brightness == Brightness.dark ? null : EngrowthShadows.softCard,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),

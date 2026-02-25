@@ -729,7 +729,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
               : Image.asset(
                   kScenarioBgAsset,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+                  errorBuilder: (_, __, ___) => Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 ),
         ),
         // 暗いオーバーレイ（テキスト可読性向上）

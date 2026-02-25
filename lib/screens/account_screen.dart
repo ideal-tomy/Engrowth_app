@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/anonymous_conversion_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_mode_provider.dart';
 import '../services/auth_service.dart';
 import '../theme/engrowth_theme.dart';
 
@@ -273,7 +274,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             '学習記録を保存するにはアカウントを作成してください。',
             style: TextStyle(
               fontSize: 14,
-              color: EngrowthColors.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 24),
@@ -288,18 +289,18 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Expanded(child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'または',
                   style: TextStyle(
                     fontSize: 12,
-                    color: EngrowthColors.onSurfaceVariant,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Expanded(child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ],
           ),
           const SizedBox(height: 20),
@@ -310,7 +311,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
-              style: const TextStyle(color: EngrowthColors.error, fontSize: 13),
+              style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13),
             ),
           ],
           const SizedBox(height: 24),
@@ -324,7 +325,62 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
                   )
                 : const Text('アカウントを作成'),
           ),
+          const SizedBox(height: 32),
+          _buildThemeSetting(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThemeSetting() {
+    final current = ref.watch(themeModeProvider);
+    final themeMode = current ?? ThemeMode.system;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.brightness_6_outlined, size: 22, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Text(
+                  '表示',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.system,
+                  label: Text('端末に合わせる'),
+                  icon: Icon(Icons.brightness_auto, size: 18),
+                ),
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.light,
+                  label: Text('ライト'),
+                  icon: Icon(Icons.light_mode, size: 18),
+                ),
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.dark,
+                  label: Text('ダーク'),
+                  icon: Icon(Icons.dark_mode, size: 18),
+                ),
+              ],
+              selected: {themeMode},
+              onSelectionChanged: (Set<ThemeMode> selected) {
+                ref.read(themeModeProvider.notifier).setThemeMode(selected.first);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -339,7 +395,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             '既にアカウントをお持ちの方はこちら',
             style: TextStyle(
               fontSize: 14,
-              color: EngrowthColors.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 24),
@@ -354,18 +410,18 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Expanded(child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'または',
                   style: TextStyle(
                     fontSize: 12,
-                    color: EngrowthColors.onSurfaceVariant,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-              Expanded(child: Divider(color: EngrowthColors.onSurfaceVariant)),
+              Expanded(child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ],
           ),
           const SizedBox(height: 20),
@@ -376,7 +432,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
-              style: const TextStyle(color: EngrowthColors.error, fontSize: 13),
+              style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13),
             ),
           ],
           const SizedBox(height: 24),
@@ -390,6 +446,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
                   )
                 : const Text('ログイン'),
           ),
+          const SizedBox(height: 32),
+          _buildThemeSetting(),
         ],
       ),
     );
@@ -432,7 +490,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
   Widget _buildSignedInBody(dynamic user) {
     final email = user?.email ?? '';
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -445,7 +503,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.account_circle, size: 48, color: EngrowthColors.primary),
+                      Icon(Icons.account_circle, size: 48, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -463,7 +521,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
                                 'メール未設定',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: EngrowthColors.onSurfaceVariant,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                           ],
@@ -476,6 +534,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
             ),
           ),
           const SizedBox(height: 24),
+          _buildThemeSetting(),
+          const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: _isLoading ? null : _signOut,
             icon: _isLoading
@@ -487,8 +547,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
                 : const Icon(Icons.logout),
             label: const Text('ログアウト'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: EngrowthColors.error,
-              side: BorderSide(color: EngrowthColors.error),
+              foregroundColor: Theme.of(context).colorScheme.error,
+              side: BorderSide(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],

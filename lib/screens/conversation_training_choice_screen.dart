@@ -13,8 +13,8 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: EngrowthColors.background,
       appBar: AppBar(
         title: const Text('会話トレーニング'),
         actions: [
@@ -35,7 +35,7 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
               'トレーニングを選んでください',
               style: TextStyle(
                 fontSize: 16,
-                color: EngrowthColors.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 24),
@@ -96,6 +96,7 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -104,8 +105,8 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: (_) => setState(() => _pressed = false),
         borderRadius: BorderRadius.circular(16),
-        splashColor: EngrowthColors.primary.withOpacity(0.2),
-        highlightColor: EngrowthColors.primary.withOpacity(0.08),
+        splashColor: colorScheme.primary.withOpacity(0.2),
+        highlightColor: colorScheme.primary.withOpacity(0.08),
         child: AnimatedScale(
           duration: const Duration(milliseconds: 170),
           curve: Curves.easeOutBack,
@@ -115,8 +116,8 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
             height: 140,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: EngrowthColors.silverBorder),
-              boxShadow: EngrowthShadows.softCard,
+              border: Border.all(color: colorScheme.outlineVariant),
+              boxShadow: Theme.of(context).brightness == Brightness.dark ? null : EngrowthShadows.softCard,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -127,7 +128,7 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
                     kScenarioBgAsset,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                        Container(color: EngrowthColors.surface),
+                        Container(color: colorScheme.surface),
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -148,13 +149,13 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: EngrowthColors.primary.withOpacity(0.9),
+                            color: colorScheme.primary.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             widget.icon,
                             size: 36,
-                            color: Colors.white,
+                            color: colorScheme.onPrimary,
                           ),
                         ),
                         const SizedBox(width: 20),

@@ -103,8 +103,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     final content = utterancesAsync.when(
         data: (utterances) {
           if (utterances.isEmpty) {
-            return const Center(
-              child: Text('発話がありません', style: TextStyle(color: EngrowthColors.onSurface)),
+            return Center(
+              child: Text('発話がありません', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             );
           }
           if (widget.autoStartPlayback && !_autoStarted && !_isPlaying) {
@@ -125,11 +125,11 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: EngrowthColors.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
+                    boxShadow: Theme.of(context).brightness == Brightness.dark ? null : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Theme.of(context).colorScheme.shadow.withOpacity(0.06),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -140,10 +140,10 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                       if (_isPlaying) ...[
                         Text(
                           '${_currentUtteranceIndex + 1} / ${utterances.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: EngrowthColors.onSurface,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -151,8 +151,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                           value: utterances.isEmpty
                               ? 0
                               : ((_currentUtteranceIndex + 1) / utterances.length).clamp(0.0, 1.0),
-                          backgroundColor: EngrowthColors.background,
-                          valueColor: const AlwaysStoppedAnimation<Color>(EngrowthColors.primary),
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                         ),
                         const SizedBox(height: 12),
                         FilledButton.icon(
@@ -160,8 +160,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                           icon: const Icon(Icons.stop, size: 22),
                           label: const Text('停止'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: EngrowthColors.error,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Theme.of(context).colorScheme.error,
+                            foregroundColor: Theme.of(context).colorScheme.onError,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                           ),
                         ),
@@ -171,8 +171,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                           icon: const Icon(Icons.play_arrow, size: 26),
                           label: const Text('再生して聴く'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: EngrowthColors.primary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
                           ),
                         ),
@@ -239,7 +239,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('エラー: $e', style: const TextStyle(color: EngrowthColors.error)),
+                  error: (e, _) => Text('エラー: $e', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
               ],
             ),
@@ -250,9 +250,9 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: EngrowthColors.error),
+              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
-              Text('エラー: $e', textAlign: TextAlign.center, style: const TextStyle(color: EngrowthColors.onSurface)),
+              Text('エラー: $e', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             ],
           ),
         ),
@@ -260,7 +260,6 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 
     if (!widget.asSheet) {
       return Scaffold(
-        backgroundColor: EngrowthColors.background,
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(
@@ -273,7 +272,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     }
 
     return Material(
-      color: EngrowthColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
@@ -285,7 +284,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               height: 5,
               margin: const EdgeInsets.only(top: 10, bottom: 8),
               decoration: BoxDecoration(
-                color: EngrowthColors.onSurfaceVariant.withOpacity(0.35),
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.35),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -296,10 +295,10 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: EngrowthColors.onBackground,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -335,14 +334,14 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: EngrowthColors.primary),
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 8),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: EngrowthColors.onBackground,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -359,7 +358,7 @@ class _ChunkTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: EngrowthColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: () => context.push('/conversation/${conversation.id}?mode=listen'),
@@ -368,7 +367,7 @@ class _ChunkTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(Icons.play_circle_outline, color: EngrowthColors.primary, size: 28),
+              Icon(Icons.play_circle_outline, color: Theme.of(context).colorScheme.primary, size: 28),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -385,16 +384,16 @@ class _ChunkTile extends StatelessWidget {
                     if (partLabel != null) const SizedBox(height: 2),
                     Text(
                       conversation.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: EngrowthColors.onSurface,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: EngrowthColors.onSurfaceVariant),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ],
           ),
         ),
