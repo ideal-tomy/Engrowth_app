@@ -9,9 +9,28 @@
 
 ## Supabase 側の設定
 
+### 匿名認証
+
 1. **Supabase Dashboard** → **Authentication** → **Providers**
 2. **Anonymous Sign-ins** を有効化（Enable をオン）
 3. 保存
+
+### Google ログイン（匿名→永続アカウントのリンク）
+
+匿名ユーザーが「Googleでアカウントを作成」を押したときに、**同じ user_id のまま** Google アカウントをリンクするには、以下が必要です。
+
+1. **Google Provider を有効化**  
+   **Authentication** → **Providers** → **Google** を有効化し、Client ID / Client Secret を設定。
+
+2. **Manual linking を有効化**  
+   **Authentication** → **Providers** の設定で **「Enable Manual Linking」** をオンにする。  
+   これがないと `linkIdentity` 実行時に「Manual linking is disabled」エラーになります。
+
+3. **リダイレクト URL の登録**  
+   **Authentication** → **URL Configuration** の **Redirect URLs** に、アプリのオリジンを追加する。  
+   - ローカル: `http://localhost:ポート番号`（例: `http://localhost:3000`）  
+   - デプロイ先: 本番のオリジン（例: `https://engrowth-app.web.app`）  
+   **Site URL** も本番の場合はデプロイ先のオリジンに合わせる。
 
 ## フロー
 

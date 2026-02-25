@@ -52,26 +52,26 @@ class AuthService {
   }
 
   /// Google OAuth でサインイン or 匿名ユーザーをリンク
-  /// 匿名時は linkIdentity で同一 user_id を保持、非匿名時は signInWithOAuth
+  /// 匿名時: linkIdentity で同一 user_id を保持（Manual linking が Supabase で有効である必要あり）
+  /// 非匿名時: signInWithOAuth で通常ログイン
+  /// リダイレクト先は Supabase の Authentication > URL Configuration に登録すること
   Future<bool> signInWithGoogle() async {
     final user = _client.auth.currentUser;
     final isAnon = user != null && user.isAnonymous;
-    try {
-      if (isAnon) {
-        await _client.auth.linkIdentity(
-          OAuthProvider.google,
-          redirectTo: _redirectUrl,
-        );
-      } else {
-        await _client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: _redirectUrl,
-        );
-      }
-      return true;
-    } catch (e) {
-      rethrow;
+    final redirectTo = _redirectUrl;
+    if (isAnon) {
+      // 匿名のまま Google をリンク → 同じ user_id で永続アカウントになる（データ保持）
+      await _client.auth.linkIdentity(
+        OAuthProvider.google,
+        redirectTo: redirectTo,
+      );
+    } else {
+      await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectTo,
+      );
     }
+    return true;
   }
 
   /// ログアウト（匿名の場合はサインアウト後、ensureSignedIn で匿名再ログイン可能）
@@ -79,5 +79,15 @@ class AuthService {
     await _client.auth.signOut();
   }
 
-  String get _redirectUrl => Uri.base.origin;
+  /// OAuth リダイレクト先。Supabase の Redirect URLs に登録必須。
+  /// 本番: https://engrowth-app.web.app。localhost の場合は本番URLに寄せてスマホ等で正しく戻れるようにする。
+  static const String _productionRedirectUrl = 'https://engrowth-app.web.app';
+
+  String get _redirectUrl {
+    final origin = Uri.base.origin;
+    if (origin.contains('localhost')) {
+      return _productionRedirectUrl;
+    }
+    return origin;
+  }
 }

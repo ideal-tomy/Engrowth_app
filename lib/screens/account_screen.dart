@@ -200,6 +200,12 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
     if (msg.contains('already registered')) {
       return 'このメールアドレスは既に登録されています。ログインをお試しください';
     }
+    if (msg.contains('Manual linking') || msg.contains('manual linking')) {
+      return 'Google連携には Supabase で「Manual linking」の有効化が必要です。ダッシュボードで有効化済みの場合は、しばらく待ってから再試行してください。';
+    }
+    if (msg.contains('redirect') && msg.contains('url')) {
+      return 'リダイレクトURLの設定を確認してください。Supabase の Authentication > URL Configuration にこのアプリのURLを追加してください。';
+    }
     return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
   }
 
