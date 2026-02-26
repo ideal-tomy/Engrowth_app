@@ -444,8 +444,12 @@ class _AudioChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // ダークモードでは primaryContainer が暗く見えるため、背景を明るめにしてコントラストを確保
+    final bgColor = isDark ? colorScheme.surfaceContainerHighest : colorScheme.primaryContainer;
+    final fgColor = isDark ? colorScheme.onSurface : colorScheme.onPrimaryContainer;
     return Material(
-      color: colorScheme.primaryContainer,
+      color: bgColor,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onPressed,
@@ -457,14 +461,14 @@ class _AudioChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 22, color: colorScheme.onPrimaryContainer),
+              Icon(icon, size: 22, color: fgColor),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: colorScheme.onPrimaryContainer,
+                  color: fgColor,
                 ),
               ),
             ],

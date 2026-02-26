@@ -1,8 +1,47 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../config/supabase_config.dart';
 import '../models/hint_phase.dart';
 import '../models/learning_session.dart';
 
 class LearningService {
+  /// セッション未初期化時は自動初期化してから学習ログを記録
+  /// onSessionCreated: セッションを新規作成したときに呼ばれる（呼び出し側で状態更新用）
+  static Future<void> logLearningEnsuringSession({
+    String? sessionId,
+    DateTime? sessionStartTime,
+    void Function(String id, DateTime start)? onSessionCreated,
+    required String sentenceId,
+    required HintPhase hintPhase,
+    required int thinkingTimeSeconds,
+    required bool usedHint,
+    required bool mastered,
+    required bool answerShown,
+  }) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    var sid = sessionId;
+    var start = sessionStartTime;
+    if (sid == null || start == null) {
+      sid = startSession(userId: userId, sentenceIds: []);
+      start = DateTime.now();
+      onSessionCreated?.call(sid, start);
+    }
+
+    await logLearning(
+      userId: userId,
+      sentenceId: sentenceId,
+      sessionId: sid,
+      sessionStartTime: start,
+      hintPhase: hintPhase,
+      thinkingTimeSeconds: thinkingTimeSeconds,
+      usedHint: usedHint,
+      mastered: mastered,
+      answerShown: answerShown,
+    );
+  }
+
   /// 学習ログを記録
   static Future<void> logLearning({
     required String userId,

@@ -1,5 +1,16 @@
 # プロジェクトリファクタリング計画
 
+## 実施状況（2025-02-26）
+
+- Phase 0: 回帰基準を `docs/dev/REGRESSION_BASELINE.md` に記録済み
+- Phase 1: 棚卸し台帳を `docs/dev/INVENTORY_DOCS_SQL.md` に作成済み
+- Phase 2: ドキュメント整理（削除・archive移動）実施済み
+- Phase 3: SQL整理方針を `docs/dev/SQL_ORGANIZATION.md` に文書化済み
+- Phase 4: コード共通化（exit dialog, logLearning）実施済み
+- PRマージ前チェック: `docs/dev/REGRESSION_BASELINE.md` にチェックリスト追加
+
+---
+
 ## 1. 目的
 
 本計画は、`engrowth_app` プロジェクトのファイル構造を整理し、保守性と開発効率を向上させることを目的とします。開発初期段階で作成された一時ファイルや重複したドキュメントを整理し、クリーンな状態を目指します。

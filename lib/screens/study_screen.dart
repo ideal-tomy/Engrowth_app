@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../widgets/study_card.dart';
 import '../widgets/review_card.dart';
 import '../widgets/session_complete_dialog.dart';
+import '../widgets/exit_confirmation_dialog.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/session_mode_provider.dart';
@@ -340,21 +341,16 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     required bool answerShown,
   }) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) {
-        // ユーザーがログインしていない場合はログを記録しない
-        return;
-      }
-
-      if (_sessionId == null || _sessionStartTime == null) {
-        _initializeSession();
-      }
-
-      await LearningService.logLearning(
-        userId: userId,
+      await LearningService.logLearningEnsuringSession(
+        sessionId: _sessionId,
+        sessionStartTime: _sessionStartTime,
+        onSessionCreated: (id, start) {
+          setState(() {
+            _sessionId = id;
+            _sessionStartTime = start;
+          });
+        },
         sentenceId: sentenceId,
-        sessionId: _sessionId!,
-        sessionStartTime: _sessionStartTime!,
         hintPhase: hintPhase,
         thinkingTimeSeconds: thinkingTimeSeconds,
         usedHint: usedHint,
@@ -363,7 +359,6 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
       );
     } catch (e) {
       print('Error logging learning: $e');
-      // エラー時も続行
     }
   }
 
@@ -398,25 +393,6 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
   }
 
   void _showExitConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('学習を終了しますか？'),
-        content: const Text('途中で終了しても、進捗は保存されます。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop(); // 学習モードを終了
-            },
-            child: const Text('終了'),
-          ),
-        ],
-      ),
-    );
+    showExitConfirmationDialog(context, onConfirm: () => context.pop());
   }
 }

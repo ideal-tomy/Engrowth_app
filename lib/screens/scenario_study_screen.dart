@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/exit_confirmation_dialog.dart';
 import '../widgets/study_card.dart';
 import '../providers/scenario_provider.dart';
 import '../providers/progress_provider.dart';
@@ -246,18 +247,16 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
     required bool answerShown,
   }) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
-
-      if (_sessionId == null || _sessionStartTime == null) {
-        _initializeSession();
-      }
-
-      await LearningService.logLearning(
-        userId: userId,
+      await LearningService.logLearningEnsuringSession(
+        sessionId: _sessionId,
+        sessionStartTime: _sessionStartTime,
+        onSessionCreated: (id, start) {
+          setState(() {
+            _sessionId = id;
+            _sessionStartTime = start;
+          });
+        },
         sentenceId: sentenceId,
-        sessionId: _sessionId!,
-        sessionStartTime: _sessionStartTime!,
         hintPhase: hintPhase,
         thinkingTimeSeconds: thinkingTimeSeconds,
         usedHint: usedHint,
@@ -270,25 +269,6 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
   }
 
   void _showExitConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('学習を終了しますか？'),
-        content: const Text('途中で終了しても、進捗は保存されます。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-            },
-            child: const Text('終了'),
-          ),
-        ],
-      ),
-    );
+    showExitConfirmationDialog(context, onConfirm: () => context.pop());
   }
 }

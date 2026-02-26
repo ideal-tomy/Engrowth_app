@@ -63,8 +63,11 @@ class StoryTrainingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(storySequencesByThemeProvider);
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         title: const Text('3分会話トレーニング'),
         actions: [
           IconButton(
@@ -221,14 +224,14 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(widget.icon, size: 24, color: EngrowthColors.primary),
+              Icon(widget.icon, size: 24, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Text(
                 widget.displayName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: EngrowthColors.onBackground,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(width: 6),
@@ -236,7 +239,7 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
                 '（${widget.stories.length}本）',
                 style: TextStyle(
                   fontSize: 14,
-                  color: EngrowthColors.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
