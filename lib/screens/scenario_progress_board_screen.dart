@@ -113,22 +113,13 @@ class _ScenarioSectionBanner extends StatelessWidget {
   }
 }
 
-/// Speak風：ずらしオフセット（index % 4）
+/// リストカードを左右交互に配置（1つ目＝左寄せ72%、2つ目＝右寄せ72%、3つ目＝左…）
 double _offsetForScenarioIndex(int globalIndex, double width) {
   final cardWidth = width * 0.72;
-  final margin = (width - cardWidth) / 2;
-  switch (globalIndex % 4) {
-    case 0:
-      return margin;
-    case 1:
-      return (margin + 16).clamp(0.0, width - cardWidth);
-    case 2:
-      return (margin + 28).clamp(0.0, width - cardWidth);
-    case 3:
-      return (margin - 8).clamp(0.0, width - cardWidth);
-    default:
-      return margin;
+  if (globalIndex.isOdd) {
+    return width - cardWidth; // 2,4,6…番目：右端に揃える
   }
+  return 0; // 1,3,5…番目：左端に揃える
 }
 
 /// Speak風：横長レッスンカード（CircleAvatar + タイトル）
@@ -427,7 +418,7 @@ class _ScenarioBoardBody extends ConsumerWidget {
     final isAnonymous = ref.watch(isAnonymousProvider);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       children: [
         if (isSamplePlaceholder)
           Padding(

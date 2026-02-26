@@ -57,7 +57,7 @@ class StoryProgressBoardScreen extends ConsumerWidget {
           final targetId = targetIdAsync.valueOrNull;
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
               Text(
                 '一歩ずつ進もう',
@@ -233,23 +233,13 @@ class _SectionBanner extends StatelessWidget {
   }
 }
 
-/// Speak風：ずらしオフセット（index % 4）
-/// 0=中央〜少し左, 1=少し右, 2=さらに右, 3=少し左へ戻る
+/// リストカードを左右交互に配置（1つ目＝左寄せ72%、2つ目＝右寄せ72%、3つ目＝左…）
 double _offsetForIndex(int globalIndex, double width) {
   final cardWidth = width * 0.72;
-  final margin = (width - cardWidth) / 2;
-  switch (globalIndex % 4) {
-    case 0:
-      return margin; // 中央
-    case 1:
-      return (margin + 16).clamp(0.0, width - cardWidth); // 少し右
-    case 2:
-      return (margin + 28).clamp(0.0, width - cardWidth); // さらに右
-    case 3:
-      return (margin - 8).clamp(0.0, width - cardWidth); // 左へ戻る
-    default:
-      return margin;
+  if (globalIndex.isOdd) {
+    return width - cardWidth; // 2,4,6…番目：右端に揃える
   }
+  return 0; // 1,3,5…番目：左端に揃える
 }
 
 /// Speak風：横長レッスンカード（CircleAvatar + タイトル）

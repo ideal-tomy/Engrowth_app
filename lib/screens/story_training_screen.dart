@@ -194,7 +194,7 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(viewportFraction: 0.52);
+    _pageController = PageController(viewportFraction: 0.34);
     _pageController.addListener(() {
       final page = _pageController.page ?? 0;
       if (!mounted) return;
@@ -246,7 +246,7 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
           ),
         ),
         SizedBox(
-          height: 180,
+          height: 170,
           child: PageView.builder(
             controller: _pageController,
             padEnds: false,
@@ -258,8 +258,8 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
               final cardScale = (1 - (distance * 0.06)).clamp(0.92, 1.0);
               return Padding(
                 padding: EdgeInsets.only(
-                  left: index == 0 ? 16 : 6,
-                  right: index == widget.stories.length - 1 ? 16 : 6,
+                  left: index == 0 ? 12 : 4,
+                  right: index == widget.stories.length - 1 ? 12 : 4,
                 ),
                 child: Transform.scale(
                   scale: cardScale,
@@ -336,8 +336,8 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
           context.push('/story/${widget.story.id}');
         },
         child: Container(
-          width: 160,
-          height: 180,
+          width: double.infinity,
+          height: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),

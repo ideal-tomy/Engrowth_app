@@ -272,7 +272,7 @@ class _SugorokuBoardEntry extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'すごろくで進捗を見る',
+            '進捗を見る',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,

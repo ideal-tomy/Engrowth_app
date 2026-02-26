@@ -146,18 +146,18 @@ class _ScenarioSection extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 180,
+          height: 160,
           child: conversations.isEmpty
               ? _buildEmptyState(context)
               : ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   physics: const BouncingScrollPhysics(),
                   itemCount: conversations.length,
                   itemBuilder: (context, index) {
                     final conversation = conversations[index];
                     return Padding(
-                      padding: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.only(right: 10),
                       child: _ScenarioConversationCard(
                         conversation: conversation,
                       ),
@@ -172,9 +172,9 @@ class _ScenarioSection extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Container(
-        width: 160,
+        width: 120,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -283,8 +283,8 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
           child: child,
         ),
         child: Container(
-          width: 160,
-          height: 180,
+          width: 120,
+          height: 135,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
