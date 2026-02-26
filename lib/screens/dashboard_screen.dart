@@ -13,6 +13,7 @@ import '../providers/user_plan_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/role_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
@@ -459,10 +460,10 @@ class _ResumeLearningCard extends ConsumerWidget {
   }
 }
 
-class _MainTilesGrid extends StatelessWidget {
+class _MainTilesGrid extends ConsumerWidget {
   const _MainTilesGrid();
 
-  static const _items = [
+  static const _baseItems = [
     _GridItem('会話トレーニング', Icons.record_voice_over, '/conversation-training'),
     _GridItem('単語検索', Icons.search, '/words'),
     _GridItem('瞬間英作文', Icons.bolt, '/instant-composition'),
@@ -470,11 +471,18 @@ class _MainTilesGrid extends StatelessWidget {
     _GridItem('学習進捗', Icons.bar_chart, '/progress'),
     _GridItem('お気に入り', Icons.favorite_border, '/favorites'),
     _GridItem('本日の復習', Icons.history, '/study'),
-    _GridItem('設定', Icons.settings, 'drawer'),
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authStage = ref.watch(authStageProvider);
+    final showRecordings =
+        authStage == AuthStage.signedIn || authStage == AuthStage.coaching;
+    final items = [
+      ..._baseItems,
+      if (showRecordings) const _GridItem('録音履歴', Icons.mic, '/recordings'),
+      const _GridItem('設定', Icons.settings, 'drawer'),
+    ];
     final width = MediaQuery.of(context).size.width - 24;
     final tileWidth = (width - 12) / 4;
     final tileHeight = tileWidth / 0.9;
@@ -491,9 +499,9 @@ class _MainTilesGrid extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
-        itemCount: _items.length,
+        itemCount: items.length,
         itemBuilder: (context, index) {
-          final item = _items[index];
+          final item = items[index];
           return _MainTile(
             title: item.title,
             icon: item.icon,
@@ -507,6 +515,8 @@ class _MainTilesGrid extends StatelessWidget {
                 context.push(item.route);
               } else if (item.route == '/favorites') {
                 context.push('/words'); // お気に入りは単語一覧へ
+              } else if (item.route == '/recordings') {
+                context.push('/recordings');
               } else {
                 context.push(item.route);
               }
@@ -592,6 +602,12 @@ class _SettingsDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devViewAsSignedIn = ref.watch(devViewAsSignedInProvider);
+    final authStage = ref.watch(authStageProvider);
+    final isConsultant = ref.watch(isConsultantProvider).valueOrNull ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
+
+    final isSignedIn =
+        authStage == AuthStage.signedIn || authStage == AuthStage.coaching;
 
     return Drawer(
       child: SafeArea(
@@ -618,16 +634,52 @@ class _SettingsDrawer extends ConsumerWidget {
                   ref.read(devViewAsSignedInProvider.notifier).toggle();
                 },
               ),
+              SwitchListTile(
+                secondary: const Icon(Icons.person_search_outlined),
+                title: const Text('開発: コンサルタント'),
+                subtitle: const Text('講師用メニューを表示'),
+                value: ref.watch(devViewAsConsultantProvider),
+                onChanged: (_) {
+                  ref.read(devViewAsConsultantProvider.notifier).toggle();
+                },
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.admin_panel_settings_outlined),
+                title: const Text('開発: 管理者'),
+                subtitle: const Text('管理者メニューを表示'),
+                value: ref.watch(devViewAsAdminProvider),
+                onChanged: (_) {
+                  ref.read(devViewAsAdminProvider.notifier).toggle();
+                },
+              ),
               const Divider(),
             ],
+            if (!isSignedIn)
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('データ保存について'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDataSaveInfo(context);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.person_outline),
-              title: const Text('アカウント'),
+              title: Text(isSignedIn ? 'アカウント' : 'アカウント作成'),
               onTap: () {
                 Navigator.pop(context);
                 context.push('/account');
               },
             ),
+            if (isSignedIn)
+              ListTile(
+                leading: const Icon(Icons.mic),
+                title: const Text('録音履歴'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/recordings');
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.timer_outlined),
               title: const Text('2秒ヒントの秒数設定'),
@@ -644,22 +696,40 @@ class _SettingsDrawer extends ConsumerWidget {
                 context.push('/playback-speed-settings');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.contact_support_outlined),
-              title: const Text('担当コンサルタントへ連絡'),
-              onTap: () {
-                Navigator.pop(context);
-                // プレースホルダー
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.record_voice_over),
-              title: const Text('講師用ダッシュボード'),
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/consultant');
-              },
-            ),
+            if (isSignedIn)
+              ListTile(
+                leading: const Icon(Icons.contact_support_outlined),
+                title: const Text('担当コンサルタントへ連絡'),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: メッセージ画面
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('この機能は準備中です')),
+                  );
+                },
+              ),
+            if (isConsultant) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.record_voice_over),
+                title: const Text('講師用ダッシュボード'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/consultant');
+                },
+              ),
+            ],
+            if (isAdmin) ...[
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings),
+                title: const Text('管理者ダッシュボード'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/admin');
+                },
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
@@ -677,6 +747,33 @@ class _SettingsDrawer extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDataSaveInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('データ保存について'),
+        content: const Text(
+          '学習記録を永続的に保存するにはアカウントの作成が必要です。\n\n'
+          'アカウント作成後は、録音履歴・学習進捗・復習データを複数端末で同期して利用できます。',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('閉じる'),
+          ),
+          FilledButton(
+            onPressed: () {
+              context.push('/account');
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('アカウント作成'),
+          ),
+        ],
       ),
     );
   }

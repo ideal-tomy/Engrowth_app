@@ -21,7 +21,9 @@ import '../screens/scenario_learning_screen.dart';
 import '../screens/conversation_training_choice_screen.dart';
 import '../screens/story_study_screen.dart';
 import '../screens/story_training_screen.dart';
+import '../screens/admin_dashboard_screen.dart';
 import '../screens/consultant_dashboard_screen.dart';
+import '../screens/recording_history_screen.dart';
 import '../screens/scenario_progress_board_screen.dart';
 import '../screens/story_progress_board_screen.dart';
 
@@ -36,6 +38,9 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final session = Supabase.instance.client.auth.currentSession;
     if (state.matchedLocation == '/consultant' && session == null) {
+      return '/home';
+    }
+    if (state.matchedLocation == '/admin' && session == null) {
       return '/home';
     }
     return null;
@@ -157,6 +162,17 @@ final appRouter = GoRouter(
         final situationType = state.uri.queryParameters['type'];
         return ConversationListScreen(situationType: situationType);
       },
+    ),
+    GoRoute(
+      path: '/recordings',
+      builder: (context, state) {
+        final tab = state.uri.queryParameters['tab'];
+        return RecordingHistoryScreen(initialTab: tab);
+      },
+    ),
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => const AdminDashboardScreen(),
     ),
     GoRoute(
       path: '/consultant',

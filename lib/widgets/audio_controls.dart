@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/tts_service.dart';
@@ -264,6 +265,30 @@ class _AudioControlsState extends State<AudioControls> {
       return;
     }
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('先生に送る'),
+        content: const Text(
+          'この録音を担当コンサルタントに共有します。\n'
+          '提出後は取り消すことができません。送信しますか？',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('送信'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isSubmitting = true);
     try {
       await _submissionService.markAsSubmitted(_lastSubmissionId!);
@@ -281,6 +306,7 @@ class _AudioControlsState extends State<AudioControls> {
           _lastSubmissionId = null;
           _recordingService.deleteRecording();
         });
+        context.push('/recordings?tab=submitted');
       }
     } catch (e) {
       if (mounted) {
