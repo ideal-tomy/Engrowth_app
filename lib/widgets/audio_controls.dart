@@ -17,6 +17,8 @@ import 'recording_waveform.dart';
 class AudioControls extends StatefulWidget {
   final String englishText;
   final String japaneseText;
+  /// 会話の役割（'A'/'B'）を指定すると、役割別の voice で再生
+  final String? speakerRole;
   final String? sentenceId;
   final String? sessionId;
   final String? conversationId;
@@ -36,6 +38,7 @@ class AudioControls extends StatefulWidget {
     super.key,
     required this.englishText,
     required this.japaneseText,
+    this.speakerRole,
     this.sentenceId,
     this.sessionId,
     this.conversationId,
@@ -94,7 +97,7 @@ class _AudioControlsState extends State<AudioControls> {
       return;
     }
     setState(() => _isPlaying = true);
-    await _ttsService.speakEnglish(widget.englishText);
+    await _ttsService.speakEnglish(widget.englishText, role: widget.speakerRole);
     if (mounted) setState(() => _isPlaying = false);
   }
 
@@ -106,7 +109,7 @@ class _AudioControlsState extends State<AudioControls> {
       return;
     }
     setState(() => _isPlaying = true);
-    await _ttsService.speakEnglishSlow(widget.englishText);
+    await _ttsService.speakEnglishSlow(widget.englishText, role: widget.speakerRole);
     if (mounted) setState(() => _isPlaying = false);
   }
 
@@ -118,7 +121,7 @@ class _AudioControlsState extends State<AudioControls> {
       return;
     }
     setState(() => _isPlaying = true);
-    await _ttsService.speakJapanese(widget.japaneseText);
+    await _ttsService.speakJapanese(widget.japaneseText, role: widget.speakerRole);
     if (mounted) setState(() => _isPlaying = false);
   }
 

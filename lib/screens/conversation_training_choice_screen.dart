@@ -40,9 +40,10 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
                   _TrainingChoiceCard(
                     title: '30秒会話',
                     subtitle: '短いシナリオの反復練習',
@@ -64,7 +65,19 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
                       context.push('/story-training');
                     },
                   ),
-                ],
+                  const SizedBox(height: 16),
+                  _TrainingChoiceCard(
+                    title: 'パターンスプリント',
+                    subtitle: '30〜60秒の口慣らし（聞く→リピート）',
+                    icon: Icons.speed,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(analyticsServiceProvider).logHapticFired(trigger: 'choice_pattern_sprint');
+                      context.push('/pattern-sprint');
+                    },
+                  ),
+                  ],
+                ),
               ),
             ),
           ],

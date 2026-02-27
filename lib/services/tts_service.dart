@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import '../config/tts_voice_config.dart';
+import 'analytics_service.dart';
 import 'openai_tts_service.dart';
 
 /// TTS（Text-to-Speech）サービス
@@ -53,15 +56,26 @@ class TtsService {
   }
 
   /// 英語で再生（設定画面の再生速度を使用）
-  Future<void> speakEnglish(String text) async {
+  /// [role] に 'A'/'B' を指定すると、役割別の voice を使用
+  /// [prefetchedUrl] を指定すると取得をスキップし即再生（プリフェッチ済み時）
+  Future<void> speakEnglish(String text, {String? role, String? prefetchedUrl}) async {
     await initialize();
     if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _openAiTts!.speakEnglish(text, speakingRate: _defaultSpeechRate);
+        if (prefetchedUrl != null && prefetchedUrl.isNotEmpty) {
+          await _openAiTts!.playFromUrl(prefetchedUrl);
+        } else {
+          await _openAiTts!.speakEnglish(
+            text,
+            speakingRate: _defaultSpeechRate,
+            role: role,
+          );
+        }
       } catch (e) {
         await _openAiTts!.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
+        AnalyticsService().logTtsFallback(reason: e.toString());
         await _speakEnglishFlutter(text);
       } finally {
         _isSpeaking = false;
@@ -78,15 +92,16 @@ class TtsService {
   }
 
   /// 英語で再生（ゆっくり固定）
-  Future<void> speakEnglishSlow(String text) async {
+  Future<void> speakEnglishSlow(String text, {String? role}) async {
     await initialize();
     if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _openAiTts!.speakEnglishSlow(text);
+        await _openAiTts!.speakEnglishSlow(text, role: role);
       } catch (e) {
         await _openAiTts!.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
+        AnalyticsService().logTtsFallback(reason: e.toString());
         await _flutterTts.setLanguage('en-US');
         await _flutterTts.setSpeechRate(0.6);
         await _flutterTts.speak(text);
@@ -101,15 +116,20 @@ class TtsService {
   }
 
   /// 日本語で再生
-  Future<void> speakJapanese(String text) async {
+  Future<void> speakJapanese(String text, {String? role}) async {
     await initialize();
     if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _openAiTts!.speakJapanese(text, speakingRate: _defaultSpeechRate);
+        await _openAiTts!.speakJapanese(
+          text,
+          speakingRate: _defaultSpeechRate,
+          role: role,
+        );
       } catch (e) {
         await _openAiTts!.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
+        AnalyticsService().logTtsFallback(reason: e.toString());
         await _speakJapaneseFlutter(text);
       } finally {
         _isSpeaking = false;
@@ -123,6 +143,22 @@ class TtsService {
     await _flutterTts.setLanguage('ja-JP');
     await _flutterTts.setSpeechRate(_defaultSpeechRate);
     await _flutterTts.speak(text);
+  }
+
+  /// プリフェッチ用: 英語音声の URL を取得（再生しない）
+  Future<String?> fetchAudioUrlForEnglish(String text, {String? role}) async {
+    await initialize();
+    if (!_useOpenAiTts || _openAiTts == null) return null;
+    try {
+      return await _openAiTts!.fetchAudioUrl(
+        text: text,
+        language: 'en-US',
+        speakingRate: _defaultSpeechRate,
+        voice: TtsVoiceConfig.voiceForRole(role),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 停止

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/story_provider.dart';
+import '../services/analytics_service.dart';
 import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
@@ -55,6 +56,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   int? _autoAdvanceSecondsRemaining;  // 残り秒（表示用）
   late AnimationController _pulseController;
   late AnimationController _progressController;  // フレーズ内のゆっくりとした進行用
+  final Map<int, String> _prefetchedUrls = {};  // index -> プリフェッチ済み URL
+  int _prefetchGenId = 0;  // 停止/スキップ時にインクリメントし、古いプリフェッチ結果を破棄
+  DateTime? _lastAdvanceTap;  // 連打対策
 
   @override
   void initState() {
@@ -148,7 +152,13 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     final utterance = utterances[index];
     setState(() => _isPlaying = true);
     _progressController.forward(from: 0);
-    await _ttsService.speakEnglish(utterance.englishText);
+    _prefetchNextUtterances(utterances, index);
+    final prefetched = _prefetchedUrls.remove(index);
+    await _ttsService.speakEnglish(
+      utterance.englishText,
+      role: utterance.speakerRole,
+      prefetchedUrl: prefetched,
+    );
     if (!mounted) return;
     _progressController.value = 1.0;
     setState(() => _isPlaying = false);
@@ -167,7 +177,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   }
 
   void _advanceNext(List<ConversationUtterance> utterances) {
+    if (!_debounceAdvanceTap()) return;
     _cancelAutoAdvance();
+    _clearPrefetch();
+    _ttsService.stop();
     if (_currentUtteranceIndex >= utterances.length - 1) {
       _maybeLogRoleCompleted(utterances);
       return;
@@ -181,9 +194,24 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   }
 
   void _advancePrev(List<ConversationUtterance> utterances) {
+    if (!_debounceAdvanceTap()) return;
     _cancelAutoAdvance();
     if (_currentUtteranceIndex <= 0) return;
+    _clearPrefetch();
+    _ttsService.stop();
     setState(() => _currentUtteranceIndex--);
+  }
+
+  static const _advanceDebounceMs = 300;
+
+  bool _debounceAdvanceTap() {
+    final now = DateTime.now();
+    final last = _lastAdvanceTap;
+    _lastAdvanceTap = now;
+    if (last != null && now.difference(last).inMilliseconds < _advanceDebounceMs) {
+      return false;
+    }
+    return true;
   }
 
   void _logAutoAdvanceUsed() {
@@ -296,7 +324,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     setState(() => _isPlaying = true);
     _progressController.forward(from: 0);
 
-      await _ttsService.speakEnglish(utterance.englishText);
+    await _ttsService.speakEnglish(utterance.englishText, role: utterance.speakerRole);
 
     if (mounted) _progressController.value = 1.0;
     setState(() => _isPlaying = false);
@@ -319,12 +347,34 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
   Future<void> _stopPlayback() async {
     _stopPlaybackRequested = true;
+    _clearPrefetch();
+    AnalyticsService().logTtsCancel();
     await _ttsService.stop();
     if (mounted) {
       setState(() => _isPlaying = false);
       _transcriptIsPlayingNotifier?.value = false;
     }
     // _stopPlaybackRequested はループ終了時にクリア（wasStopped 判定のためここでは触らない）
+  }
+
+  void _clearPrefetch() {
+    _prefetchGenId++;
+    _prefetchedUrls.clear();
+  }
+
+  void _prefetchNextUtterances(List<ConversationUtterance> utterances, int currentIndex) {
+    final gen = _prefetchGenId;
+    for (var o = 1; o <= 2; o++) {
+      final idx = currentIndex + o;
+      if (idx >= utterances.length) break;
+      final u = utterances[idx];
+      if (u.englishText.trim().isEmpty) continue;
+      _ttsService.fetchAudioUrlForEnglish(u.englishText, role: u.speakerRole).then((url) {
+        if (url != null && gen == _prefetchGenId && mounted) {
+          _prefetchedUrls[idx] = url;
+        }
+      });
+    }
   }
 
   /// 会話全体を再生。startIndex 指定時はその位置から（再開時は一つ前からで文脈を思い出せるように）
@@ -336,6 +386,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if (_isPlaying) return;
 
     _stopPlaybackRequested = false;
+    _clearPrefetch();
     final fromIndex = startIndex ?? 0;
     setState(() => _isPlaying = true);
     _transcriptIsPlayingNotifier?.value = true;
@@ -348,10 +399,18 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       setState(() => _currentUtteranceIndex = i);
       _transcriptCurrentIndexNotifier?.value = i;  // 英語シートのハイライト同期
 
+      // 次1〜2発話をプリフェッチ（非同期）
+      _prefetchNextUtterances(utterances, i);
+
       // プログレスバーをゆっくり進行させる（フレーズ再生中）
       _progressController.forward(from: 0);
 
-      final speakFuture = _ttsService.speakEnglish(utterance.englishText);
+      final prefetched = _prefetchedUrls.remove(i);
+      final speakFuture = _ttsService.speakEnglish(
+        utterance.englishText,
+        role: utterance.speakerRole,
+        prefetchedUrl: prefetched,
+      );
 
       // 再生が終わったらプログレスを完了位置に
       speakFuture.whenComplete(() {
@@ -592,6 +651,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   Future<void> _startRolePractice(String role, List<ConversationUtterance> utterances) async {
     if (!_hasListenedToAll) return;
     if (_isPlaying || _isCountdownActive) return;
+
+    // 役割切替時: 再生・プリフェッチを確実停止
+    await _ttsService.stop();
+    _clearPrefetch();
 
     setState(() {
       _mode = role;
@@ -1492,6 +1555,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
           AudioControls(
             englishText: currentUtterance.englishText,
             japaneseText: currentUtterance.japaneseText,
+            speakerRole: currentUtterance.speakerRole,
             conversationId: widget.conversationId,
             utteranceId: currentUtterance.id,
             sessionId: _sessionId,

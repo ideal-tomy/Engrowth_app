@@ -8,7 +8,8 @@ import '../screens/library_hub_screen.dart';
 import '../screens/word_list_screen.dart';
 import '../screens/sentence_list_screen.dart';
 import '../screens/study_screen.dart';
-import '../screens/instant_composition_screen.dart';
+import '../screens/pattern_sprint_list_screen.dart';
+import '../screens/pattern_sprint_session_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/hint_settings_screen.dart';
 import '../screens/playback_speed_settings_screen.dart';
@@ -100,8 +101,21 @@ final appRouter = GoRouter(
       builder: (context, state) => const PlaybackSpeedSettingsScreen(),
     ),
     GoRoute(
-      path: '/instant-composition',
-      builder: (context, state) => const InstantCompositionScreen(),
+      path: '/pattern-sprint',
+      builder: (context, state) => const PatternSprintListScreen(),
+      routes: [
+        GoRoute(
+          path: 'session',
+          builder: (context, state) {
+            final prefix = state.uri.queryParameters['prefix'] ?? '';
+            final duration = int.tryParse(state.uri.queryParameters['duration'] ?? '45') ?? 45;
+            return PatternSprintSessionScreen(
+              prefix: Uri.decodeComponent(prefix),
+              durationSec: duration.clamp(30, 60),
+            );
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: '/study',

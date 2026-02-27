@@ -1,63 +1,69 @@
-# センテンストレーニング 実装計画
+# パターンスプリント 実装計画 V2
 
-MVP 実装の段階とタスクを定義します。
+MVP 実装の段階とタスクを定義します。既存資産（conversation_utterances + TTS キャッシュ）を活用し、30〜60秒の口慣らしトレーニングを実装します。
 
 ---
 
 ## 1. MVP スコープ
 
-- **モード**: Listen-Repeat のみ
-- **データ**: 既存 `sentences` を `category_tag = #SentenceTraining` でフィルタし、Pack は `group` でグルーピング
-- **画面**: 会話トレーニング選択に「センテンストレーニング」追加 → パック一覧 → チャンク単位の練習画面
-- **進捗**: 再生回数・完了チャンク数をローカル（SharedPreferences）または Supabase に記録
+- **モード**: Listen-Repeat（日本語ヒント表示、聞く→即リピート）
+- **データ**: `conversation_utterances` から prefix マッチで抽出。音声は `tts_synthesize` 経由。
+- **画面**: 会話トレーニング選択の「パターンスプリント」→ パターン一覧 → セッション画面
+- **セッション長**: 30/45/60秒選択（デフォルト 45秒）
+- **IA**: 瞬間英作文をパターンスプリントに置換。センテンス一覧はカテゴリ見出しセクション化。
 
 ---
 
 ## 2. 実装フェーズ
 
-### Phase 1: 導線と一覧（1〜2日）
+### Phase A: 設計更新（完了）
 
-1. **ルート追加**
-   - `router.dart`: `/sentence-training` を追加
-   - 遷移先: `SentenceTrainingListScreen`（新規）
+- `SENTENCE_TRAINING_SPEC` を Pattern Sprint V2 仕様へ更新
+- SQL サンプル・データソース（`tts_assets.text` 不在）を明記
 
-2. **会話トレーニング選択にカード追加**
-   - `ConversationTrainingChoiceScreen`: 3つ目のカード「センテンストレーニング」を追加
-   - `onTap`: `context.push('/sentence-training')`
+### Phase B: IA 差し替えと一覧再編
 
-3. **パック一覧画面**
-   - `SentenceTrainingListScreen`: `sentences` を `category_tag` でフィルタし、`group` でグルーピング
-   - 各グループを「Pack」としてカード表示
-   - タップで `SentenceTrainingStudyScreen` へ（packId=group 名を渡す）
+1. **ルート・導線**
+   - `instant-composition` 導線を `パターンスプリント` に置換
+   - `/pattern-sprint` ルート追加
+   - Library 内の該当ボタン文言/遷移先の更新
 
-### Phase 2: 練習画面（2〜3日）
+2. **センテンス一覧**
+   - `sentence_list_screen.dart` で `category_tag` ごとにグルーピング表示
+   - 各カテゴリ末尾に「このカテゴリでスプリント」導線
 
-1. **SentenceTrainingStudyScreen**
-   - `group` に属する sentences を順番に表示
-   - 1チャンクあたり: 英語表示、TTS 再生、録音ボタン、次/前
-   - 既存 `AudioControls` を組み込み（sentenceId を渡す）
-   - 最後のチャンク完了時に「お疲れ様」表示、パック一覧へ戻る
+3. **会話トレーニング選択**
+   - パターンスプリントカード追加（または既存導線の差し替え）
 
-2. **進捗記録**
-   - 完了チャンク数を `SharedPreferences` または `user_progress` 相当に保存
-   - パック単位の完了率を一覧で表示（任意）
+### Phase C: セッション実装
 
-### Phase 3: データ整備（1日）
+1. **PatternSprintListScreen**
+   - パターン一覧（prefix ベース）
+   - 30/45/60秒選択
 
-1. **トレーニング用 sentences の登録**
-   - Supabase `sentences` に `category_tag = #SentenceTraining`、`group` に Pack 名を設定した例文を投入
-   - 初回は 1 Pack（例: 20 チャンク）分のみ用意
+2. **PatternSprintSessionScreen**
+   - 自動再生ループ（1フレーズ→2〜3秒猶予→次へ）
+   - 一時停止/再開、スキップ、停止
+   - プリフェッチ・キャンセル・デバウンス
+   - 終了演出（実施件数、「もう1セット」）
 
-2. **Provider 拡張**
-   - `sentenceTrainingPacksProvider`: `sentences` を `category_tag = #SentenceTraining` でフィルタし、`group` でグループ化
-   - `sentenceTrainingPackSentencesProvider(packId)`: 指定 Pack の sentences を返す
+3. **PatternSprintService / Provider**
+   - `conversation_utterances` からの prefix 抽出
+   - 候補整形（重複排除、抽選）
 
-### Phase 4: 拡張（将来）
+### Phase D: 計測と調整
 
-- Shadowing モード（遅延再生）
-- Pattern Substitution（語句差し替えUI）
-- Cued Recall（日本語ヒント表示）
-- `training_packs` / `training_chunks` 専用テーブルへの移行
+- analytics: session_start / session_complete / session_abort
+- played_count, duration_sec, cache_hit_rate
+- 失敗時フォールバック
+- prefill 同時実行ポリシーを Runbook に反映
+
+### Phase E: 拡張（将来）
+
+- Shadowing モード
+- Pattern Substitution
+- Cued Recall 拡張
+- n-gram 人気パターン自動提示
 
 ---
 
@@ -65,28 +71,33 @@ MVP 実装の段階とタスクを定義します。
 
 | ファイル | 役割 |
 |----------|------|
-| `lib/screens/sentence_training_list_screen.dart` | Pack 一覧 |
-| `lib/screens/sentence_training_study_screen.dart` | チャンク単位の練習 |
-| `lib/providers/sentence_training_provider.dart` | Pack 取得・進捗 |
-| `lib/utils/router.dart` | `/sentence-training` 追加 |
-| `lib/screens/conversation_training_choice_screen.dart` | カード追加 |
+| `lib/screens/pattern_sprint_list_screen.dart` | パターン選択・秒数選択 |
+| `lib/screens/pattern_sprint_session_screen.dart` | セッション実行画面 |
+| `lib/providers/pattern_sprint_provider.dart` | 候補取得・セッション状態 |
+| `lib/services/pattern_sprint_service.dart` | 抽出クエリ・整形 |
+| `lib/screens/sentence_list_screen.dart` | カテゴリグルーピング改修 |
+| `lib/utils/router.dart` | `/pattern-sprint` 追加 |
+| `lib/screens/conversation_training_choice_screen.dart` | パターンスプリントカード |
+| `lib/screens/library_hub_screen.dart` | 瞬間英作文→パターンスプリント導線置換 |
 
 ---
 
 ## 4. 依存関係
 
-- `TtsService`: 既存
-- `AudioControls` / 録音: 既存
-- `sentences` / `SupabaseService`: 既存
-- `EnvConfig`, `SupabaseConfig`: 既存
+- `OpenAiTtsService`（`fetchAudioUrl`, `playFromUrl`, `stop`）
+- `conversation_utterances` / `ConversationService` 拡張または新規取得
+- `tts_synthesize` Edge Function
+- `ConversationStudyScreen` のプリフェッチ・キャンセル・デバウンス設計
 
 ---
 
 ## 5. 受け入れ基準（MVP）
 
-- [ ] 会話トレーニング選択から「センテンストレーニング」を選べる
-- [ ] パック一覧が表示される（1 Pack 以上）
-- [ ] パックを選ぶと、チャンクが順番に表示される
-- [ ] 各チャンクで TTS 再生と録音ができる
-- [ ] 次/前でチャンク間を移動できる
-- [ ] 最後のチャンク完了後、一覧へ戻れる
+- [ ] 会話トレーニング選択から「パターンスプリント」を選べる
+- [ ] パターン一覧が表示される
+- [ ] 30/45/60秒を選択してセッション開始できる
+- [ ] セッション内で聞く→リピート猶予→次へが自動進行する
+- [ ] 一時停止/再開/スキップ/停止が破綻しない
+- [ ] 英文非表示 + 日本語ヒントのみで運用できる
+- [ ] センテンス一覧がカテゴリ見出しセクションで表示される
+- [ ] 瞬間英作文導線がパターンスプリントに置換されている

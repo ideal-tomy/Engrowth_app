@@ -1,8 +1,12 @@
-// OpenAI TTS プロキシ: クライアントからのテキストを受け取り OpenAI Audio API で合成し MP3 を返す
+// OpenAI TTS プロキシ: キャッシュ優先 → ミス時のみ OpenAI 合成 → Storage 保存 → 署名付き URL 返却
 // API キーはサーバー側シークレット OPENAI_API_KEY を使用
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
 const MODEL = "tts-1-hd";
+const BUCKET = "tts-audio";
+const SIGNED_URL_EXPIRY_SEC = 3600;
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +18,7 @@ interface ReqBody {
   text?: string;
   language?: string;
   speakingRate?: number;
+  speed?: number; // alias for speakingRate (prefill 等の互換用)
   voice?: string;
 }
 
@@ -30,7 +35,35 @@ function errResponse(code: string, message: string, status: number): Response {
   );
 }
 
+async function sha256Hex(text: string): Promise<string> {
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function cacheKey(
+  text: string,
+  language: string,
+  voice: string,
+  speed: number,
+  model: string
+): string {
+  return `${text}|${language}|${voice}|${speed}|${model}`;
+}
+
 Deno.serve(async (req) => {
+  try {
+    return await handleRequest(req);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("TTS uncaught error:", msg, e);
+    return errResponse("upstream_error", `Internal error: ${msg}`, 502);
+  }
+});
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: {
@@ -54,6 +87,16 @@ Deno.serve(async (req) => {
     );
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return errResponse(
+      "config_error",
+      "Supabase not configured",
+      502
+    );
+  }
+
   let body: ReqBody;
   try {
     body = (await req.json()) as ReqBody;
@@ -71,13 +114,58 @@ Deno.serve(async (req) => {
   }
 
   const language = typeof body.language === "string" ? body.language : "en-US";
-  const speakingRate = typeof body.speakingRate === "number"
-    ? Math.min(4, Math.max(0.25, body.speakingRate))
+  const rawRateValue = typeof body.speakingRate === "number"
+    ? body.speakingRate
+    : typeof body.speed === "number"
+    ? body.speed
     : 1.0;
+  const rawRate = Math.min(4, Math.max(0.25, rawRateValue));
+  const speakingRate = Math.round(rawRate * 100) / 100; // 浮動小数点誤差回避
   const voice = typeof body.voice === "string"
     ? body.voice
     : (language.startsWith("ja") ? "alloy" : "nova");
 
+  const key = cacheKey(text, language, voice, speakingRate, MODEL);
+  const keyHash = await sha256Hex(key);
+  const storagePath = `${keyHash}.mp3`;
+
+  const client = createClient(supabaseUrl, supabaseServiceKey);
+
+  // 1. キャッシュ参照
+  const { data: asset } = await client
+    .from("tts_assets")
+    .select("storage_path, id")
+    .eq("cache_key", keyHash)
+    .maybeSingle();
+
+  if (asset?.storage_path) {
+    const { data: urlData } = await client.storage
+      .from(BUCKET)
+      .createSignedUrl(asset.storage_path, SIGNED_URL_EXPIRY_SEC);
+
+    if (urlData?.signedUrl) {
+      await client
+        .from("tts_assets")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", asset.id);
+
+      return new Response(
+        JSON.stringify({
+          url: urlData.signedUrl,
+          cache_hit: true,
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        }
+      );
+    }
+  }
+
+  // 2. ミス: OpenAI 合成
   const openAiBody = {
     model: MODEL,
     input: text,
@@ -86,6 +174,7 @@ Deno.serve(async (req) => {
     speed: speakingRate,
   };
 
+  let bytes: ArrayBuffer;
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -111,15 +200,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const bytes = await res.arrayBuffer();
-    return new Response(bytes, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/octet-stream",
-        "Content-Length": String(bytes.byteLength),
-      },
-      status: 200,
-    });
+    bytes = await res.arrayBuffer();
   } catch (e) {
     const msg = String(e);
     if (msg.includes("abort") || msg.includes("timeout")) {
@@ -127,4 +208,58 @@ Deno.serve(async (req) => {
     }
     return errResponse("upstream_error", msg, 502);
   }
-});
+
+  // 3. Storage 保存
+  const { error: uploadErr } = await client.storage
+    .from(BUCKET)
+    .upload(storagePath, bytes, {
+      contentType: "audio/mpeg",
+      upsert: true,
+    });
+
+  if (uploadErr) {
+    console.error("TTS storage upload error:", uploadErr);
+    return errResponse(
+      "storage_error",
+      `Failed to save audio: ${uploadErr.message}`,
+      502
+    );
+  }
+
+  // 4. tts_assets メタ挿入
+  await client.from("tts_assets").upsert(
+    {
+      cache_key: keyHash,
+      storage_path: storagePath,
+      model: MODEL,
+      voice,
+      language,
+      speed: speakingRate,
+      last_used_at: new Date().toISOString(),
+    },
+    { onConflict: "cache_key" }
+  );
+
+  // 5. 署名付き URL を返却
+  const { data: urlData } = await client.storage
+    .from(BUCKET)
+    .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_SEC);
+
+  if (!urlData?.signedUrl) {
+    return errResponse("storage_error", "Failed to create signed URL", 502);
+  }
+
+  return new Response(
+    JSON.stringify({
+      url: urlData.signedUrl,
+      cache_hit: false,
+    }),
+    {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+      status: 200,
+    }
+  );
+}

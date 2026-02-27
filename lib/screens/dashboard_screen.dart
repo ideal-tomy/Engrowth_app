@@ -466,7 +466,7 @@ class _MainTilesGrid extends ConsumerWidget {
   static const _baseItems = [
     _GridItem('会話トレーニング', Icons.record_voice_over, '/conversation-training'),
     _GridItem('単語検索', Icons.search, '/words'),
-    _GridItem('瞬間英作文', Icons.bolt, '/instant-composition'),
+    _GridItem('パターンスプリント', Icons.speed, '/pattern-sprint'),
     _GridItem('センテンス一覧', Icons.format_list_bulleted, '/sentences'),
     _GridItem('学習進捗', Icons.bar_chart, '/progress'),
     _GridItem('お気に入り', Icons.favorite_border, '/favorites'),

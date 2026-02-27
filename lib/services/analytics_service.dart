@@ -88,4 +88,20 @@ class AnalyticsService {
       logEvent(eventType: 'anon_save_nudge_shown', eventProperties: {'source': source});
   void logAnonSaveNudgeCta({String? source}) =>
       logEvent(eventType: 'anon_save_nudge_cta', eventProperties: {'source': source});
+
+  // TTS 低遅延化・運用計測（Phase 6）
+  void logTtsRequest({
+    required int latencyMs,
+    bool? cacheHit,
+  }) =>
+      logEvent(
+        eventType: 'tts_request',
+        eventProperties: {
+          'latency_ms': latencyMs,
+          'cache_hit': cacheHit,
+        },
+      );
+  void logTtsFallback({String? reason}) =>
+      logEvent(eventType: 'tts_fallback', eventProperties: {'reason': reason});
+  void logTtsCancel() => logEvent(eventType: 'tts_cancel');
 }

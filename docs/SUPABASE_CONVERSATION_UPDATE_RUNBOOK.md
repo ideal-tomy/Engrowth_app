@@ -141,7 +141,37 @@ dart run scripts/import_conversations_from_csv.dart "path/to/your_conversations.
 
 ---
 
-## 7. 運用強化（実装済み・予定）
+## 7. TTS 音声キャッシュ事前投入（prefill）
+
+会話データ登録後、TTS 音声を一括生成して Storage に事前投入すると、再生時の遅延を削減できます。
+
+```bash
+# 件数確認のみ
+dart run scripts/prefill_tts_assets.dart --dry-run
+
+# 全件処理
+dart run scripts/prefill_tts_assets.dart
+
+# 先頭 50 件のみ（テスト用）
+dart run scripts/prefill_tts_assets.dart --limit 50
+```
+
+前提:
+- `.env` に `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`（または `SUPABASE_ANON_KEY`）
+- `tts_synthesize` Edge Function がデプロイ済み
+- `database_tts_assets_migration.sql` 実行済み（tts_assets テーブル、tts-audio バケット）
+
+冪等: 既にキャッシュ済みの場合は Edge Function がヒットを返し、再合成しない。
+
+**prefill 同時実行ポリシー**:
+- 同時実行は可能だが推奨しない（体感遅延・502 率上昇の恐れ）
+- 本番利用時間帯は `--limit` で小分け実行。大量 prefill はオフピークで実行
+- 連続 502 が増える場合は間隔を空けて再試行
+- Edge Functions Invocations/Logs で 5xx 率を監視。しきい値超過時は prefill を一時停止
+
+---
+
+## 8. 運用強化（実装済み・予定）
 
 | 項目 | 状況 | 備考 |
 |------|------|------|
@@ -149,10 +179,49 @@ dart run scripts/import_conversations_from_csv.dart "path/to/your_conversations.
 | CSVフォーマット検証 | 予定 | `validate_csv_before_import.dart` |
 | インポートログ | 手動 | 標準出力をファイルにリダイレクト |
 | theme/situation_type 辞書 | 済 | `conversation_scene_coverage_matrix.md` |
+| TTS 事前投入バッチ | 済 | `prefill_tts_assets.dart` |
 
 ---
 
-## 8. トラブルシューティング
+## 9. TTS 運用計測・アラート
+
+### 計測イベント（analytics_events テーブル）
+
+| event_type    | 説明                       | event_properties                         |
+|---------------|----------------------------|------------------------------------------|
+| tts_request   | TTS リクエスト完了         | latency_ms, cache_hit                     |
+| tts_fallback  | OpenAI → flutter_tts フォールバック | reason                                |
+| tts_cancel    | 再生停止・スキップ時のキャンセル | -                                    |
+| pattern_sprint_session_start  | パターンスプリント開始 | prefix, duration_sec |
+| pattern_sprint_session_complete | パターンスプリント完了 | prefix, duration_sec, played_count, elapsed_sec |
+| pattern_sprint_session_abort | パターンスプリント中断 | prefix, elapsed_sec, current_index |
+
+### 推奨しきい値・アラート
+
+- **cache hit 率 < 85%**: prefill バッチの実行を検討
+- **p95 start latency > 800ms**: Edge Function またはネットワーク遅延を確認
+- **tts_fallback 増加**: OpenAI API 制限・Edge Function エラーを確認
+
+### 集計クエリ例
+
+```sql
+-- キャッシュヒット率（直近7日）
+SELECT
+  COUNT(*) FILTER (WHERE (event_properties->>'cache_hit')::boolean) * 100.0 / NULLIF(COUNT(*), 0) AS cache_hit_rate_pct
+FROM analytics_events
+WHERE event_type = 'tts_request'
+  AND created_at >= NOW() - INTERVAL '7 days';
+
+-- p95 遅延（ミリ秒）
+SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (event_properties->>'latency_ms')::int)
+FROM analytics_events
+WHERE event_type = 'tts_request' AND event_properties->>'latency_ms' IS NOT NULL
+  AND created_at >= NOW() - INTERVAL '7 days';
+```
+
+---
+
+## 10. トラブルシューティング
 
 ### インポート時にエラー
 
@@ -169,3 +238,9 @@ dart run scripts/import_conversations_from_csv.dart "path/to/your_conversations.
 
 - Order が整数として正しくソートされているか確認
 - 同じ Order が重複していないか確認
+
+### TTS 再生が遅い・フォールバックが多い
+
+- `prefill_tts_assets.dart` の実行でキャッシュを事前投入
+- Edge Function `tts_synthesize` がデプロイ済みか確認
+- analytics_events の tts_request / tts_fallback を確認

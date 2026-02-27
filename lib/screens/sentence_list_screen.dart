@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/sentence.dart';
 import '../widgets/sentence_card.dart';
 import '../widgets/sentence_detail_sheet.dart';
 import '../providers/sentence_provider.dart';
@@ -210,20 +212,41 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                   );
                 }
                 final masteredIds = masteredIdsAsync.valueOrNull ?? <String>{};
-                return ListView.builder(
-                  itemCount: sentences.length,
-                  itemBuilder: (context, index) {
-                    final sentence = sentences[index];
-                    return SentenceCard(
-                      sentence: sentence,
-                      compact: true,
-                      isMastered: masteredIds.contains(sentence.id),
-                      onTap: () =>
-                          SentenceDetailSheet.show(context, sentence),
-                      onStudyTap: (id) =>
-                          context.push('/study?sentenceId=$id'),
+                final grouped = _groupByCategory(sentences);
+                final children = <Widget>[];
+
+                for (final entry in grouped.entries) {
+                  final category = entry.key;
+                  final list = entry.value;
+                  children.add(
+                    _CategorySectionHeader(title: category),
+                  );
+                  for (final sentence in list) {
+                    children.add(
+                      SentenceCard(
+                        sentence: sentence,
+                        compact: true,
+                        isMastered: masteredIds.contains(sentence.id),
+                        onTap: () =>
+                            SentenceDetailSheet.show(context, sentence),
+                        onStudyTap: (id) =>
+                            context.push('/study?sentenceId=$id'),
+                      ),
                     );
-                  },
+                  }
+                  children.add(
+                    _CategorySprintCta(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        context.push('/pattern-sprint');
+                      },
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: children.length,
+                  itemBuilder: (context, index) => children[index],
                 );
               },
               loading: () => const Center(
@@ -250,6 +273,63 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Map<String, List<Sentence>> _groupByCategory(List<Sentence> sentences) {
+    final map = <String, List<Sentence>>{};
+    for (final s in sentences) {
+      final key = s.categoryTag != null && s.categoryTag!.isNotEmpty
+          ? s.categoryTag!
+          : 'その他';
+      map.putIfAbsent(key, () => []).add(s);
+    }
+    final keys = map.keys.toList()..sort();
+    return Map.fromEntries(
+      keys.map((k) => MapEntry(k, map[k]!)),
+    );
+  }
+}
+
+class _CategorySectionHeader extends StatelessWidget {
+  final String title;
+
+  const _CategorySectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategorySprintCta extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _CategorySprintCta({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.speed, size: 18),
+        label: const Text('このカテゴリでスプリント'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: theme.colorScheme.primary,
+        ),
       ),
     );
   }
