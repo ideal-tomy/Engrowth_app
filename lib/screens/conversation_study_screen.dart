@@ -1379,9 +1379,12 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                   children: [
                     Icon(Icons.info_outline, color: Colors.amber[200], size: 20),
                     const SizedBox(width: 10),
-                    Text(
-                      'まず「会話全体を聞く」で会話を聴いてください',
-                      style: TextStyle(color: Colors.amber[100], fontSize: 14),
+                    Flexible(
+                      child: Text(
+                        'まず「会話全体を聞く」で会話を聴いてください',
+                        style: TextStyle(color: Colors.amber[100], fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

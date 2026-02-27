@@ -45,7 +45,7 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
                 children: [
                   _TrainingChoiceCard(
                     title: '30秒会話',
-                    subtitle: 'シナリオ別の短い英会話',
+                    subtitle: '短いシナリオの反復練習',
                     icon: Icons.timer,
                     onTap: () {
                       HapticFeedback.selectionClick();
@@ -56,7 +56,7 @@ class ConversationTrainingChoiceScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _TrainingChoiceCard(
                     title: '3分英会話',
-                    subtitle: 'テーマ別のロールプレイ',
+                    subtitle: 'テーマ別ロールプレイ（3分連続）',
                     icon: Icons.auto_stories,
                     onTap: () {
                       HapticFeedback.selectionClick();

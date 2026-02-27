@@ -2,13 +2,17 @@
 ///
 /// 使い方（プロジェクトルートで）:
 ///   dart run scripts/import_conversations_from_csv.dart
-///   （assets/csv 内の全CSVを自動検出）
+///   （assets/csv 内の会話CSVを自動検出）
+///
+/// 上書きインポート（既存会話を全削除してから投入）:
+///   dart run scripts/import_conversations_from_csv.dart --replace
 ///
 /// または ファイルパスを指定:
 ///   dart run scripts/import_conversations_from_csv.dart "assets/csv/Engrowthアプリ英単語データ - アパレル 01： 試着とサイズ探し.csv"
 ///
 /// 必要なテーブル: conversations, conversation_utterances（database_conversation_migration.sql 実行済み）
 /// 注意: Flutter非依存の純粋Dartで実行（supabase + dotenv パッケージ使用）
+/// --replace 時は DELETE ポリシーが必要（SUPABASE_CONVERSATION_UPDATE_RUNBOOK.md 参照）
 
 import 'dart:io';
 import 'package:csv/csv.dart';
@@ -18,22 +22,58 @@ import 'package:dotenv/dotenv.dart';
 void main(List<String> args) async {
   final env = DotEnv(includePlatformEnvironment: true)..load(['.env']);
   final url = env['SUPABASE_URL'];
-  final anonKey = env['SUPABASE_ANON_KEY'];
-  if (url == null || url.isEmpty || anonKey == null || anonKey.isEmpty) {
-    print('❌ .env に SUPABASE_URL と SUPABASE_ANON_KEY を設定してください');
+  var serviceKey = env['SUPABASE_SERVICE_ROLE_KEY'];
+  var anonKey = env['SUPABASE_ANON_KEY'];
+  // --replace 時は service_role を推奨（DELETE 権限）
+  final doReplace = args.contains('--replace');
+  final filteredArgs = args.where((a) => a != '--replace').toList();
+
+  if (url == null || url.isEmpty) {
+    print('❌ .env に SUPABASE_URL を設定してください');
+    exit(1);
+  }
+  if (serviceKey == null || serviceKey.isEmpty) serviceKey = anonKey;
+  if (anonKey == null || anonKey.isEmpty) {
+    print('❌ .env に SUPABASE_ANON_KEY または SUPABASE_SERVICE_ROLE_KEY を設定してください');
     exit(1);
   }
 
-  final client = SupabaseClient(url, anonKey);
+  final key = doReplace && (env['SUPABASE_SERVICE_ROLE_KEY'] ?? '').isNotEmpty
+      ? env['SUPABASE_SERVICE_ROLE_KEY']!
+      : anonKey!;
+  final client = SupabaseClient(url, key);
 
   // インポート対象CSV（引数 or assets/csv 内の全CSV）
-  final List<String> csvPaths = args.isNotEmpty
-      ? args
+  final List<String> csvPaths = filteredArgs.isNotEmpty
+      ? filteredArgs
       : await _findCsvFilesInAssets();
 
   if (csvPaths.isEmpty) {
     print('❌ インポート対象のCSVファイルが見つかりません（assets/csv を確認してください）');
     exit(1);
+  }
+
+  if (doReplace) {
+    print('⚠ --replace 指定: 既存の会話データを全削除してからインポートします');
+    try {
+      final convs = await client.from('conversations').select('id');
+      final ids = (convs as List).map((r) => r['id'] as String).toList();
+      if (ids.isNotEmpty) {
+        for (var i = 0; i < ids.length; i += 100) {
+          final chunk = ids.skip(i).take(100).toList();
+          await client.from('conversation_utterances').delete().inFilter('conversation_id', chunk);
+          await client.from('conversations').delete().inFilter('id', chunk);
+        }
+        print('   ${ids.length} 件の会話を削除しました');
+      } else {
+        print('   削除対象なし（テーブルは空）');
+      }
+    } catch (e) {
+      print('   ❌ 削除エラー: $e');
+      print('   → RLS で DELETE が許可されていない場合は、Supabase Dashboard で手動削除するか');
+      print('   → .env に SUPABASE_SERVICE_ROLE_KEY を設定してください');
+      exit(1);
+    }
   }
 
   print('📋 対象: ${csvPaths.length} ファイル');
@@ -105,12 +145,12 @@ void main(List<String> args) async {
         return o1.compareTo(o2);
       });
 
-      final title = '${_humanizeScenarioId(scenarioId)} - $theme';
+      final title = _buildTitle(scenarioId, theme);
 
       try {
         final convResp = await client.from('conversations').insert({
           'title': title,
-          'description': '$theme の会話シナリオ',
+          'description': '$theme の会話練習',
           'situation_type': situationType,
           'theme': theme,
         }).select('id').single();
@@ -152,10 +192,15 @@ void main(List<String> args) async {
 Future<List<String>> _findCsvFilesInAssets() async {
   final csvDir = Directory('assets/csv');
   if (!await csvDir.exists()) return [];
+  final exclude = ['words_master', 'words_slot', 'words_usage_ledger', 'useful_phrases'];
   final files = csvDir
       .listSync()
       .whereType<File>()
-      .where((f) => f.path.toLowerCase().endsWith('.csv'))
+      .where((f) {
+        final name = f.path.split(RegExp(r'[/\\]')).last.toLowerCase();
+        if (!name.endsWith('.csv')) return false;
+        return !exclude.any((e) => name.contains(e));
+      })
       .map((f) => f.path)
       .toList();
   files.sort();
@@ -186,6 +231,33 @@ String _situationTypeFromFilename(String path) {
     return 'travel';
   }
   return 'daily';
+}
+
+/// アプリ表示用のタイトルを生成（テーマ＋番号）
+String _buildTitle(String scenarioId, String theme) {
+  final num = RegExp(r'(\d+)$').firstMatch(scenarioId)?.group(1) ?? '1';
+  final themeLabel = _normalizeThemeForDisplay(theme);
+  return '$themeLabel $num';
+}
+
+String _normalizeThemeForDisplay(String theme) {
+  if (theme.contains('道') || theme.contains('案内')) return '道案内';
+  if (theme.contains('挨拶')) return '挨拶';
+  if (theme.contains('自己紹介')) return '自己紹介';
+  if (theme.contains('飛行機') || theme.contains('空港')) return '空港';
+  if (theme.contains('ホテル') || theme.contains('宿泊')) return 'ホテル';
+  if (theme.contains('カフェ') || theme.contains('レストラン')) return 'カフェ・レストラン';
+  if (theme.contains('アパレル')) return 'アパレル';
+  if (theme.contains('スーパー')) return 'スーパー';
+  if (theme.contains('ベーカリー') || theme.contains('デリ')) return 'ベーカリー';
+  if (theme.contains('ドラッグ')) return 'ドラッグストア';
+  if (theme.contains('病院')) return '病院';
+  if (theme.contains('銀行')) return '銀行';
+  if (theme.contains('郵便') || theme.contains('宅急便')) return '郵便局・宅急便';
+  if (theme.contains('土産') || theme.contains('雑貨')) return 'お土産・雑貨';
+  if (theme.contains('マーケット')) return 'マーケット';
+  if (theme.contains('交通') || theme.contains('免税')) return theme;
+  return theme;
 }
 
 String _humanizeScenarioId(String id) {

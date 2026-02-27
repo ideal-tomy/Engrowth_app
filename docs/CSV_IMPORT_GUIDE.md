@@ -94,15 +94,33 @@ CREATE POLICY "Allow insert for import" ON conversation_utterances FOR INSERT WI
 
 ### 3. スクリプト実行
 ```bash
-# プロジェクトルートで
+# プロジェクトルートで（assets/csv 内の会話CSVを自動検出）
 dart run scripts/import_conversations_from_csv.dart
 ```
 
-カフェ・ホテルの2つのCSVを自動検出してインポートします。特定ファイルのみ指定する場合：
-
+**既存データを上書きする場合**（Supabase の会話を全削除してから再投入）：
 ```bash
-dart run scripts/import_conversations_from_csv.dart "Engrowthアプリ英単語データ - カフェ・レストラン編.csv"
+dart run scripts/import_conversations_from_csv.dart --replace
+```
+- `SUPABASE_SERVICE_ROLE_KEY` を .env に設定すると、DELETE が確実に実行されます
+- RLS で anon に DELETE が許可されていない場合は service_role キーが必要です
+
+特定ファイルのみ指定する場合：
+```bash
+dart run scripts/import_conversations_from_csv.dart "assets/csv/Engrowthアプリ英単語データ - カフェ・レストラン編.csv"
 ```
 
 ### 4. アプリでの確認
-学習画面のメニューから「会話コース」→「カフェ・レストラン」や「ホテル・宿泊」を選択し、会話学習が表示されることを確認してください。
+学習画面のメニューから「会話トレーニング」→「30秒会話」または「3分英会話」を選択し、該当テーマの会話が表示されることを確認してください。
+
+---
+
+## Supabase ダッシュボードから手動で更新する場合
+
+会話形式（conversations + conversation_utterances）は**親子関係**のため、テーブルエディタでCSVを直接アップロードするだけでは正しく反映できません。
+
+### 手動手順
+1. **インポートスクリプトを使用することを推奨**（上記「スクリプト実行」を参照）
+2. スクリプトが使えない場合：
+   - 既存データを削除: Table Editor → conversations / conversation_utterances → 手動で行を削除
+   - 続けて `dart run scripts/import_conversations_from_csv.dart` を実行（削除後なら --replace なしで追加のみ）

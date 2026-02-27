@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'google_tts_service.dart';
+import 'openai_tts_service.dart';
 
 /// TTS（Text-to-Speech）サービス
-/// Google Cloud TTS（APIキー設定時）でリアルな発音、未設定時はデバイスTTSを使用
+/// OpenAI TTS（Edge Function 経由）を優先、失敗時はデバイス TTS（flutter_tts）を使用
 class TtsService {
   static final TtsService _instance = TtsService._internal();
   factory TtsService() => _instance;
@@ -11,25 +12,28 @@ class TtsService {
   static double _defaultSpeechRate = 1.0;
 
   final FlutterTts _flutterTts = FlutterTts();
-  GoogleTtsService? _googleTts;
+  OpenAiTtsService? _openAiTts;
   bool _isInitialized = false;
   bool _isSpeaking = false;
-  bool _useGoogleTts = false;
+  bool _useOpenAiTts = false;
 
   /// 再生速度のデフォルト値を設定（設定画面から呼び出し）
   static void setDefaultSpeechRate(double rate) {
     _defaultSpeechRate = rate.clamp(0.5, 2.0);
   }
 
-  bool get useGoogleTts => _useGoogleTts;
+  bool get useOpenAiTts => _useOpenAiTts;
 
   /// 初期化
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    _useGoogleTts = GoogleTtsService.isAvailable;
-    if (_useGoogleTts) {
-      _googleTts ??= GoogleTtsService();
+    _useOpenAiTts = OpenAiTtsService.isAvailable;
+    if (_useOpenAiTts) {
+      _openAiTts ??= OpenAiTtsService();
+      if (kDebugMode) debugPrint('TTS: OpenAI TTS（Edge Function 経由）を使用します');
+    } else if (kDebugMode) {
+      debugPrint('TTS: Supabase 未設定のためデバイス TTS を使用します');
     }
 
     await _flutterTts.setLanguage('en-US');
@@ -42,7 +46,7 @@ class TtsService {
     _flutterTts.setCompletionHandler(() => _isSpeaking = false);
     _flutterTts.setErrorHandler((msg) {
       _isSpeaking = false;
-      print('TTS Error: $msg');
+      if (kDebugMode) debugPrint('TTS Error: $msg');
     });
 
     _isInitialized = true;
@@ -51,12 +55,13 @@ class TtsService {
   /// 英語で再生（設定画面の再生速度を使用）
   Future<void> speakEnglish(String text) async {
     await initialize();
-    if (_useGoogleTts && _googleTts != null) {
+    if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _googleTts!.speakEnglish(text, speakingRate: _defaultSpeechRate);
+        await _openAiTts!.speakEnglish(text, speakingRate: _defaultSpeechRate);
       } catch (e) {
-        print('Google TTS fallback to device: $e');
+        await _openAiTts!.stop();
+        if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         await _speakEnglishFlutter(text);
       } finally {
         _isSpeaking = false;
@@ -75,12 +80,13 @@ class TtsService {
   /// 英語で再生（ゆっくり固定）
   Future<void> speakEnglishSlow(String text) async {
     await initialize();
-    if (_useGoogleTts && _googleTts != null) {
+    if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _googleTts!.speakEnglishSlow(text);
+        await _openAiTts!.speakEnglishSlow(text);
       } catch (e) {
-        print('Google TTS fallback to device: $e');
+        await _openAiTts!.stop();
+        if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         await _flutterTts.setLanguage('en-US');
         await _flutterTts.setSpeechRate(0.6);
         await _flutterTts.speak(text);
@@ -97,12 +103,13 @@ class TtsService {
   /// 日本語で再生
   Future<void> speakJapanese(String text) async {
     await initialize();
-    if (_useGoogleTts && _googleTts != null) {
+    if (_useOpenAiTts && _openAiTts != null) {
       try {
         _isSpeaking = true;
-        await _googleTts!.speakJapanese(text, speakingRate: _defaultSpeechRate);
+        await _openAiTts!.speakJapanese(text, speakingRate: _defaultSpeechRate);
       } catch (e) {
-        print('Google TTS fallback to device: $e');
+        await _openAiTts!.stop();
+        if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         await _speakJapaneseFlutter(text);
       } finally {
         _isSpeaking = false;
@@ -120,8 +127,8 @@ class TtsService {
 
   /// 停止
   Future<void> stop() async {
-    if (_useGoogleTts && _googleTts != null) {
-      await _googleTts!.stop();
+    if (_useOpenAiTts && _openAiTts != null) {
+      await _openAiTts!.stop();
     }
     await _flutterTts.stop();
     _isSpeaking = false;
@@ -132,7 +139,7 @@ class TtsService {
 
   /// 破棄
   void dispose() {
-    _googleTts?.dispose();
+    _openAiTts?.dispose();
     _flutterTts.stop();
   }
 }
