@@ -47,6 +47,7 @@ dependencies:
   shimmer: ^3.0.0
   
   # 音声機能
+  crypto: ^3.0.3
   flutter_tts: ^4.0.0
   http: ^1.2.0
   record: ^5.0.0
@@ -61,6 +62,7 @@ dev_dependencies:
   # インポートスクリプト用（Flutter非依存・dart run で実行可能）
   supabase: ^2.0.0
   dotenv: ^4.2.0
+  crypto: ^3.0.3
 
 flutter:
   uses-material-design: true

@@ -31,6 +31,10 @@ class AudioControls extends StatefulWidget {
   final VoidCallback? onPlayFullEnglish;
   /// 会話モード時：録音完了時のコールバック（自動進行用）
   final VoidCallback? onRecordingComplete;
+  /// AI会話ループ用：録音ファイルを受け取り STT→AI→TTS を親で実行
+  final Future<void> Function(File file)? onRecordingCompleteWithFile;
+  /// 処理中表示（認識中/思考中/返答中）のテキスト
+  final String? processingStateLabel;
   /// 録音完了後のSnackBarメッセージ（例文学習向けに簡潔な案内を指定可能）
   final String? recordingCompleteMessage;
 
@@ -47,6 +51,8 @@ class AudioControls extends StatefulWidget {
     this.hideJapaneseButton = false,
     this.onPlayFullEnglish,
     this.onRecordingComplete,
+    this.onRecordingCompleteWithFile,
+    this.processingStateLabel,
     this.recordingCompleteMessage,
   });
 
@@ -171,41 +177,67 @@ class _AudioControlsState extends State<AudioControls> {
       if (path != null) {
         final file = File(path);
         if (await file.exists()) {
-          final userId = Supabase.instance.client.auth.currentUser?.id;
-          final sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
-          if (userId != null) {
+          if (widget.onRecordingCompleteWithFile != null) {
             setState(() => _isUploading = true);
             try {
-              final submission = await _submissionService.uploadAsPractice(
-                audioFile: file,
-                sessionId: sessionId,
-                sentenceId: widget.sentenceId,
-                conversationId: widget.conversationId,
-                utteranceId: widget.utteranceId,
-              );
-              if (mounted && submission != null) {
-                _lastSubmissionId = submission.id;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      widget.recordingCompleteMessage ??
-                          '練習として保存しました。聴き直して「先生に送る」で提出できます。',
-                    ),
-                    duration: const Duration(seconds: 2),
-                  ),
+              await widget.onRecordingCompleteWithFile!(file);
+              final userId = Supabase.instance.client.auth.currentUser?.id;
+              final sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+              if (mounted && userId != null) {
+                final submission = await _submissionService.uploadAsPractice(
+                  audioFile: file,
+                  sessionId: sessionId,
+                  sentenceId: widget.sentenceId,
+                  conversationId: widget.conversationId,
+                  utteranceId: widget.utteranceId,
                 );
+                if (mounted && submission != null) _lastSubmissionId = submission.id;
               }
             } catch (e) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('アップロードに失敗しました: $e'), duration: const Duration(seconds: 3)),
+                  SnackBar(content: Text('処理エラー: $e'), duration: const Duration(seconds: 3)),
                 );
               }
             }
             if (mounted) setState(() => _isUploading = false);
+          } else {
+            final userId = Supabase.instance.client.auth.currentUser?.id;
+            final sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+            if (userId != null) {
+              setState(() => _isUploading = true);
+              try {
+                final submission = await _submissionService.uploadAsPractice(
+                  audioFile: file,
+                  sessionId: sessionId,
+                  sentenceId: widget.sentenceId,
+                  conversationId: widget.conversationId,
+                  utteranceId: widget.utteranceId,
+                );
+                if (mounted && submission != null) {
+                  _lastSubmissionId = submission.id;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        widget.recordingCompleteMessage ??
+                            '練習として保存しました。聴き直して「先生に送る」で提出できます。',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('アップロードに失敗しました: $e'), duration: const Duration(seconds: 3)),
+                  );
+                }
+              }
+              if (mounted) setState(() => _isUploading = false);
+            }
+            widget.onRecordingComplete?.call();
           }
         }
-        widget.onRecordingComplete?.call();
       }
     } else {
       try {
@@ -385,7 +417,11 @@ class _AudioControlsState extends State<AudioControls> {
                   ? RecordingWaveform(isActive: true, size: 20, color: Colors.red)
                   : Icon(Icons.mic, size: 18, color: _isRecording ? Colors.red : null),
           label: Text(
-            _isUploading ? '保存中' : _isRecording ? '停止' : '録音',
+            _isUploading
+                ? (widget.processingStateLabel ?? '保存中')
+                : _isRecording
+                    ? '停止'
+                    : '録音',
             style: TextStyle(
               fontSize: 11,
               color: _isRecording ? Colors.red : (widget.useDarkTheme ? Colors.white70 : null),

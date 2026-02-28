@@ -93,15 +93,75 @@ class AnalyticsService {
   void logTtsRequest({
     required int latencyMs,
     bool? cacheHit,
+    String? sessionId,
+    String? source,
   }) =>
       logEvent(
         eventType: 'tts_request',
         eventProperties: {
           'latency_ms': latencyMs,
           'cache_hit': cacheHit,
+          if (sessionId != null) 'tts_session_id': sessionId,
+          if (source != null) 'tts_source': source,
         },
       );
   void logTtsFallback({String? reason}) =>
       logEvent(eventType: 'tts_fallback', eventProperties: {'reason': reason});
   void logTtsCancel() => logEvent(eventType: 'tts_cancel');
+
+  // 会話ループKPI（AI会話モード）
+  void logConversationTurnCompleted({
+    required String conversationId,
+    required int turnCount,
+  }) =>
+      logEvent(
+        eventType: 'conversation_turn_completed',
+        eventProperties: {
+          'conversation_id': conversationId,
+          'turn_count': turnCount,
+        },
+      );
+  void logSttFailed({String? reason}) =>
+      logEvent(eventType: 'stt_failed', eventProperties: {'reason': reason});
+  void logReplyLatency({required int latencyMs}) =>
+      logEvent(
+        eventType: 'reply_latency_ms',
+        eventProperties: {'latency_ms': latencyMs},
+      );
+  void logSessionDropReason({String? reason}) =>
+      logEvent(
+        eventType: 'session_drop_reason',
+        eventProperties: {'reason': reason},
+      );
+
+  /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
+  void logTtsPlaybackSession({
+    required String conversationId,
+    required int utteranceCount,
+    required bool firstUtterancePrefetched,
+    required int prefetchHitCount,
+    required int prefetchMissCount,
+    int? tapToFirstAudioMs,
+    int? avgUtteranceGapMs,
+    int? maxUtteranceGapMs,
+    int? first5PrefetchHitCount,
+    int? flutterFallbackCount,
+  }) =>
+      logEvent(
+        eventType: 'tts_playback_session',
+        eventProperties: {
+          'conversation_id': conversationId,
+          'utterance_count': utteranceCount,
+          'first_utterance_prefetched': firstUtterancePrefetched,
+          'prefetch_hit_count': prefetchHitCount,
+          'prefetch_miss_count': prefetchMissCount,
+          if (tapToFirstAudioMs != null) 'tap_to_first_audio_ms': tapToFirstAudioMs,
+          if (avgUtteranceGapMs != null) 'utterance_gap_avg_ms': avgUtteranceGapMs,
+          if (maxUtteranceGapMs != null) 'utterance_gap_max_ms': maxUtteranceGapMs,
+          if (first5PrefetchHitCount != null)
+            'first_5_prefetch_hit_count': first5PrefetchHitCount,
+          if (flutterFallbackCount != null)
+            'flutter_fallback_count': flutterFallbackCount,
+        },
+      );
 }

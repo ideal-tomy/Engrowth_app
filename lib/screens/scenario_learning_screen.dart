@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../constants/scenario_categories.dart';
 import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
+import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
@@ -45,6 +46,25 @@ class ScenarioLearningScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(conversationsByCategoryWithSubsectionsProvider);
+
+    ref.listen(conversationsByCategoryWithSubsectionsProvider, (_, next) {
+      next.whenData((byCategory) {
+        final ids = <String>[];
+        for (final category in kScenarioCategories) {
+          for (final sub in (byCategory[category.id] ?? [])) {
+            for (final c in sub.conversations.take(3)) {
+              ids.add(c.id);
+              if (ids.length >= 5) break;
+            }
+            if (ids.length >= 5) break;
+          }
+          if (ids.length >= 5) break;
+        }
+        if (ids.isNotEmpty) {
+          TtsWarmupService().warmupForConversationIds(ref, ids);
+        }
+      });
+    });
 
     return Scaffold(
       appBar: AppBar(

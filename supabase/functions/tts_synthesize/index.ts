@@ -1,4 +1,4 @@
-// OpenAI TTS プロキシ: キャッシュ優先 → ミス時のみ OpenAI 合成 → Storage 保存 → 署名付き URL 返却
+// OpenAI TTS プロキシ: キャッシュ優先 → ミス時のみ OpenAI 合成 → Storage 保存 → Public URL 返却
 // API キーはサーバー側シークレット OPENAI_API_KEY を使用
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -6,7 +6,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
 const MODEL = "tts-1-hd";
 const BUCKET = "tts-audio";
-const SIGNED_URL_EXPIRY_SEC = 3600;
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +40,11 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/** キャッシュキー用: 前後trim + 連続空白・改行を単一スペースに（prefill と完全一致） */
+function normalizeTextForCache(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
 }
 
 function cacheKey(
@@ -104,7 +108,8 @@ async function handleRequest(req: Request): Promise<Response> {
     return errResponse("validation_error", "Invalid JSON body", 400);
   }
 
-  const text = typeof body.text === "string" ? body.text.trim() : "";
+  const rawText = typeof body.text === "string" ? body.text : "";
+  const text = normalizeTextForCache(rawText);
   if (!text || text.length > 4096) {
     return errResponse(
       "validation_error",
@@ -139,30 +144,37 @@ async function handleRequest(req: Request): Promise<Response> {
     .maybeSingle();
 
   if (asset?.storage_path) {
-    const { data: urlData } = await client.storage
-      .from(BUCKET)
-      .createSignedUrl(asset.storage_path, SIGNED_URL_EXPIRY_SEC);
+    await client
+      .from("tts_assets")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", asset.id);
 
-    if (urlData?.signedUrl) {
-      await client
-        .from("tts_assets")
-        .update({ last_used_at: new Date().toISOString() })
-        .eq("id", asset.id);
+    // Public URL: createSignedUrl の往復を省略し即時返却（爆速化）
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${storagePath}`;
 
-      return new Response(
-        JSON.stringify({
-          url: urlData.signedUrl,
-          cache_hit: true,
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-          status: 200,
-        }
-      );
-    }
+    console.log(
+      JSON.stringify({
+        cache_hit: true,
+        cache_key_hash: keyHash.slice(0, 8),
+        voice,
+        speed: speakingRate,
+        text_length: text.length,
+      })
+    );
+
+    return new Response(
+      JSON.stringify({
+        url: publicUrl,
+        cache_hit: true,
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 200,
+      }
+    );
   }
 
   // 2. ミス: OpenAI 合成
@@ -240,18 +252,23 @@ async function handleRequest(req: Request): Promise<Response> {
     { onConflict: "cache_key" }
   );
 
-  // 5. 署名付き URL を返却
-  const { data: urlData } = await client.storage
-    .from(BUCKET)
-    .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_SEC);
+  // 5. Public URL を返却（バケット public 化済み前提）
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${storagePath}`;
 
-  if (!urlData?.signedUrl) {
-    return errResponse("storage_error", "Failed to create signed URL", 502);
-  }
+  console.log(
+    JSON.stringify({
+      cache_hit: false,
+      cache_key_hash: keyHash,
+      cache_key_preview: key.slice(0, 80),
+      voice,
+      speed: speakingRate,
+      text_length: text.length,
+    })
+  );
 
   return new Response(
     JSON.stringify({
-      url: urlData.signedUrl,
+      url: publicUrl,
       cache_hit: false,
     }),
     {

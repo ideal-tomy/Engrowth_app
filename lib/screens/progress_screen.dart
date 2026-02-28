@@ -10,6 +10,7 @@ import '../widgets/achievement_display.dart' show AchievementBadge;
 import '../providers/progress_provider.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/user_stats_provider.dart';
+import '../providers/conversation_practice_provider.dart';
 import '../providers/achievement_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../services/scenario_service.dart';
@@ -60,6 +61,7 @@ class ProgressScreen extends ConsumerWidget {
             const StreakDisplay(),
             const _RingProgressSection(),
             const _ProgressSummarySection(),
+            const _ConversationPracticeSection(),
             const AudioComparisonPlayer(),
             // バッジ・称号（解除済み/次に狙うを分けて表示）
             achievementsAsync.when(
@@ -389,6 +391,84 @@ class _RingProgressSection extends ConsumerWidget {
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// 会話練習サマリ（今日のターン数・目標）
+class _ConversationPracticeSection extends ConsumerWidget {
+  const _ConversationPracticeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final turnsAsync = ref.watch(todayConversationTurnsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            ref.read(analyticsServiceProvider).logProgressBoardOpened(track: 'conversation');
+            context.push('/conversations');
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.smart_toy, size: 32, color: colorScheme.primary),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'AI会話練習',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      turnsAsync.when(
+                        data: (turns) => Text(
+                          '今日 $turns ターン完了　目標: $dailyConversationGoalTurns ターン',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        ),
+                        loading: () => Text(
+                          'AIと会話して英語を練習しよう',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        ),
+                        error: (_, __) => Text(
+                          'AIと会話して英語を練習しよう',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: colorScheme.primary),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

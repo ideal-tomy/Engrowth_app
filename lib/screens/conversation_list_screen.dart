@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
+import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
@@ -30,6 +31,15 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
       theme: _selectedTheme,
     );
     final conversationsAsync = ref.watch(conversationsProvider(filter.filterKey));
+
+    ref.listen(conversationsProvider(filter.filterKey), (_, next) {
+      next.whenData((conversations) {
+        if (conversations.isNotEmpty) {
+          final ids = conversations.take(3).map((c) => c.id).toList();
+          TtsWarmupService().warmupForConversationIds(ref, ids);
+        }
+      });
+    });
 
     return Scaffold(
       appBar: AppBar(

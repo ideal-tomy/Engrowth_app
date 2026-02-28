@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/sentence_provider.dart';
+import '../providers/conversation_practice_provider.dart';
 import '../providers/user_plan_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
@@ -54,6 +55,8 @@ class DashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 6),
                     ],
                     const _QuickStartCtaBar(),
+                    const SizedBox(height: 6),
+                    const _ConversationPracticeGoalCard(),
                     const SizedBox(height: 6),
                     SizedBox(
                       height: 100,
@@ -269,6 +272,94 @@ class _QuickStartButton extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationPracticeGoalCard extends ConsumerWidget {
+  const _ConversationPracticeGoalCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final turnsAsync = ref.watch(todayConversationTurnsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          context.push('/conversations');
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.smart_toy,
+                size: 28,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '今日の会話目標',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    turnsAsync.when(
+                      data: (turns) {
+                        final remaining = (dailyConversationGoalTurns - turns).clamp(0, dailyConversationGoalTurns);
+                        final text = turns >= dailyConversationGoalTurns
+                            ? '目標達成！$turnsターン完了'
+                            : 'あと$remainingターンで目標達成（$turns / $dailyConversationGoalTurns）';
+                        return Text(
+                          text,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        );
+                      },
+                      loading: () => Text(
+                        'AIと会話して英語を練習',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withOpacity(0.8),
+                        ),
+                      ),
+                      error: (_, __) => Text(
+                        'AIと会話して英語を練習',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withOpacity(0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.primary,
               ),
             ],
           ),

@@ -58,7 +58,15 @@ class TtsService {
   /// 英語で再生（設定画面の再生速度を使用）
   /// [role] に 'A'/'B' を指定すると、役割別の voice を使用
   /// [prefetchedUrl] を指定すると取得をスキップし即再生（プリフェッチ済み時）
-  Future<void> speakEnglish(String text, {String? role, String? prefetchedUrl}) async {
+  /// [onFlutterFallback] OpenAI 失敗で flutter_tts へ切替えた際に呼ぶ
+  Future<void> speakEnglish(
+    String text, {
+    String? role,
+    String? prefetchedUrl,
+    void Function(int latencyMs, bool? cacheHit)? onTtsRequestComplete,
+    String? ttsSessionId,
+    void Function()? onFlutterFallback,
+  }) async {
     await initialize();
     if (_useOpenAiTts && _openAiTts != null) {
       try {
@@ -70,12 +78,16 @@ class TtsService {
             text,
             speakingRate: _defaultSpeechRate,
             role: role,
+            onTtsRequestComplete: onTtsRequestComplete,
+            ttsSessionId: ttsSessionId,
           );
         }
       } catch (e) {
         await _openAiTts!.stop();
+        await _flutterTts.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
+        onFlutterFallback?.call();
         await _speakEnglishFlutter(text);
       } finally {
         _isSpeaking = false;
@@ -100,6 +112,7 @@ class TtsService {
         await _openAiTts!.speakEnglishSlow(text, role: role);
       } catch (e) {
         await _openAiTts!.stop();
+        await _flutterTts.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
         await _flutterTts.setLanguage('en-US');
@@ -128,6 +141,7 @@ class TtsService {
         );
       } catch (e) {
         await _openAiTts!.stop();
+        await _flutterTts.stop();
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
         await _speakJapaneseFlutter(text);

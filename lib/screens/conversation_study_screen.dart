@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,8 @@ import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
 import '../services/learning_completion_orchestrator.dart';
+import '../services/stt_service.dart';
+import '../services/ai_conversation_service.dart';
 
 import '../theme/engrowth_theme.dart';
 import '../widgets/audio_controls.dart';
@@ -22,7 +25,7 @@ import '../widgets/scenario_background.dart';
 /// スマホ1画面で完結・スクロール不要のUI
 class ConversationStudyScreen extends ConsumerStatefulWidget {
   final String conversationId;
-  final String initialMode;  // listen, roleA, roleB
+  final String initialMode;  // listen, roleA, roleB, aiConversation
 
   const ConversationStudyScreen({
     super.key,
@@ -44,7 +47,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   bool _isPlaying = false;
   Map<String, bool> _textVisibleMap = {};
   bool _showAllTexts = false;
-  String _mode = 'listen';  // listen, roleA, roleB
+  String _mode = 'listen';  // listen, roleA, roleB, aiConversation
   bool _hasListenedToAll = false;  // ①会話全体を聞いたか
   Set<String> _revealedTextInRoleMode = {};  // 役モードで「テキスト表示」を押した発話
   bool _isCountdownActive = false;  // 3秒カウントダウン中
@@ -59,14 +62,25 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   final Map<int, String> _prefetchedUrls = {};  // index -> プリフェッチ済み URL
   int _prefetchGenId = 0;  // 停止/スキップ時にインクリメントし、古いプリフェッチ結果を破棄
   DateTime? _lastAdvanceTap;  // 連打対策
+  String? _index0PrefetchedForConversation;  // Phase 2: 1発話目先読み済み会話ID
+
+  // AI会話ループ用
+  final SttService _sttService = SttService();
+  final AiConversationService _aiConversationService = AiConversationService();
+  String? _lastUserTranscript;
+  String? _lastAiReply;
+  bool _isProcessingAi = false;
+  int _aiTurnCount = 0;
 
   @override
   void initState() {
     super.initState();
-    // 次のパートから遷移した場合は roleA/roleB を維持し、それ以外は listen から開始
     final m = widget.initialMode;
     if (m == 'roleA' || m == 'roleB') {
       _mode = m;
+      _hasListenedToAll = true;
+    } else if (m == 'aiConversation') {
+      _mode = 'aiConversation';
       _hasListenedToAll = true;
     } else {
       _mode = 'listen';
@@ -98,6 +112,74 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
   static const _delayAfterRecordingSec = 1.2;
   static const _delayAfterOpponentSec = 0.6;
+
+  Future<void> _handleAiRecordingComplete(File audioFile) async {
+    if (!mounted || _isProcessingAi) return;
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final transcript = await _sttService.transcribeFile(audioFile);
+      if (!mounted) return;
+      if (transcript == null || transcript.trim().isEmpty) {
+        AnalyticsService().logSttFailed(reason: 'empty_or_null');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('聞き取れませんでした。もう一度話してください。'),
+              duration: const Duration(seconds: 3),
+              action: SnackBarAction(
+                label: '再試行',
+                onPressed: () {},
+              ),
+            ),
+          );
+        }
+        setState(() => _isProcessingAi = false);
+        return;
+      }
+
+      final cwu = await ref.read(conversationWithUtterancesProvider(widget.conversationId).future);
+      final samples = cwu.utterances.map((u) => u.englishText).where((t) => t.trim().isNotEmpty).toList();
+
+      final reply = await _aiConversationService.generateReply(
+        userTranscript: transcript,
+        conversationTitle: cwu.conversation.title,
+        theme: cwu.conversation.theme,
+        sampleUtterances: samples,
+      );
+
+      if (!mounted) return;
+      final effectiveReply = (reply != null && reply.trim().isNotEmpty)
+          ? reply!.trim()
+          : "I didn't quite catch that. Could you say it again?";
+
+      setState(() {
+        _lastUserTranscript = transcript;
+        _lastAiReply = effectiveReply;
+        _aiTurnCount++;
+      });
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      await _ttsService.speakEnglish(effectiveReply);
+      if (!mounted) return;
+
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        AnalyticsService().logConversationTurnCompleted(
+          conversationId: widget.conversationId,
+          turnCount: _aiTurnCount,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラー: $e'), duration: const Duration(seconds: 2)),
+        );
+      }
+    }
+    if (mounted) setState(() => _isProcessingAi = false);
+  }
 
   void _cancelAutoAdvance() {
     _autoAdvanceTimer?.cancel();
@@ -360,11 +442,33 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   void _clearPrefetch() {
     _prefetchGenId++;
     _prefetchedUrls.clear();
+    // Phase 2: 次回プレイで先頭を再プリフェッチさせるためリセット
+    _index0PrefetchedForConversation = null;
   }
 
+  /// Phase 3: 発話間の待機を発話長・役割交代に応じて動的調整
+  static int _computePauseAfterUtterance(
+    ConversationUtterance current,
+    ConversationUtterance? next,
+  ) {
+    final len = current.englishText.trim().length;
+    var ms = 420; // base（A/B切り替え間を短く）
+    if (len < 15) {
+      ms = 280; // 短文: テンポよく
+    } else if (len > 60) {
+      ms = 520; // 長文: やや余韻を
+    }
+    if (next != null && next.speakerRole != current.speakerRole) {
+      ms += 35; // 役割交代時: 自然な間（短めに）
+    }
+    return ms.clamp(220, 600);
+  }
+
+  /// 次に再生する発話を先読み（画面表示時は先頭5件、再生中は次の4件）
   void _prefetchNextUtterances(List<ConversationUtterance> utterances, int currentIndex) {
     final gen = _prefetchGenId;
-    for (var o = 1; o <= 2; o++) {
+    final count = currentIndex < 0 ? 5 : 4;
+    for (var o = 1; o <= count; o++) {
       final idx = currentIndex + o;
       if (idx >= utterances.length) break;
       final u = utterances[idx];
@@ -386,10 +490,56 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if (_isPlaying) return;
 
     _stopPlaybackRequested = false;
-    _clearPrefetch();
+    // Phase 2: 再生開始時に _clearPrefetch しない（先読み済み index 0 を保持。
+    // 停止・次へ・戻る・役割切替時のみクリア）
     final fromIndex = startIndex ?? 0;
     setState(() => _isPlaying = true);
     _transcriptIsPlayingNotifier?.value = true;
+
+    // 再生開始時: 1発話目が未取得なら短時間待つ（補完先読み）
+    if (fromIndex == 0 &&
+        utterances.isNotEmpty &&
+        utterances.first.englishText.trim().isNotEmpty &&
+        !_prefetchedUrls.containsKey(0)) {
+      final first = utterances[0];
+      final url = await _ttsService
+          .fetchAudioUrlForEnglish(first.englishText, role: first.speakerRole)
+          .timeout(const Duration(milliseconds: 300), onTimeout: () => null);
+      if (url != null && mounted && !_stopPlaybackRequested) {
+        _prefetchedUrls[0] = url;
+      }
+    }
+
+    // Phase 1: TTS計測用
+    final playTapTime = DateTime.now();
+    final ttsSessionId = '${playTapTime.millisecondsSinceEpoch}_${widget.conversationId}';
+    var prefetchHitCount = 0;
+    var prefetchMissCount = 0;
+    var first5PrefetchHitCount = 0;
+    var flutterFallbackCount = 0;
+    bool? firstUtterancePrefetched;
+    int? firstUtteranceTtsMs;
+    int? tapToFirstAudioMs;
+    DateTime? lastUtteranceEndTime;
+    final utteranceGapMsList = <int>[];
+    var utterancesPlayedCount = 0;
+
+    void _flushTtsMetrics() {
+      if (utterancesPlayedCount == 0) return;
+      final gaps = utteranceGapMsList;
+      AnalyticsService().logTtsPlaybackSession(
+        conversationId: widget.conversationId,
+        utteranceCount: utterancesPlayedCount,
+        firstUtterancePrefetched: firstUtterancePrefetched ?? false,
+        prefetchHitCount: prefetchHitCount,
+        prefetchMissCount: prefetchMissCount,
+        tapToFirstAudioMs: tapToFirstAudioMs,
+        avgUtteranceGapMs: gaps.isEmpty ? null : (gaps.reduce((a, b) => a + b) / gaps.length).round(),
+        maxUtteranceGapMs: gaps.isEmpty ? null : gaps.reduce((a, b) => a > b ? a : b),
+        first5PrefetchHitCount: first5PrefetchHitCount,
+        flutterFallbackCount: flutterFallbackCount > 0 ? flutterFallbackCount : null,
+      );
+    }
 
     for (var i = fromIndex; i < utterances.length; i++) {
       if (!mounted) break;
@@ -406,10 +556,32 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       _progressController.forward(from: 0);
 
       final prefetched = _prefetchedUrls.remove(i);
+      final usedPrefetch = prefetched != null && prefetched.isNotEmpty;
+      if (usedPrefetch) {
+        prefetchHitCount++;
+        if (i < 5) first5PrefetchHitCount++;
+      } else {
+        prefetchMissCount++;
+      }
+      if (firstUtterancePrefetched == null) {
+        firstUtterancePrefetched = usedPrefetch;
+      }
+
+      final utteranceStartTime = DateTime.now();
+      if (lastUtteranceEndTime != null) {
+        utteranceGapMsList.add(utteranceStartTime.difference(lastUtteranceEndTime!).inMilliseconds);
+      }
       final speakFuture = _ttsService.speakEnglish(
         utterance.englishText,
         role: utterance.speakerRole,
         prefetchedUrl: prefetched,
+        ttsSessionId: ttsSessionId,
+        onTtsRequestComplete: usedPrefetch
+            ? null
+            : (latencyMs, _) {
+                if (firstUtteranceTtsMs == null) firstUtteranceTtsMs = latencyMs;
+              },
+        onFlutterFallback: () => flutterFallbackCount++,
       );
 
       // 再生が終わったらプログレスを完了位置に
@@ -418,6 +590,14 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       });
 
       await speakFuture;
+
+      if (utterancesPlayedCount == 0 && tapToFirstAudioMs == null) {
+        tapToFirstAudioMs = usedPrefetch
+            ? utteranceStartTime.difference(playTapTime).inMilliseconds
+            : firstUtteranceTtsMs;
+      }
+      utterancesPlayedCount++;
+      lastUtteranceEndTime = DateTime.now();
 
       if (!mounted) break;
       if (_stopPlaybackRequested) break;
@@ -437,9 +617,14 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       }
 
       if (i < utterances.length - 1 && !_stopPlaybackRequested) {
-        await Future.delayed(const Duration(milliseconds: 500));
+        final next = utterances[i + 1];
+        final pauseMs =
+            _computePauseAfterUtterance(utterance, next);
+        await Future.delayed(Duration(milliseconds: pauseMs));
       }
     }
+
+    _flushTtsMetrics();
 
     if (mounted) {
       final wasStoppedByUser = _stopPlaybackRequested;
@@ -450,6 +635,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       });
       _transcriptIsPlayingNotifier?.value = false;
         if (!wasStoppedByUser && showPromptOnComplete) {
+        // Phase 2: 次回「もう一度」用に index 0,1 を先読み
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _prefetchNextUtterances(utterances, -1);
+        });
         final userId = Supabase.instance.client.auth.currentUser?.id;
         if (userId != null) {
           _learningEvents.logListenCompleted(
@@ -580,6 +769,24 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 ),
                 const SizedBox(height: 16),
               ],
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    context.push('/conversation/${widget.conversationId}?mode=aiConversation');
+                  },
+                  icon: const Icon(Icons.smart_toy, size: 20),
+                  label: const Text('AIと会話'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: EngrowthColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -774,6 +981,22 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   Widget _buildBody(BuildContext context, Conversation conversation, List<ConversationUtterance> utterances) {
     if (utterances.isEmpty) {
       return _buildEmpty(context);
+    }
+    if (_mode == 'aiConversation') {
+      return _buildAiConversationBody(context, conversation, utterances);
+    }
+
+    // Phase 2: 1発話目の先読み（画面表示時に開始し、再生タップ時に即時再生可能に）
+    if (_index0PrefetchedForConversation != widget.conversationId &&
+        utterances.any((u) => u.englishText.trim().isNotEmpty)) {
+      _index0PrefetchedForConversation = widget.conversationId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _index0PrefetchedForConversation == widget.conversationId &&
+            !_isPlaying) {
+          _prefetchNextUtterances(utterances, -1);  // index 0 と 1 を先読み
+        }
+      });
     }
 
     final currentUtterance = utterances[_currentUtteranceIndex];
@@ -1566,6 +1789,322 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 ? () => _scheduleAdvanceAfterRecording(utterances)
                 : null,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiConversationBody(
+    BuildContext context,
+    Conversation conversation,
+    List<ConversationUtterance> utterances,
+  ) {
+    final firstUtterance = utterances.isNotEmpty ? utterances.first : null;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: conversation.thumbnailUrl != null
+              ? OptimizedImage(
+                  imageUrl: conversation.thumbnailUrl!,
+                  fit: BoxFit.cover,
+                )
+              : Image.asset(
+                  kScenarioBgAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                ),
+        ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.2),
+                  Colors.black.withOpacity(0.4),
+                  Colors.black.withOpacity(0.6),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SafeArea(
+          child: Column(
+            children: [
+              _buildAiConversationAppBar(context, conversation.title),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _buildAiConversationCard(
+                      lastUser: _lastUserTranscript,
+                      lastAi: _lastAiReply,
+                      turnCount: _aiTurnCount,
+                      isProcessing: _isProcessingAi,
+                    ),
+                  ),
+                ),
+              ),
+              BottomInteractionBar(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.6),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isProcessingAi)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: OutlinedButton.icon(
+                          onPressed: () => _ttsService.stop(),
+                          icon: const Icon(Icons.stop, size: 18),
+                          label: const Text('再生を停止'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: AudioControls(
+                        englishText: firstUtterance?.englishText ?? '',
+                        japaneseText: firstUtterance?.japaneseText ?? '',
+                        speakerRole: firstUtterance?.speakerRole,
+                        conversationId: widget.conversationId,
+                        utteranceId: firstUtterance?.id,
+                        sessionId: _sessionId,
+                        useDarkTheme: true,
+                        hideJapaneseButton: true,
+                        onRecordingCompleteWithFile: _handleAiRecordingComplete,
+                        processingStateLabel: _isProcessingAi ? '認識・応答生成中' : null,
+                        recordingCompleteMessage: null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAiConversationAppBar(BuildContext context, String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => context.pop(),
+            tooltip: '終了',
+            style: IconButton.styleFrom(backgroundColor: Colors.black26),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: EngrowthColors.primary,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.smart_toy, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'AIと会話',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiConversationCard({
+    String? lastUser,
+    String? lastAi,
+    required int turnCount,
+    required bool isProcessing,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (turnCount == 0 && !isProcessing)
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.mic, color: Colors.white70, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    '録音ボタンを押して、英語で話しかけてください',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.95),
+                      fontSize: 16,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'AIが自然に返答します',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            if (lastUser != null)
+              Container(
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: EngrowthColors.primary.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: EngrowthColors.primary.withOpacity(0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.person, color: EngrowthColors.primary, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'あなた',
+                          style: TextStyle(
+                            color: EngrowthColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      lastUser,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (lastAi != null)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.smart_toy, color: Colors.white70, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'AI',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      lastAi,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (isProcessing)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '考えています...',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
