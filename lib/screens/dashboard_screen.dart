@@ -15,11 +15,13 @@ import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
+import '../providers/ui_experiments_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
 import '../widgets/dashboard_sections/consultant_notification_banner.dart';
+import '../widgets/marquee/header_marquee_rail.dart';
 import '../widgets/dashboard_sections/todays_mission_card.dart';
 
 /// Dashboard（Home タブ）
@@ -32,12 +34,18 @@ class DashboardScreen extends ConsumerWidget {
     final authStage = ref.watch(authStageProvider);
     final userPlan = ref.watch(userPlanProvider);
 
+    final enableMarquee = ref.watch(enableMarqueeRailProvider);
+
     return Scaffold(
       drawer: const _SettingsDrawer(),
       body: SafeArea(
         child: Column(
           children: [
             _DashboardHeader(),
+            if (enableMarquee) ...[
+              const HeaderMarqueeRail(),
+              const SizedBox(height: 4),
+            ],
             Expanded(
               child: SingleChildScrollView(
                 primary: true,
@@ -743,6 +751,15 @@ class _SettingsDrawer extends ConsumerWidget {
               ),
             ),
             if (kDebugMode) ...[
+              SwitchListTile(
+                secondary: const Icon(Icons.view_carousel_outlined),
+                title: const Text('Marquee導線'),
+                subtitle: const Text('ヘッダー・フッターの流れるタブを表示'),
+                value: ref.watch(enableMarqueeRailProvider),
+                onChanged: (_) {
+                  ref.read(enableMarqueeRailProvider.notifier).toggle();
+                },
+              ),
               SwitchListTile(
                 secondary: const Icon(Icons.bug_report_outlined),
                 title: const Text('開発: ログイン済み画面'),

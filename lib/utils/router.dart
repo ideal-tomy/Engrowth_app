@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/dashboard_screen.dart';
@@ -30,6 +31,8 @@ import '../screens/story_progress_board_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/review_list_screen.dart';
+import '../providers/ui_experiments_provider.dart';
+import '../widgets/marquee/bottom_recommendation_rail.dart';
 
 /// 導線ポリシー:
 /// - タブルート直下（/home, /library, /progress, /words）: 戻る矢印なし
@@ -250,7 +253,8 @@ final appRouter = GoRouter(
 
 /// StatefulShellRoute用のScaffold
 /// NavigationBarを統一的に表示し、各タブの状態を保持
-class ScaffoldWithNavBar extends StatelessWidget {
+/// Marquee有効時はフッター上におすすめレールを1段追加
+class ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const ScaffoldWithNavBar({
@@ -259,50 +263,61 @@ class ScaffoldWithNavBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: NavigationBar(
-            height: 68,
-            backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.92 : 0.95),
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: (index) {
-              navigationShell.goBranch(
-                index,
-                // 同じブランチ内の最初のルートに移動
-                initialLocation: index == navigationShell.currentIndex,
-              );
-            },
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.menu_book_outlined),
-                selectedIcon: Icon(Icons.menu_book),
-                label: 'Library',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.trending_up_outlined),
-                selectedIcon: Icon(Icons.trending_up),
-                label: 'Stats',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.search_outlined),
-                selectedIcon: Icon(Icons.search),
-                label: 'Search',
-              ),
-            ],
-          ),
+    final enableMarquee = ref.watch(enableMarqueeRailProvider);
+
+    final navBar = ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: NavigationBar(
+          height: enableMarquee ? 56 : 68,
+          backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.92 : 0.95),
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: (index) {
+            navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            );
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.menu_book_outlined),
+              selectedIcon: Icon(Icons.menu_book),
+              label: 'Library',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.trending_up_outlined),
+              selectedIcon: Icon(Icons.trending_up),
+              label: 'Stats',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: 'Search',
+            ),
+          ],
         ),
       ),
+    );
+
+    return Scaffold(
+      body: navigationShell,
+      bottomNavigationBar: enableMarquee
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BottomRecommendationRail(),
+                navBar,
+              ],
+            )
+          : navBar,
     );
   }
 }
