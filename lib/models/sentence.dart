@@ -13,6 +13,10 @@ class Sentence {
   final String? sceneSetting;
   final String? categoryTag;
   final String? imagePrompt;
+  /// ネイティブ言い回しタイトル（例: Can I have ...?, Would you like ...?）
+  final String? phraseTitle;
+  /// 日本語カテゴリタグ（例: 接客, 道案内, 買い物）
+  final String? categoryLabelJa;
 
   Sentence({
     required this.id,
@@ -26,6 +30,8 @@ class Sentence {
     this.sceneSetting,
     this.categoryTag,
     this.imagePrompt,
+    this.phraseTitle,
+    this.categoryLabelJa,
   });
 
   factory Sentence.fromJson(Map<String, dynamic> json) {
@@ -54,6 +60,8 @@ class Sentence {
       sceneSetting: json['scene_setting'] ?? json['Scene Setting'] as String?,
       categoryTag: json['category_tag'] ?? json['Category Tag'] as String?,
       imagePrompt: json['image_prompt'] ?? json['Image Prompt'] as String?,
+      phraseTitle: json['phrase_title'] as String?,
+      categoryLabelJa: json['category_label_ja'] as String?,
     );
   }
 
@@ -70,6 +78,8 @@ class Sentence {
       'scene_setting': sceneSetting,
       'category_tag': categoryTag,
       'image_prompt': imagePrompt,
+      'phrase_title': phraseTitle,
+      'category_label_ja': categoryLabelJa,
     };
   }
 

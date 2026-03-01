@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,8 +8,6 @@ import '../models/sentence.dart';
 import '../services/tts_service.dart';
 import '../widgets/sentence_detail_sheet.dart';
 import '../providers/sentence_provider.dart';
-import '../providers/progress_provider.dart';
-import '../theme/engrowth_theme.dart';
 
 class SentenceListScreen extends ConsumerStatefulWidget {
   final String? initialWord;
@@ -100,7 +97,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: '例文、「道を尋ねる」「接客」などで検索',
+                hintText: '例文、「道案内」「接客」などで検索',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -121,7 +118,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             ),
           ),
           
-          // カテゴリフィルタチップ（日本語表示名・日本人が求めそうな順）
+          // カテゴリタブ（#接客, #道案内 等）。タップで同一ページ内絞り込み
           ref.watch(sentenceCategoryDisplayListProvider).when(
             data: (displayList) => SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -138,16 +135,15 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(displayName),
+                        label: Text('#$displayName'),
                         selected: isSelected,
                         onSelected: (selected) {
-                          final current = Set<String>.from(selectedCategories);
+                          // 単一選択: 2つ目をタップしたら1つ目を解除して切り替え
                           if (selected) {
-                            current.add(displayName);
+                            ref.read(selectedCategoriesProvider.notifier).state = {displayName};
                           } else {
-                            current.remove(displayName);
+                            ref.read(selectedCategoriesProvider.notifier).state = {};
                           }
-                          ref.read(selectedCategoriesProvider.notifier).state = current;
                         },
                       ),
                     );
@@ -159,9 +155,9 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             error: (_, __) => const SizedBox.shrink(),
           ),
 
-          // 例文リスト（アコーディオン + シンプル行）
+          // 例文リスト（phrase_title アコーディオン + シンプル行）
           Expanded(
-            child: ref.watch(filteredSentencesByCategoryProvider).when(
+            child: ref.watch(filteredSentencesByPhraseTitleProvider).when(
               data: (grouped) {
                 if (grouped.isEmpty) {
                   final hasSearch = ref.watch(debouncedSentenceSearchProvider).isNotEmpty;
@@ -233,7 +229,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                     Text('エラー: $error'),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.invalidate(filteredSentencesByCategoryProvider),
+                      onPressed: () => ref.invalidate(filteredSentencesByPhraseTitleProvider),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
@@ -250,7 +246,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
   }
 }
 
-/// アコーディオン1セクション（例: 「買い物」を開くと買い物時のセンテンス一覧）
+/// アコーディオン1セクション（例: 「Can I have ...?」を開くと該当センテンス一覧）
 class _SentenceAccordionSection extends StatelessWidget {
   final String title;
   final List<Sentence> sentences;
@@ -262,19 +258,53 @@ class _SentenceAccordionSection extends StatelessWidget {
     required this.onTapSentence,
   });
 
+  String _effectiveCategory(Sentence s) {
+    if (s.categoryLabelJa != null && s.categoryLabelJa!.trim().isNotEmpty) {
+      return canonicalCategoryForTabs(s.categoryLabelJa!.trim());
+    }
+    return canonicalCategoryForTabs(resolveSentenceCategory(
+      categoryTag: s.categoryTag,
+      englishText: s.englishText,
+      japaneseText: s.japaneseText,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final categoryTags = sentences.map(_effectiveCategory).toSet().toList();
+    final tagLabel = categoryTags.isNotEmpty ? '#${categoryTags.first}' : '';
     return ExpansionTile(
       initiallyExpanded: false,
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       childrenPadding: const EdgeInsets.only(left: 8, right: 16, bottom: 12),
-      title: Text(
-        title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+          if (tagLabel.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                tagLabel,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
       ),
       children: sentences
           .map((s) => _SentenceListRow(
@@ -303,14 +333,22 @@ class _SentenceListRow extends StatefulWidget {
 class _SentenceListRowState extends State<_SentenceListRow> {
   final TtsService _tts = TtsService();
   bool _isPlaying = false;
+  String? _prefetchedUrl;
 
   @override
   void initState() {
     super.initState();
     _tts.initialize();
+    _prefetchAudio();
   }
 
-  // TtsService はシングルトンのため dispose は呼ばない
+  void _prefetchAudio() {
+    _tts.fetchAudioUrlForEnglish(widget.sentence.englishText).then((url) {
+      if (mounted && url != null) {
+        setState(() => _prefetchedUrl = url);
+      }
+    });
+  }
 
   Future<void> _play() async {
     if (_isPlaying) {
@@ -319,7 +357,10 @@ class _SentenceListRowState extends State<_SentenceListRow> {
       return;
     }
     if (mounted) setState(() => _isPlaying = true);
-    await _tts.speakEnglish(widget.sentence.englishText);
+    await _tts.speakEnglish(
+      widget.sentence.englishText,
+      prefetchedUrl: _prefetchedUrl,
+    );
     if (mounted) setState(() => _isPlaying = false);
   }
 

@@ -57,6 +57,8 @@ ERROR: 42P01: relation "analytics_events" does not exist
 | `database_notifications.sql` | アプリ内通知テーブル（通知一覧ページ用） |
 | `database_user_favorites.sql` | お気に入りテーブル（お気に入りページ用） |
 | `database_user_favorites_add_pattern.sql` | お気に入りに `pattern` タイプ追加（パターンスプリント用） |
+| `database_sentences_phrase_title_category.sql` | sentences に phrase_title / category_label_ja 追加（センテンス一覧用） |
+| `database_sentences_backfill_phrase_category.sql` | 既存 sentences の phrase_title / category_label_ja を初期バックフィル（上記の直後に実行） |
 
 ---
 

@@ -1,6 +1,6 @@
-/// センテンス一覧用のカテゴリ定義（日本人が求めそうなカテゴリ分け・日本語表示）
-/// DB の category_tag を日本語ラベルにマッピングし、表示順を定義する。
-/// 英文・日本語訳のキーワードから自動振り分けするロジックも含む。
+// センテンス一覧用のカテゴリ定義（日本人が求めそうなカテゴリ分け・日本語表示）
+// DB の category_tag を日本語ラベルにマッピングし、表示順を定義する。
+// 英文・日本語訳のキーワードから自動振り分けするロジックも含む。
 
 /// 表示用の日本語カテゴリ名（DB の category_tag → 日本語）
 const Map<String, String> kSentenceCategoryDisplayNames = {
@@ -155,7 +155,10 @@ const Map<String, List<String>> kCategoryKeywords = {
 
 /// [rawTag] を日本語表示名に変換。未定義なら [rawTag] をそのまま返す。
 String sentenceCategoryToDisplayName(String rawTag) {
-  final trimmed = rawTag.trim();
+  var trimmed = rawTag.trim();
+  if (trimmed.isEmpty) return 'その他';
+  // # や ## プレフィックスを除去してからマッピング
+  trimmed = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
   if (trimmed.isEmpty) return 'その他';
   return kSentenceCategoryDisplayNames[trimmed] ??
       kSentenceCategoryDisplayNames[trimmed.toLowerCase()] ??
@@ -176,12 +179,15 @@ String resolveSentenceCategory({
   required String englishText,
   required String japaneseText,
 }) {
-  // 1) DB の category_tag が登録済みなら日本語に変換して返す
+  // 1) DB の category_tag が登録済みなら日本語に変換して返す（# / ## プレフィックス対応）
   if (categoryTag != null && categoryTag.trim().isNotEmpty) {
-    final lower = categoryTag.trim().toLowerCase();
-    if (kSentenceCategoryDisplayNames[categoryTag.trim()] != null ||
-        kSentenceCategoryDisplayNames[lower] != null) {
-      return sentenceCategoryToDisplayName(categoryTag.trim());
+    final normalized = categoryTag.trim().replaceFirst(RegExp(r'^#+\s*'), '');
+    if (normalized.isNotEmpty) {
+      final lower = normalized.toLowerCase();
+      if (kSentenceCategoryDisplayNames[normalized] != null ||
+          kSentenceCategoryDisplayNames[lower] != null) {
+        return sentenceCategoryToDisplayName(categoryTag.trim());
+      }
     }
   }
 
@@ -202,4 +208,37 @@ String resolveSentenceCategory({
 
   // 3) どれにも当てはまらなければ「その他」
   return 'その他';
+}
+
+/// DB の phrase_title が未設定時のフォールバック: 英文からネイティブ言い回しタイトルを推定
+String derivePhraseTitleFromEnglish(String englishText) {
+  final lower = englishText.trim().toLowerCase();
+  if (lower.isEmpty) return 'その他';
+  if (lower.startsWith('can i have')) return 'Can I have ...?';
+  if (lower.startsWith('would you like')) return 'Would you like ...?';
+  if (lower.startsWith('could you tell me')) return 'Could you tell me ...?';
+  if (lower.startsWith('excuse me, where') || lower.startsWith('excuse me. where')) return 'Excuse me, where is ...?';
+  if (lower.startsWith("where's ") || lower.startsWith('where is')) return 'Where is ...?';
+  if (lower.startsWith('how do i get') || lower.startsWith('how can i get')) return 'How do I get to ...?';
+  if (lower.startsWith("i'd like") || lower.startsWith('i would like')) return "I'd like ...";
+  if (lower.startsWith('i want')) return 'I want ...';
+  if (lower.startsWith('can i help you') || lower.startsWith('may i help you')) return 'Can I help you ...?';
+  if (lower.startsWith('of course') || lower.startsWith('sure')) return 'Of course. / Sure.';
+  if (lower.startsWith('yes please') || lower.startsWith('yes, please')) return 'Yes, please.';
+  if (lower.startsWith('is this the right way')) return 'Is this the right way to ...?';
+  if (lower.startsWith('which way')) return 'Which way ...?';
+  if (lower.startsWith('hello') || lower == 'hi' || lower.startsWith('hi ')) return 'Hello. / Hi.';
+  if (lower.startsWith('thank you') || lower.startsWith('thanks')) return 'Thank you. / Thanks.';
+  if (lower.startsWith('goodbye') || lower.startsWith('bye')) return 'Goodbye. / Bye.';
+  if (lower.startsWith('sorry') || lower.startsWith('excuse me')) return 'Sorry. / Excuse me.';
+  // パターンに合わない場合は短く切り詰めて表示（全文をそのまま出さない）
+  if (englishText.length > 30) return '${englishText.substring(0, 30).trim()}...';
+  return englishText.length > 15 ? '${englishText.substring(0, 15).trim()}...' : (englishText.isEmpty ? 'その他' : englishText);
+}
+
+/// タブ表示用: 「道を尋ねる」→「道案内」など、表示名を統一。英語タグは必ず日本語に変換。
+String canonicalCategoryForTabs(String? raw) {
+  if (raw == null || raw.isEmpty) return 'その他';
+  if (raw == '道を尋ねる') return '道案内';
+  return sentenceCategoryToDisplayName(raw);
 }

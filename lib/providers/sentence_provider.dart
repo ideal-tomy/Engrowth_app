@@ -67,15 +67,17 @@ final filteredSentencesProvider = FutureProvider<List<Sentence>>((ref) async {
     }).toList();
   }
   
-  // カテゴリフィルタ（日本語表示名で判定・自動振り分け結果を使用）
+  // カテゴリフィルタ（category_label_ja 優先、未設定時は resolveSentenceCategory でフォールバック）
   if (selectedCategories.isNotEmpty) {
     sentences = sentences.where((sentence) {
-      final displayName = resolveSentenceCategory(
-        categoryTag: sentence.categoryTag,
-        englishText: sentence.englishText,
-        japaneseText: sentence.japaneseText,
-      );
-      return selectedCategories.contains(displayName);
+      final effective = sentence.categoryLabelJa != null && sentence.categoryLabelJa!.trim().isNotEmpty
+          ? canonicalCategoryForTabs(sentence.categoryLabelJa!.trim())
+          : canonicalCategoryForTabs(resolveSentenceCategory(
+              categoryTag: sentence.categoryTag,
+              englishText: sentence.englishText,
+              japaneseText: sentence.japaneseText,
+            ));
+      return selectedCategories.contains(effective);
     }).toList();
   }
   
@@ -128,39 +130,38 @@ final categoryListProvider = FutureProvider<List<String>>((ref) async {
   return categories;
 });
 
-/// センテンス一覧用: 日本語カテゴリ表示名のリスト（英文・日本語訳の自動振り分け後、日本人が求めそうな順）
+/// センテンス一覧用: カテゴリタブ一覧（#接客, #道案内 等）。category_label_ja 優先、フォールバックで resolve。
 final sentenceCategoryDisplayListProvider = FutureProvider<List<String>>((ref) async {
   final sentences = await ref.watch(sentencesProvider.future);
   final displayNames = <String>{};
   for (final s in sentences) {
-    final resolved = resolveSentenceCategory(
-      categoryTag: s.categoryTag,
-      englishText: s.englishText,
-      japaneseText: s.japaneseText,
-    );
-    displayNames.add(resolved);
+    final effective = s.categoryLabelJa != null && s.categoryLabelJa!.trim().isNotEmpty
+        ? canonicalCategoryForTabs(s.categoryLabelJa!.trim())
+        : canonicalCategoryForTabs(resolveSentenceCategory(
+            categoryTag: s.categoryTag,
+            englishText: s.englishText,
+            japaneseText: s.japaneseText,
+          ));
+    displayNames.add(effective);
   }
-  final list = displayNames.toList();
+  final list = displayNames.toSet().toList();
   list.sort((a, b) =>
       sentenceCategorySortIndex(a).compareTo(sentenceCategorySortIndex(b)));
   return list;
 });
 
-/// フィルタ済み例文を日本語カテゴリ（表示名）でグルーピング。英文・日本語訳から自動振り分け。
-final filteredSentencesByCategoryProvider =
+/// フィルタ済み例文を phrase_title でグルーピング（アコーディオン見出し用）。phrase_title 優先、フォールバックで derive。
+final filteredSentencesByPhraseTitleProvider =
     FutureProvider<Map<String, List<Sentence>>>((ref) async {
   final sentences = await ref.watch(filteredSentencesProvider.future);
   final map = <String, List<Sentence>>{};
   for (final s in sentences) {
-    final displayName = resolveSentenceCategory(
-      categoryTag: s.categoryTag,
-      englishText: s.englishText,
-      japaneseText: s.japaneseText,
-    );
-    map.putIfAbsent(displayName, () => []).add(s);
+    final title = s.phraseTitle != null && s.phraseTitle!.trim().isNotEmpty
+        ? s.phraseTitle!.trim()
+        : derivePhraseTitleFromEnglish(s.englishText);
+    map.putIfAbsent(title, () => []).add(s);
   }
   final keys = map.keys.toList();
-  keys.sort((a, b) =>
-      sentenceCategorySortIndex(a).compareTo(sentenceCategorySortIndex(b)));
+  keys.sort((a, b) => a.compareTo(b));
   return Map.fromEntries(keys.map((k) => MapEntry(k, map[k]!)));
 });
