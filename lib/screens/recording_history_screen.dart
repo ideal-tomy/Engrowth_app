@@ -30,6 +30,7 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
   List<VoiceSubmission> _practice = [];
   List<VoiceSubmission> _submitted = [];
   bool _loading = true;
+  final Map<String, String?> _contextLabels = {};
 
   @override
   void initState() {
@@ -60,10 +61,17 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
     setState(() => _loading = true);
     try {
       final list = await _submissionService.getUserSubmissions(userId: userId);
+      final labels = <String, String?>{};
+      for (final s in list) {
+        final label = await _submissionService.getSubmissionContextLabel(s);
+        labels[s.id] = label;
+      }
       if (mounted) {
         setState(() {
           _practice = list.where((s) => s.submissionType == 'practice').toList();
           _submitted = list.where((s) => s.submissionType == 'submitted').toList();
+          _contextLabels.clear();
+          _contextLabels.addAll(labels);
           _loading = false;
         });
       }
@@ -129,13 +137,13 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
   }
 
   Widget _buildTabContent(List<VoiceSubmission> list, String type) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     final userId = ref.read(currentUserIdProvider);
-    if (userId == null) {
-      return Center(
+
+    Widget child;
+    if (_loading) {
+      child = const Center(child: CircularProgressIndicator());
+    } else if (userId == null) {
+      child = Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -157,10 +165,8 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
           ),
         ),
       );
-    }
-
-    if (list.isEmpty) {
-      return Center(
+    } else if (list.isEmpty) {
+      child = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -183,35 +189,53 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
           ],
         ),
       );
+    } else {
+      child = ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final s = list[index];
+          return _RecordingCard(
+            submission: s,
+            contextLabel: _contextLabels[s.id],
+            onPlay: () => _playAudio(s),
+            showSubmitButton: type == 'practice',
+            onSubmitted: () {
+              _tabController.animateTo(1);
+              _loadSubmissions();
+            },
+          );
+        },
+      );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final s = list[index];
-        return _RecordingCard(
-          submission: s,
-          onPlay: () => _playAudio(s),
-          showSubmitButton: type == 'practice',
-          onSubmitted: () {
-            _tabController.animateTo(1);
-            _loadSubmissions();
-          },
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _loadSubmissions,
+      child: child is ListView
+          ? child
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height - 200,
+                ),
+                child: child,
+              ),
+            ),
     );
   }
 }
 
 class _RecordingCard extends StatelessWidget {
   final VoiceSubmission submission;
+  final String? contextLabel;
   final VoidCallback onPlay;
   final bool showSubmitButton;
   final VoidCallback? onSubmitted;
 
   const _RecordingCard({
     required this.submission,
+    this.contextLabel,
     required this.onPlay,
     required this.showSubmitButton,
     this.onSubmitted,
@@ -249,6 +273,19 @@ class _RecordingCard extends StatelessWidget {
                           color: colorScheme.onSurface,
                         ),
                       ),
+                      if (contextLabel != null && contextLabel!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          contextLabel!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       _buildStatusChip(context),
                     ],
@@ -355,7 +392,15 @@ class _RecordingCard extends StatelessWidget {
               } catch (e) {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('送信エラー: $e')),
+                    SnackBar(
+                      content: Text('送信エラー: $e'),
+                      action: SnackBarAction(
+                        label: '再試行',
+                        onPressed: () {
+                          _showSubmitConfirm(ctx, submission, onSubmitted);
+                        },
+                      ),
+                    ),
                   );
                 }
               }

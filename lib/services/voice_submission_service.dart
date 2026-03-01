@@ -82,6 +82,41 @@ class VoiceSubmissionService {
     }
   }
 
+  /// 録音の対象コンテンツラベルを取得（例文/会話のプレビュー表示用）
+  Future<String?> getSubmissionContextLabel(VoiceSubmission s) async {
+    if (s.sentenceId != null && s.sentenceId!.isNotEmpty) {
+      try {
+        final res = await _client
+            .from('sentences')
+            .select('dialogue_en, english_text')
+            .eq('id', s.sentenceId!)
+            .maybeSingle();
+        if (res != null) {
+          final text = (res['dialogue_en'] ?? res['english_text']) as String?;
+          if (text != null && text.isNotEmpty) {
+            return text.length > 40 ? '${text.substring(0, 40)}...' : text;
+          }
+        }
+      } catch (_) {}
+    }
+    if (s.conversationId != null && s.conversationId!.isNotEmpty) {
+      try {
+        final res = await _client
+            .from('conversations')
+            .select('title')
+            .eq('id', s.conversationId!)
+            .maybeSingle();
+        if (res != null) {
+          final title = res['title'] as String?;
+          if (title != null && title.isNotEmpty) {
+            return s.utteranceId != null ? '$title（発話）' : title;
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   /// 音声の再生用URLを取得（signed URL、1時間有効）
   Future<String?> getSignedPlaybackUrl(String storagePathOrUrl) async {
     if (storagePathOrUrl.startsWith('http')) return storagePathOrUrl;

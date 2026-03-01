@@ -32,6 +32,20 @@ class ConversationService {
     }
   }
 
+  /// IDで会話を1件取得
+  Future<Conversation?> getConversationById(String id) async {
+    try {
+      final res = await _supabase
+          .from('conversations')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      return res == null ? null : Conversation.fromJson(res);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 会話の詳細を取得（発話リスト含む）
   Future<ConversationWithUtterances> getConversationWithUtterances(String conversationId) async {
     try {

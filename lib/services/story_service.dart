@@ -6,6 +6,20 @@ import '../models/conversation.dart';
 class StoryService {
   final _client = Supabase.instance.client;
 
+  /// IDでストーリーシーケンスを1件取得
+  Future<StorySequence?> getStorySequenceById(String id) async {
+    try {
+      final res = await _client
+          .from('story_sequences')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      return res == null ? null : StorySequence.fromJson(res as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// ストーリーシーケンス一覧を取得
   Future<List<StorySequence>> getStorySequences() async {
     try {

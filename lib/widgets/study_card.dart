@@ -9,6 +9,7 @@ import 'hint_display.dart';
 import 'optimized_image.dart';
 import 'audio_controls.dart';
 import 'bottom_interaction_bar.dart';
+import 'favorite_toggle_icon.dart';
 import '../providers/hint_settings_provider.dart';
 
 class StudyCard extends ConsumerStatefulWidget {
@@ -242,6 +243,16 @@ class _StudyCardState extends ConsumerState<StudyCard> with TickerProviderStateM
                               height: imageHeight,
                               fit: BoxFit.cover,
                               groupName: widget.sentence.group,
+                            ),
+                          ),
+                          // お気に入り（右上）
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: FavoriteToggleIcon(
+                              targetType: 'sentence',
+                              targetId: widget.sentence.id,
+                              size: 22,
                             ),
                           ),
                           // カテゴリタグと難易度バッジ

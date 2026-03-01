@@ -70,9 +70,8 @@ class ReviewCard extends ConsumerWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      // 復習セッションを開始
-                      // TODO: 復習専用の学習モードに遷移
-                      context.push('/study?mode=review');
+                      // 復習一覧ページへ（その日の復習対象をリスト表示）
+                      context.push('/review');
                     },
                     icon: const Icon(Icons.refresh),
                     label: const Text('復習を開始'),

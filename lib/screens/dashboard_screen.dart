@@ -289,12 +289,19 @@ class _ConversationPracticeGoalCard extends ConsumerWidget {
     final turnsAsync = ref.watch(todayConversationTurnsProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
+    final achieved = turnsAsync.valueOrNull != null &&
+        turnsAsync.valueOrNull! >= dailyConversationGoalTurns;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.selectionClick();
-          context.push('/conversations');
+          if (achieved) {
+            context.push('/progress');
+          } else {
+            context.push('/conversations');
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
@@ -328,15 +335,35 @@ class _ConversationPracticeGoalCard extends ConsumerWidget {
                     turnsAsync.when(
                       data: (turns) {
                         final remaining = (dailyConversationGoalTurns - turns).clamp(0, dailyConversationGoalTurns);
-                        final text = turns >= dailyConversationGoalTurns
-                            ? '目標達成！$turnsターン完了'
+                        final isAchieved = turns >= dailyConversationGoalTurns;
+                        final text = isAchieved
+                            ? '目標達成！タップで進捗を確認'
                             : 'あと$remainingターンで目標達成（$turns / $dailyConversationGoalTurns）';
-                        return Text(
-                          text,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface.withOpacity(0.8),
-                          ),
+                        final sub = isAchieved
+                            ? null
+                            : 'タップして会話学習を始める';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              text,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurface.withOpacity(0.8),
+                              ),
+                            ),
+                            if (sub != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                sub,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colorScheme.primary.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ],
                         );
                       },
                       loading: () => Text(
@@ -561,7 +588,7 @@ class _MainTilesGrid extends ConsumerWidget {
     _GridItem('センテンス一覧', Icons.format_list_bulleted, '/sentences'),
     _GridItem('学習進捗', Icons.bar_chart, '/progress'),
     _GridItem('お気に入り', Icons.favorite_border, '/favorites'),
-    _GridItem('本日の復習', Icons.history, '/study'),
+    _GridItem('本日の復習', Icons.history, '/review'),
   ];
 
   @override
@@ -605,7 +632,7 @@ class _MainTilesGrid extends ConsumerWidget {
               } else if (item.route == '/sentences') {
                 context.push(item.route);
               } else if (item.route == '/favorites') {
-                context.push('/words'); // お気に入りは単語一覧へ
+                context.push('/favorites');
               } else if (item.route == '/recordings') {
                 context.push('/recordings');
               } else {

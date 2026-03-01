@@ -7,6 +7,7 @@ import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/favorite_toggle_icon.dart';
 
 /// 会話一覧画面
 class ConversationListScreen extends ConsumerStatefulWidget {
@@ -131,7 +132,10 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
                   itemCount: conversations.length,
                   itemBuilder: (context, index) {
                     final conversation = conversations[index];
-                    return ConversationCard(conversation: conversation);
+                    return ConversationCard(
+                      conversation: conversation,
+                      targetType: 'conversation',
+                    );
                   },
                 );
               },
@@ -170,20 +174,26 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
 
 /// 会話カード（シチュエーション選択用）
 /// 画像 + 会話内容を聴く / A役 / B役 の3モード選択
-class ConversationCard extends StatelessWidget {
+class ConversationCard extends ConsumerWidget {
   final Conversation conversation;
+  final String targetType;
 
   const ConversationCard({
     super.key,
     required this.conversation,
+    this.targetType = 'conversation',
   });
 
   void _navigateToConversation(BuildContext context, String mode) {
-    context.push('/conversation/${conversation.id}?mode=$mode');
+    if (targetType == 'story') {
+      context.push('/story/${conversation.id}');
+    } else {
+      context.push('/conversation/${conversation.id}?mode=$mode');
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -214,12 +224,24 @@ class ConversationCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  conversation.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        conversation.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    FavoriteToggleIcon(
+                      targetType: targetType,
+                      targetId: conversation.id,
+                      size: 22,
+                    ),
+                  ],
                 ),
                 if (conversation.description != null) ...[
                   const SizedBox(height: 4),

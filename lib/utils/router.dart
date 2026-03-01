@@ -27,6 +27,9 @@ import '../screens/consultant_dashboard_screen.dart';
 import '../screens/recording_history_screen.dart';
 import '../screens/scenario_progress_board_screen.dart';
 import '../screens/story_progress_board_screen.dart';
+import '../screens/favorites_screen.dart';
+import '../screens/notifications_screen.dart';
+import '../screens/review_list_screen.dart';
 
 /// 導線ポリシー:
 /// - タブルート直下（/home, /library, /progress, /words）: 戻る矢印なし
@@ -121,7 +124,8 @@ final appRouter = GoRouter(
       path: '/study',
       builder: (context, state) {
         final sentenceId = state.uri.queryParameters['sentenceId'];
-        final sessionMode = state.uri.queryParameters['sessionMode'];
+        final sessionMode = state.uri.queryParameters['sessionMode'] ??
+            state.uri.queryParameters['mode'];
         return StudyScreen(
           initialSentenceId: sentenceId,
           initialSessionModeParam: sessionMode,
@@ -176,6 +180,18 @@ final appRouter = GoRouter(
         final situationType = state.uri.queryParameters['type'];
         return ConversationListScreen(situationType: situationType);
       },
+    ),
+    GoRoute(
+      path: '/favorites',
+      builder: (context, state) => const FavoritesScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/review',
+      builder: (context, state) => const ReviewListScreen(),
     ),
     GoRoute(
       path: '/recordings',

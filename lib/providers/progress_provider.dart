@@ -44,6 +44,7 @@ class ProgressNotifier extends StateNotifier<AsyncValue<void>> {
   Future<void> updateProgress({
     required String sentenceId,
     required bool isMastered,
+    bool usedHintToMaster = false,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -56,6 +57,7 @@ class ProgressNotifier extends StateNotifier<AsyncValue<void>> {
         userId: userId,
         sentenceId: sentenceId,
         isMastered: isMastered,
+        usedHintToMaster: usedHintToMaster,
       );
       
       // プロバイダーを再読み込み

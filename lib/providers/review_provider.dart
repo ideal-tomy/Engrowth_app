@@ -8,15 +8,18 @@ final reviewServiceProvider = Provider<ReviewService>((ref) {
   return ReviewService();
 });
 
-/// 今日の復習リストプロバイダ
+/// 今日の復習リストプロバイダ（user_progress 未設定時は空リストでフォールバック）
 final todayReviewListProvider = FutureProvider<List<UserProgress>>((ref) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) {
     return [];
   }
-
-  final service = ref.read(reviewServiceProvider);
-  return await service.getTodayReviewList(userId);
+  try {
+    final service = ref.read(reviewServiceProvider);
+    return await service.getTodayReviewList(userId);
+  } catch (_) {
+    return [];
+  }
 });
 
 /// 復習リストの件数プロバイダ

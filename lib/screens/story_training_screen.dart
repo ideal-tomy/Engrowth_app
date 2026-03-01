@@ -9,6 +9,7 @@ import '../providers/story_provider.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/favorite_toggle_icon.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
@@ -384,6 +385,16 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
                         stops: const [0.0, 0.4, 1.0],
                       ),
                     ),
+                  ),
+                ),
+                // お気に入り（右上）
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: FavoriteToggleIcon(
+                    targetType: 'story',
+                    targetId: widget.story.id,
+                    size: 22,
                   ),
                 ),
                 // 状態ピル（左上）

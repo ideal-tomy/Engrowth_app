@@ -14,6 +14,10 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_i
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
+-- 冪等性: 再実行時にエラーにならないよう DROP してから CREATE
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update own notifications (mark read)" ON notifications;
+
 CREATE POLICY "Users can view own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);

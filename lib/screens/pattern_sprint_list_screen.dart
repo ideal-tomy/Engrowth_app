@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../services/pattern_sprint_service.dart';
+import '../widgets/favorite_toggle_icon.dart';
 
 /// パターンスプリント: パターン選択・秒数選択・セッション開始
 class PatternSprintListScreen extends ConsumerStatefulWidget {
@@ -187,10 +188,19 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                     HapticFeedback.selectionClick();
                     setState(() => _selectedPrefix = p.prefix);
                   },
-                  trailing: IconButton.filledTonal(
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    tooltip: 'このパターンですぐ始める',
-                    onPressed: () {
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FavoriteToggleIcon(
+                        targetType: 'pattern',
+                        targetId: p.prefix,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton.filledTonal(
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        tooltip: 'このパターンですぐ始める',
+                        onPressed: () {
                       HapticFeedback.selectionClick();
                       ref.read(analyticsServiceProvider).logHapticFired(
                             trigger: 'pattern_sprint_start_from_list_item',
@@ -199,6 +209,8 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                         '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
                       );
                     },
+                  ),
+                    ],
                   ),
                 ),
               );

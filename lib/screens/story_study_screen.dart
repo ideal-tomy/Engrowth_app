@@ -6,6 +6,7 @@ import '../models/story_sequence.dart';
 import '../providers/story_provider.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
+import '../widgets/favorite_toggle_icon.dart';
 
 /// 3分ストーリー学習画面
 /// メイン: 3分一気に聴く / A役・B役で3分通し練習
@@ -266,6 +267,13 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
+          actions: [
+            FavoriteToggleIcon(
+              targetType: 'story',
+              targetId: widget.storyId,
+              size: 24,
+            ),
+          ],
         ),
         body: content,
       );

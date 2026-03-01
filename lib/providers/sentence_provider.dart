@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/sentence_categories.dart';
 import '../models/sentence.dart';
 import '../services/supabase_service.dart';
 import 'progress_provider.dart';
+import 'review_provider.dart';
 
 final sentencesProvider = FutureProvider<List<Sentence>>((ref) async {
   return await SupabaseService.getSentences();
@@ -65,15 +67,35 @@ final filteredSentencesProvider = FutureProvider<List<Sentence>>((ref) async {
     }).toList();
   }
   
-  // カテゴリフィルタ
+  // カテゴリフィルタ（日本語表示名で判定・自動振り分け結果を使用）
   if (selectedCategories.isNotEmpty) {
     sentences = sentences.where((sentence) {
-      return sentence.categoryTag != null &&
-             selectedCategories.contains(sentence.categoryTag);
+      final displayName = resolveSentenceCategory(
+        categoryTag: sentence.categoryTag,
+        englishText: sentence.englishText,
+        japaneseText: sentence.japaneseText,
+      );
+      return selectedCategories.contains(displayName);
     }).toList();
   }
   
   return sentences;
+});
+
+/// 本日の復習用例文リスト（優先度キュー順。取得失敗時は空でフォールバック）
+final studySentencesForReviewProvider = FutureProvider<List<Sentence>>((ref) async {
+  try {
+    final reviewList = await ref.watch(todayReviewListProvider.future);
+    if (reviewList.isEmpty) return [];
+    final sentences = <Sentence>[];
+    for (final p in reviewList) {
+      final s = await SupabaseService.getSentenceById(p.sentenceId);
+      if (s != null) sentences.add(s);
+    }
+    return sentences;
+  } catch (_) {
+    return [];
+  }
 });
 
 /// 次推奨（今日の推奨）: 未習得の最初の例文、またはランダム未習得。全て習得済みなら先頭を返す。
@@ -94,7 +116,7 @@ final instantCompositionSentencesProvider = FutureProvider<List<Sentence>>((ref)
   return shuffled;
 });
 
-// カテゴリリスト
+// カテゴリリスト（DB の raw タグ）
 final categoryListProvider = FutureProvider<List<String>>((ref) async {
   final sentences = await ref.watch(sentencesProvider.future);
   final categories = sentences
@@ -104,4 +126,41 @@ final categoryListProvider = FutureProvider<List<String>>((ref) async {
       .toList();
   categories.sort();
   return categories;
+});
+
+/// センテンス一覧用: 日本語カテゴリ表示名のリスト（英文・日本語訳の自動振り分け後、日本人が求めそうな順）
+final sentenceCategoryDisplayListProvider = FutureProvider<List<String>>((ref) async {
+  final sentences = await ref.watch(sentencesProvider.future);
+  final displayNames = <String>{};
+  for (final s in sentences) {
+    final resolved = resolveSentenceCategory(
+      categoryTag: s.categoryTag,
+      englishText: s.englishText,
+      japaneseText: s.japaneseText,
+    );
+    displayNames.add(resolved);
+  }
+  final list = displayNames.toList();
+  list.sort((a, b) =>
+      sentenceCategorySortIndex(a).compareTo(sentenceCategorySortIndex(b)));
+  return list;
+});
+
+/// フィルタ済み例文を日本語カテゴリ（表示名）でグルーピング。英文・日本語訳から自動振り分け。
+final filteredSentencesByCategoryProvider =
+    FutureProvider<Map<String, List<Sentence>>>((ref) async {
+  final sentences = await ref.watch(filteredSentencesProvider.future);
+  final map = <String, List<Sentence>>{};
+  for (final s in sentences) {
+    final displayName = resolveSentenceCategory(
+      categoryTag: s.categoryTag,
+      englishText: s.englishText,
+      japaneseText: s.japaneseText,
+    );
+    map.putIfAbsent(displayName, () => []).add(s);
+  }
+  final keys = map.keys.toList();
+  keys.sort((a, b) =>
+      sentenceCategorySortIndex(a).compareTo(sentenceCategorySortIndex(b)));
+  return Map.fromEntries(keys.map((k) => MapEntry(k, map[k]!)));
 });

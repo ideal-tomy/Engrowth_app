@@ -8,11 +8,14 @@ import '../widgets/session_complete_dialog.dart';
 import '../widgets/exit_confirmation_dialog.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/review_provider.dart';
 import '../providers/session_mode_provider.dart';
 import '../providers/last_study_resume_provider.dart';
 import '../services/learning_service.dart';
 import '../services/learning_completion_orchestrator.dart';
+import '../services/review_service.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/next_action_provider.dart';
 import '../models/hint_phase.dart';
 import '../models/learning_session_mode.dart';
 import '../models/sentence.dart';
@@ -49,6 +52,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     final param = widget.initialSessionModeParam;
     if (param == 'quick30') return LearningSessionMode.quick30;
     if (param == 'focus3') return LearningSessionMode.focus3;
+    if (param == 'review') return LearningSessionMode.review;
     return ref.read(sessionModeProvider);
   }
 
@@ -64,14 +68,17 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
   @override
   Widget build(BuildContext context) {
     final sessionMode = _resolveSessionMode(ref);
+    final isReviewMode = sessionMode == LearningSessionMode.review;
     final resumeState = ref.watch(lastStudyResumeProvider);
     final effectiveSentenceId = widget.initialSentenceId ?? resumeState.sentenceId;
-    final sentencesAsync = ref.watch(studySentencesFromProvider(effectiveSentenceId));
+    final sentencesAsync = isReviewMode
+        ? ref.watch(studySentencesForReviewProvider)
+        : ref.watch(studySentencesFromProvider(effectiveSentenceId));
     final progressNotifier = ref.read(progressNotifierProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('学習モード'),
+        title: Text(isReviewMode ? '本日の復習' : '学習モード'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -215,17 +222,20 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                         Icon(Icons.check_circle, size: 64, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 16),
                         Text(
-                          mode == LearningSessionMode.quick30 ||
-                                  mode == LearningSessionMode.focus3
-                              ? 'セッション完了！'
-                              : 'すべての例文を学習しました！',
+                          mode == LearningSessionMode.review
+                              ? '復習セッション完了！'
+                              : mode == LearningSessionMode.quick30 ||
+                                      mode == LearningSessionMode.focus3
+                                  ? 'セッション完了！'
+                                  : 'すべての例文を学習しました！',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         if (mode == LearningSessionMode.quick30 ||
-                            mode == LearningSessionMode.focus3)
+                            mode == LearningSessionMode.focus3 ||
+                            mode == LearningSessionMode.review)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
                             child: Text(
@@ -234,6 +244,15 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                                 fontSize: 14,
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
+                            ),
+                          ),
+                        if (mode == LearningSessionMode.review)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: FilledButton.icon(
+                              onPressed: () => context.go('/home'),
+                              icon: const Icon(Icons.home, size: 20),
+                              label: const Text('ホームへ'),
                             ),
                           ),
                       ],
@@ -258,26 +277,54 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                       mastered: true,
                       answerShown: false,
                     );
-                    await progressNotifier.updateProgress(
-                      sentenceId: currentSentence.id,
-                      isMastered: true,
-                    );
-
-                    await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+                    if (isReviewMode) {
+                      final userId = Supabase.instance.client.auth.currentUser?.id;
+                      if (userId != null) {
+                        await ReviewService().updateReviewSchedule(
+                          userId: userId,
+                          sentenceId: currentSentence.id,
+                          isCorrect: true,
+                          usedHint: usedHint,
+                        );
+                        ref.invalidate(todayReviewListProvider);
+                        ref.invalidate(nextActionSuggestionsProvider);
+                      }
+                    } else {
+                      await progressNotifier.updateProgress(
+                        sentenceId: currentSentence.id,
+                        isMastered: true,
+                        usedHintToMaster: usedHint,
+                      );
+                      await LearningCompletionOrchestrator.onLearningCompleted(ref, context);
+                    }
 
                     if (mounted) _saveResumePoint(limitedSentences);
-                    if (mounted) _showSnackBar(context, '覚えた！');
+                    if (mounted) _showSnackBar(context, isReviewMode ? '復習OK！' : '覚えた！');
                     if (mounted) _nextSentence(limitedSentences.length);
                   },
-                  onNext: () {
+                  onNext: () async {
+                    final usedHint = _learningLogs[currentSentence.id]?['used_hint'] ?? false;
                     _logLearning(
                       sentenceId: currentSentence.id,
                       hintPhase: _learningLogs[currentSentence.id]?['hint_phase'] ?? HintPhase.none,
                       thinkingTimeSeconds: _learningLogs[currentSentence.id]?['thinking_time'] ?? 0,
-                      usedHint: _learningLogs[currentSentence.id]?['used_hint'] ?? false,
+                      usedHint: usedHint,
                       mastered: false,
                       answerShown: false,
                     );
+                    if (isReviewMode) {
+                      final userId = Supabase.instance.client.auth.currentUser?.id;
+                      if (userId != null) {
+                        await ReviewService().updateReviewSchedule(
+                          userId: userId,
+                          sentenceId: currentSentence.id,
+                          isCorrect: false,
+                          usedHint: usedHint,
+                        );
+                        ref.invalidate(todayReviewListProvider);
+                        ref.invalidate(nextActionSuggestionsProvider);
+                      }
+                    }
                     if (mounted) _saveResumePoint(limitedSentences);
                     _nextSentence(limitedSentences.length);
                   },

@@ -14,6 +14,10 @@ CREATE INDEX IF NOT EXISTS idx_consultant_assignments_client ON consultant_assig
 
 ALTER TABLE consultant_assignments ENABLE ROW LEVEL SECURITY;
 
+-- 冪等性: 再実行時にエラーにならないよう DROP してから CREATE
+DROP POLICY IF EXISTS "Consultants can manage own assignments" ON consultant_assignments;
+DROP POLICY IF EXISTS "Clients can view own assignments" ON consultant_assignments;
+
 CREATE POLICY "Consultants can manage own assignments"
   ON consultant_assignments FOR ALL
   USING (auth.uid() = consultant_id);

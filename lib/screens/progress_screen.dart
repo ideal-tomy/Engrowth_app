@@ -6,8 +6,11 @@ import '../widgets/ring_progress_indicator.dart';
 import '../widgets/streak_display.dart';
 import '../widgets/audio_comparison_player.dart';
 import '../models/achievement.dart';
+import '../models/next_action_suggestion.dart';
 import '../widgets/achievement_display.dart' show AchievementBadge;
 import '../providers/progress_provider.dart';
+import '../providers/progress_analysis_provider.dart';
+import '../providers/next_action_provider.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/conversation_practice_provider.dart';
@@ -18,7 +21,7 @@ import '../services/supabase_service.dart';
 import '../theme/engrowth_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// 学習進捗ページ - 成長実感を中心に再構成
+/// 学習進捗ページ - 要点ダッシュボード + 深掘り分析の2層構造
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
@@ -56,16 +59,27 @@ class ProgressScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _SugorokuBoardEntry(),
-            // 上部：連続日数・リング進捗・今日の達成率・次のメダルまでを集約
+            // === 第1層: 要点ダッシュボード ===
             const StreakDisplay(),
             const _RingProgressSection(),
             const _ProgressSummarySection(),
+            const _NextActionsSection(),
             const _ConversationPracticeSection(),
             const AudioComparisonPlayer(),
+            // === 第2層: 深掘り分析 ===
+            const _DeepDiveSection(),
             // バッジ・称号（解除済み/次に狙うを分けて表示）
             achievementsAsync.when(
               data: (achievements) {
+                if (achievements.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Text(
+                      'バッジ・称号はDB設定後に表示されます（achievements テーブル）',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  );
+                }
                 return unlockedIdsAsync.when(
                   data: (unlockedIds) {
                     final unlocked = achievements
@@ -111,9 +125,12 @@ class ProgressScreen extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('エラー: $error'),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Text(
+                  'バッジ・称号は現在利用できません（DB未設定の場合は achievements テーブルを用意してください）',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
               ),
             ),
             // 全体進捗
@@ -258,6 +275,229 @@ class ProgressScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 次アクション提案セクション（復習・お気に入り・録音・日次目標）
+class _NextActionsSection extends ConsumerWidget {
+  const _NextActionsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final suggestionsAsync = ref.watch(nextActionSuggestionsProvider);
+
+    return suggestionsAsync.when(
+      data: (suggestions) {
+        if (suggestions.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '次にやること',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...suggestions.map((s) => _NextActionCard(suggestion: s)),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _NextActionCard extends StatelessWidget {
+  final NextActionSuggestion suggestion;
+
+  const _NextActionCard({required this.suggestion});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push(suggestion.route),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: suggestion.accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: suggestion.accentColor.withOpacity(0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(suggestion.icon, color: suggestion.accentColor, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        suggestion.title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        suggestion.subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: suggestion.accentColor),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 深掘り分析セクション（すごろく・学習分析・バッジ・詳細リスト）
+class _DeepDiveSection extends ConsumerWidget {
+  const _DeepDiveSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            '深掘り分析',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const _SugorokuBoardEntry(),
+        const _ProgressAnalysisSection(),
+      ],
+    );
+  }
+}
+
+/// 学習セッション分析（習得率・ヒント依存度）
+class _ProgressAnalysisSection extends ConsumerWidget {
+  const _ProgressAnalysisSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final analysisAsync = ref.watch(progressAnalysisProvider);
+
+    return analysisAsync.when(
+      data: (analysis) {
+        if (analysis.totalCount == 0) return const SizedBox.shrink();
+        final colorScheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '学習セッション分析',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AnalysisMetric(
+                          label: '習得率',
+                          value: '${(analysis.masteredRate * 100).toInt()}%',
+                          subtitle: '${analysis.masteredCount}/${analysis.totalCount}例文',
+                        ),
+                      ),
+                      Expanded(
+                        child: _AnalysisMetric(
+                          label: 'ヒント依存',
+                          value: '${(analysis.hintDependentRate * 100).toInt()}%',
+                          subtitle: '習得済みのうち${analysis.hintDependentCount}件',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _AnalysisMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String subtitle;
+
+  const _AnalysisMetric({
+    required this.label,
+    required this.value,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.primary,
+          ),
+        ),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 11,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

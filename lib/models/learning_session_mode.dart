@@ -1,10 +1,12 @@
 /// 学習セッションの長さ・目標時間
 /// Quick30: 30〜60秒（1〜2問、即時達成）
 /// Focus3: 約3分（5〜10問、小さな完了）
+/// review: 本日の復習専用セッション
 enum LearningSessionMode {
   quick30,
   focus3,
   unlimited,
+  review,
 }
 
 extension LearningSessionModeExtension on LearningSessionMode {
@@ -16,6 +18,8 @@ extension LearningSessionModeExtension on LearningSessionMode {
         return '3分';
       case LearningSessionMode.unlimited:
         return '続ける';
+      case LearningSessionMode.review:
+        return '復習';
     }
   }
 
@@ -27,6 +31,8 @@ extension LearningSessionModeExtension on LearningSessionMode {
         return 'Focus3';
       case LearningSessionMode.unlimited:
         return 'Unlimited';
+      case LearningSessionMode.review:
+        return 'Review';
     }
   }
 
@@ -38,6 +44,7 @@ extension LearningSessionModeExtension on LearningSessionMode {
       case LearningSessionMode.focus3:
         return 8;
       case LearningSessionMode.unlimited:
+      case LearningSessionMode.review:
         return 999;
     }
   }
@@ -50,6 +57,7 @@ extension LearningSessionModeExtension on LearningSessionMode {
       case LearningSessionMode.focus3:
         return 180;
       case LearningSessionMode.unlimited:
+      case LearningSessionMode.review:
         return 0;
     }
   }

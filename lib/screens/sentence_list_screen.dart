@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../constants/sentence_categories.dart';
 import '../models/sentence.dart';
-import '../widgets/sentence_card.dart';
+import '../services/tts_service.dart';
 import '../widgets/sentence_detail_sheet.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
@@ -59,10 +60,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sentencesAsync = ref.watch(filteredSentencesProvider);
-    final categories = ref.watch(categoryListProvider);
     final selectedCategories = ref.watch(selectedCategoriesProvider);
-    final masteredIdsAsync = ref.watch(masteredSentenceIdsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -123,9 +121,9 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             ),
           ),
           
-          // カテゴリフィルタチップ
-          categories.when(
-            data: (categoryList) => SingleChildScrollView(
+          // カテゴリフィルタチップ（日本語表示名・日本人が求めそうな順）
+          ref.watch(sentenceCategoryDisplayListProvider).when(
+            data: (displayList) => SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
@@ -135,19 +133,19 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 8),
-                  ...categoryList.map((category) {
-                    final isSelected = selectedCategories.contains(category);
+                  ...displayList.map((displayName) {
+                    final isSelected = selectedCategories.contains(displayName);
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(category),
+                        label: Text(displayName),
                         selected: isSelected,
                         onSelected: (selected) {
                           final current = Set<String>.from(selectedCategories);
                           if (selected) {
-                            current.add(category);
+                            current.add(displayName);
                           } else {
-                            current.remove(category);
+                            current.remove(displayName);
                           }
                           ref.read(selectedCategoriesProvider.notifier).state = current;
                         },
@@ -160,12 +158,12 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
           ),
-          
-          // 例文リスト
+
+          // 例文リスト（アコーディオン + シンプル行）
           Expanded(
-            child: sentencesAsync.when(
-              data: (sentences) {
-                if (sentences.isEmpty) {
+            child: ref.watch(filteredSentencesByCategoryProvider).when(
+              data: (grouped) {
+                if (grouped.isEmpty) {
                   final hasSearch = ref.watch(debouncedSentenceSearchProvider).isNotEmpty;
                   final hasFilter = ref.watch(selectedCategoriesProvider).isNotEmpty;
                   return Center(
@@ -211,48 +209,22 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                     ),
                   );
                 }
-                final masteredIds = masteredIdsAsync.valueOrNull ?? <String>{};
-                final grouped = _groupByCategory(sentences);
-                final children = <Widget>[];
-
-                for (final entry in grouped.entries) {
-                  final category = entry.key;
-                  final list = entry.value;
-                  children.add(
-                    _CategorySectionHeader(title: category),
-                  );
-                  for (final sentence in list) {
-                    children.add(
-                      SentenceCard(
-                        sentence: sentence,
-                        compact: true,
-                        isMastered: masteredIds.contains(sentence.id),
-                        onTap: () =>
-                            SentenceDetailSheet.show(context, sentence),
-                        onStudyTap: (id) =>
-                            context.push('/study?sentenceId=$id'),
-                      ),
-                    );
-                  }
-                  children.add(
-                    _CategorySprintCta(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        context.push('/pattern-sprint');
-                      },
-                    ),
-                  );
-                }
-
                 return ListView.builder(
-                  itemCount: children.length,
-                  itemBuilder: (context, index) => children[index],
+                  padding: const EdgeInsets.only(bottom: 24),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, index) {
+                    final title = grouped.keys.elementAt(index);
+                    final list = grouped[title]!;
+                    return _SentenceAccordionSection(
+                      title: title,
+                      sentences: list,
+                      onTapSentence: (s) => SentenceDetailSheet.show(context, s),
+                    );
+                  },
                 );
               },
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (error, stack) => Center(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -261,7 +233,7 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
                     Text('エラー: $error'),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.invalidate(filteredSentencesProvider),
+                      onPressed: () => ref.invalidate(filteredSentencesByCategoryProvider),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
@@ -276,59 +248,137 @@ class _SentenceListScreenState extends ConsumerState<SentenceListScreen> {
       ),
     );
   }
-
-  Map<String, List<Sentence>> _groupByCategory(List<Sentence> sentences) {
-    final map = <String, List<Sentence>>{};
-    for (final s in sentences) {
-      final key = s.categoryTag != null && s.categoryTag!.isNotEmpty
-          ? s.categoryTag!
-          : 'その他';
-      map.putIfAbsent(key, () => []).add(s);
-    }
-    final keys = map.keys.toList()..sort();
-    return Map.fromEntries(
-      keys.map((k) => MapEntry(k, map[k]!)),
-    );
-  }
 }
 
-class _CategorySectionHeader extends StatelessWidget {
+/// アコーディオン1セクション（例: 「買い物」を開くと買い物時のセンテンス一覧）
+class _SentenceAccordionSection extends StatelessWidget {
   final String title;
+  final List<Sentence> sentences;
+  final void Function(Sentence) onTapSentence;
 
-  const _CategorySectionHeader({required this.title});
+  const _SentenceAccordionSection({
+    required this.title,
+    required this.sentences,
+    required this.onTapSentence,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-      child: Text(
+    return ExpansionTile(
+      initiallyExpanded: false,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      childrenPadding: const EdgeInsets.only(left: 8, right: 16, bottom: 12),
+      title: Text(
         title,
         style: theme.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.primary,
         ),
       ),
+      children: sentences
+          .map((s) => _SentenceListRow(
+                sentence: s,
+                onTap: () => onTapSentence(s),
+              ))
+          .toList(),
     );
   }
 }
 
-class _CategorySprintCta extends StatelessWidget {
+/// シンプル行: 英文・日本語訳・右側に通常再生ボタンのみ（画像なし）
+class _SentenceListRow extends StatefulWidget {
+  final Sentence sentence;
   final VoidCallback onTap;
 
-  const _CategorySprintCta({required this.onTap});
+  const _SentenceListRow({
+    required this.sentence,
+    required this.onTap,
+  });
+
+  @override
+  State<_SentenceListRow> createState() => _SentenceListRowState();
+}
+
+class _SentenceListRowState extends State<_SentenceListRow> {
+  final TtsService _tts = TtsService();
+  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts.initialize();
+  }
+
+  // TtsService はシングルトンのため dispose は呼ばない
+
+  Future<void> _play() async {
+    if (_isPlaying) {
+      await _tts.stop();
+      if (mounted) setState(() => _isPlaying = false);
+      return;
+    }
+    if (mounted) setState(() => _isPlaying = true);
+    await _tts.speakEnglish(widget.sentence.englishText);
+    if (mounted) setState(() => _isPlaying = false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.speed, size: 18),
-        label: const Text('このカテゴリでスプリント'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: theme.colorScheme.primary,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surface,
+      child: InkWell(
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.sentence.englishText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.sentence.japaneseText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                onPressed: _play,
+                icon: Icon(
+                  _isPlaying ? Icons.stop_circle : Icons.volume_up,
+                  size: 24,
+                  color: colorScheme.primary,
+                ),
+                tooltip: '通常',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

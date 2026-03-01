@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +6,7 @@ import 'app.dart';
 import 'services/auth_service.dart';
 import 'services/playback_speed_service.dart';
 import 'services/tts_service.dart';
+import 'utils/auth_url_cleanup.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +29,9 @@ void main() async {
 
   // Supabase初期化
   await Supabase.initialize(url: url, anonKey: key);
+
+  // OAuth リダイレクト後、URL から認証トークンを除去（共有時の漏洩防止）
+  cleanAuthParamsFromUrl();
 
   // 匿名サインイン（未ログイン時のみ）
   try {

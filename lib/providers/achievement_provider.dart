@@ -8,19 +8,26 @@ final achievementServiceProvider = Provider<AchievementService>((ref) {
   return AchievementService();
 });
 
-/// 全バッジプロバイダ
+/// 全バッジプロバイダ（テーブル未設定時は空リストでフォールバック）
 final achievementsProvider = FutureProvider<List<Achievement>>((ref) async {
-  final service = ref.read(achievementServiceProvider);
-  return await service.getAchievements();
+  try {
+    final service = ref.read(achievementServiceProvider);
+    return await service.getAchievements();
+  } catch (_) {
+    return [];
+  }
 });
 
-/// ユーザーの獲得バッジプロバイダ
+/// ユーザーの獲得バッジプロバイダ（テーブル未設定時は空でフォールバック）
 final userAchievementsProvider = FutureProvider<List<UserAchievement>>((ref) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) return [];
-
-  final service = ref.read(achievementServiceProvider);
-  return await service.getUserAchievements(userId);
+  try {
+    final service = ref.read(achievementServiceProvider);
+    return await service.getUserAchievements(userId);
+  } catch (_) {
+    return [];
+  }
 });
 
 /// ユーザーが獲得済みのバッジIDセットプロバイダ

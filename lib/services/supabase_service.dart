@@ -141,15 +141,24 @@ class SupabaseService {
     required String userId,
     required String sentenceId,
     required bool isMastered,
+    bool usedHintToMaster = false,
   }) async {
     try {
+      final now = DateTime.now();
+      // 習得時は復習スケジュールを設定（正解+ヒントなし→3日後、ヒントあり→1日後）
+      final nextReviewAt = isMastered
+          ? (usedHintToMaster
+              ? now.add(const Duration(days: 1))
+              : now.add(const Duration(days: 3)))
+          : null;
       await SupabaseConfig.client
           .from('user_progress')
           .upsert({
             'user_id': userId,
             'sentence_id': sentenceId,
             'is_mastered': isMastered,
-            'last_studied_at': DateTime.now().toIso8601String(),
+            'last_studied_at': now.toIso8601String(),
+            if (nextReviewAt != null) 'next_review_at': nextReviewAt.toIso8601String(),
           }, onConflict: 'user_id,sentence_id');
     } catch (e) {
       print('Error updating progress: $e');

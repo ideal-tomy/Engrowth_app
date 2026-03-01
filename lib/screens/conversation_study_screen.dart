@@ -17,6 +17,7 @@ import '../services/ai_conversation_service.dart';
 
 import '../theme/engrowth_theme.dart';
 import '../widgets/audio_controls.dart';
+import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/bottom_interaction_bar.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
@@ -1151,6 +1152,12 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
               textAlign: TextAlign.center,
             ),
           ),
+          FavoriteToggleIcon(
+            targetType: 'conversation',
+            targetId: widget.conversationId,
+            size: 22,
+            color: Colors.white,
+          ),
           // 役モードでは音のみ学習のためテキスト表示は下部のフォールバックのみ
           if (_mode == 'listen')
             IconButton(
@@ -1951,6 +1958,12 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
+          ),
+          FavoriteToggleIcon(
+            targetType: 'conversation',
+            targetId: widget.conversationId,
+            size: 22,
+            color: Colors.white,
           ),
         ],
       ),

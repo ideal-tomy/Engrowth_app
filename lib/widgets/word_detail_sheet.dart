@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/word.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
+import 'favorite_toggle_icon.dart';
 
 /// 単語詳細ハーフシート（タップで表示）
 /// 意味・品詞・通常・ゆっくり再生を表示
-class WordDetailSheet extends StatefulWidget {
+class WordDetailSheet extends ConsumerStatefulWidget {
   final Word word;
 
   const WordDetailSheet({super.key, required this.word});
@@ -25,10 +27,10 @@ class WordDetailSheet extends StatefulWidget {
   }
 
   @override
-  State<WordDetailSheet> createState() => _WordDetailSheetState();
+  ConsumerState<WordDetailSheet> createState() => _WordDetailSheetState();
 }
 
-class _WordDetailSheetState extends State<WordDetailSheet> {
+class _WordDetailSheetState extends ConsumerState<WordDetailSheet> {
   final TtsService _ttsService = TtsService();
   bool _isPlaying = false;
 
@@ -98,12 +100,24 @@ class _WordDetailSheetState extends State<WordDetailSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   children: [
-                    Text(
-                      widget.word.word,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.word.word,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        FavoriteToggleIcon(
+                          targetType: 'word',
+                          targetId: widget.word.id,
+                          size: 28,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Text(
