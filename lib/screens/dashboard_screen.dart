@@ -15,12 +15,15 @@ import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
+import '../providers/onboarding_provider.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
 import '../widgets/dashboard_sections/consultant_notification_banner.dart';
+import '../widgets/dashboard_sections/daily_report_card.dart';
+import '../widgets/dashboard_sections/onboarding_banner.dart';
 import '../widgets/marquee/header_marquee_rail.dart';
 import '../widgets/dashboard_sections/todays_mission_card.dart';
 
@@ -52,6 +55,8 @@ class DashboardScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   children: [
+                    const OnboardingBanner(),
+                    const SizedBox(height: 6),
                     if (authStage == AuthStage.anonymous) ...[
                       const AnonymousDataSaveBanner(),
                       const SizedBox(height: 6),
@@ -62,6 +67,8 @@ class DashboardScreen extends ConsumerWidget {
                       const TodaysMissionCard(),
                       const SizedBox(height: 6),
                     ],
+                    const DailyReportCard(),
+                    const SizedBox(height: 6),
                     const _QuickStartCtaBar(),
                     const SizedBox(height: 6),
                     const _ConversationPracticeGoalCard(),
@@ -785,6 +792,17 @@ class _SettingsDrawer extends ConsumerWidget {
                 value: ref.watch(devViewAsAdminProvider),
                 onChanged: (_) {
                   ref.read(devViewAsAdminProvider.notifier).toggle();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.school_outlined),
+                title: const Text('開発: 初回体験をリセット'),
+                subtitle: const Text('初回体験フローを再表示'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await ref.read(onboardingCompleteNotifierProvider).reset();
+                  ref.invalidate(onboardingCompletedProvider);
+                  if (context.mounted) context.push('/onboarding');
                 },
               ),
               const Divider(),

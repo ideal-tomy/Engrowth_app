@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,7 +37,7 @@ class _HeaderMarqueeRailBody extends StatefulWidget {
 class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
     with SingleTickerProviderStateMixin {
   static const _autoScrollSpeed = 18.0; // px/s（60fps想定で0.3px/frame）
-  static const _resumeDelay = Duration(milliseconds: 1200);
+  static const _resumeDelay = Duration(milliseconds: 500);
   static const _chipHeight = 32.0;
   static const _chipPaddingH = 12.0;
   static const _chipGap = 10.0;
@@ -43,8 +45,8 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
   late final ScrollController _scrollController;
   late final AnimationController _animationController;
   bool _userScrolling = false;
-  VoidCallback? _scrollingNotifierListener;
   Duration _lastTickElapsed = Duration.zero;
+  Timer? _resumeCheckTimer;
 
   @override
   void initState() {
@@ -66,8 +68,39 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
     final isUserScrolling = _scrollController.position.isScrollingNotifier.value;
     if (isUserScrolling && !_userScrolling) {
       _animationController.stop();
+      _resumeCheckTimer?.cancel();
       setState(() => _userScrolling = true);
+      _startResumeCheck();
     }
+  }
+
+  void _startResumeCheck() {
+    _resumeCheckTimer?.cancel();
+    _resumeCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final notifier = _scrollController.position.isScrollingNotifier;
+      if (!notifier.value && _userScrolling) {
+        _resumeCheckTimer?.cancel();
+        Future.delayed(_resumeDelay, () {
+          if (!mounted) return;
+          _doResume();
+        });
+      }
+    });
+  }
+
+  void _doResume() {
+    if (!mounted || !_scrollController.hasClients) return;
+    if (!_userScrolling) return;
+    final pos = _scrollController.position;
+    final firstCopyWidth = (pos.maxScrollExtent + pos.viewportDimension) / 2;
+    if (firstCopyWidth > 0) {
+      final phase = pos.pixels % firstCopyWidth;
+      _animationController.value = phase / firstCopyWidth;
+    }
+    _lastTickElapsed = Duration.zero;
+    setState(() => _userScrolling = false);
+    _animationController.repeat();
   }
 
   void _onAnimationTick() {
@@ -99,38 +132,6 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
 
   void _startAutoScroll() {
     if (!mounted || MediaQuery.disableAnimationsOf(context)) return;
-
-    void scheduleResume() {
-      Future.delayed(_resumeDelay, () {
-        if (!mounted) return;
-        final notifier = _scrollController.position.isScrollingNotifier;
-        if (!notifier.value && _userScrolling) {
-          if (!_scrollController.hasClients) return;
-          final pos = _scrollController.position;
-          final firstCopyWidth =
-              (pos.maxScrollExtent + pos.viewportDimension) / 2;
-          if (firstCopyWidth > 0) {
-            final phase = pos.pixels % firstCopyWidth;
-            _animationController.value = phase / firstCopyWidth;
-          }
-          _lastTickElapsed = Duration.zero;
-          setState(() => _userScrolling = false);
-          _animationController.repeat();
-        } else if (notifier.value) {
-          scheduleResume();
-        }
-      });
-    }
-
-    _scrollingNotifierListener = () {
-      if (!_scrollController.position.isScrollingNotifier.value &&
-          _userScrolling) {
-        scheduleResume();
-      }
-    };
-    _scrollController.position.isScrollingNotifier
-        .addListener(_scrollingNotifierListener!);
-
     if (!_userScrolling) {
       _animationController.repeat();
     }
@@ -138,13 +139,9 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
 
   @override
   void dispose() {
+    _resumeCheckTimer?.cancel();
     _animationController.removeListener(_onAnimationTick);
     _animationController.dispose();
-    if (_scrollingNotifierListener != null &&
-        _scrollController.hasClients) {
-      _scrollController.position.isScrollingNotifier
-          .removeListener(_scrollingNotifierListener!);
-    }
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -155,9 +152,10 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
     return Consumer(
       builder: (context, ref, _) {
         final items = widget.items;
-        final colorScheme = Theme.of(context).colorScheme;
-
         final duplicatedCount = items.length * 2;
+
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final colorScheme = Theme.of(context).colorScheme;
 
         return SizedBox(
           height: _chipHeight + 12,
@@ -168,8 +166,13 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
             physics: const BouncingScrollPhysics(),
             itemCount: duplicatedCount,
             separatorBuilder: (_, __) => const SizedBox(width: _chipGap),
-            itemBuilder: (_, i) =>
-                _buildChip(context, ref, items[i % items.length], colorScheme),
+            itemBuilder: (_, i) => _buildChip(
+              context,
+              ref,
+              items[i % items.length],
+              isDark,
+              colorScheme.onSurface,
+            ),
           ),
         );
       },
@@ -180,8 +183,12 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
     BuildContext context,
     WidgetRef ref,
     MarqueeRailItem item,
-    ColorScheme colorScheme,
+    bool isDark,
+    Color textColor,
   ) {
+    final bg = MarqueeCategoryColors.tabBackground(item.category, isDark);
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -198,17 +205,19 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
           constraints: const BoxConstraints(minWidth: 80, maxWidth: 140),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withOpacity(0.8),
+            color: bg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-                color: colorScheme.outlineVariant.withOpacity(0.5)),
+              color: colorScheme.outlineVariant.withOpacity(0.4),
+              width: 1,
+            ),
           ),
           child: Text(
             item.label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+              color: textColor,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

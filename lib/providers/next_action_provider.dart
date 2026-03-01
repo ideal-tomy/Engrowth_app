@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/next_action_suggestion.dart';
 import '../services/favorite_service.dart';
 import '../services/voice_submission_service.dart';
+import 'auth_provider.dart';
+import 'daily_report_status_provider.dart';
 import 'review_provider.dart';
 import 'user_stats_provider.dart';
 
@@ -15,6 +17,27 @@ final nextActionSuggestionsProvider = FutureProvider<List<NextActionSuggestion>>
   final List<NextActionSuggestion> suggestions = [];
   final favService = FavoriteService();
   final submissionService = VoiceSubmissionService();
+
+  // 0. 今日の日課未報告（最優先）
+  final dailyState = await ref.read(dailyReportStatusProvider.future);
+  if (dailyState.status == DailyReportStatus.notStarted ||
+      dailyState.status == DailyReportStatus.recorded) {
+    final title = dailyState.status == DailyReportStatus.notStarted
+        ? '今日の報告をする'
+        : '今日の報告を送る';
+    final subtitle = dailyState.status == DailyReportStatus.notStarted
+        ? '今日の出来事を英語で録音してコンサルに送りましょう'
+        : '${dailyState.practiceCount}件の録音が未提出です';
+    suggestions.add(NextActionSuggestion(
+      type: NextActionType.dailyReport,
+      title: title,
+      subtitle: subtitle,
+      icon: Icons.mic,
+      accentColor: Colors.teal,
+      route: '/recordings',
+      count: dailyState.practiceCount > 0 ? dailyState.practiceCount : 1,
+    ));
+  }
 
   // 1. 復習が溜まっている
   final reviewList = await ref.read(todayReviewListProvider.future);

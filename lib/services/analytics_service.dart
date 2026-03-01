@@ -134,6 +134,22 @@ class AnalyticsService {
         eventProperties: {'reason': reason},
       );
 
+  // 初回体験・日課提出KPI（初回完了率・提出率・D1継続率算出用）
+  void logOnboardingStarted({String? step}) =>
+      logEvent(eventType: 'onboarding_started', eventProperties: {'step': step});
+  void logOnboardingStepCompleted({required String step, int? index}) =>
+      logEvent(
+        eventType: 'onboarding_step_completed',
+        eventProperties: {'step': step, if (index != null) 'step_index': index},
+      );
+  void logOnboardingCompleted() => logEvent(eventType: 'onboarding_completed');
+  void logOnboardingSkipped({String? atStep}) =>
+      logEvent(eventType: 'onboarding_skipped', eventProperties: {'at_step': atStep});
+  void logDailyReportRecorded() => logEvent(eventType: 'daily_report_recorded');
+  void logDailyReportSubmitted() => logEvent(eventType: 'daily_report_submitted');
+  void logDailyReportCardShown({String? status}) =>
+      logEvent(eventType: 'daily_report_card_shown', eventProperties: {'status': status});
+
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
   void logTtsPlaybackSession({
     required String conversationId,

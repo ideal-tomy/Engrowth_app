@@ -89,6 +89,29 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
 }
 
 class _PermissionGrantPanel extends StatelessWidget {
+  static Widget _buildPhaseNote(ColorScheme colorScheme, String text) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -153,6 +176,16 @@ class _PermissionGrantPanel extends StatelessWidget {
         Text(
           'consultant_client_permissions テーブル導入後、実際の付与・編集が可能になります。',
           style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 16),
+        _buildPhaseNote(
+          colorScheme,
+          '今できること: 日課提出の運用指標確認、コンサル権限のサンプル表示',
+        ),
+        const SizedBox(height: 8),
+        _buildPhaseNote(
+          colorScheme,
+          '次フェーズ（DB追加後）: 権限付与・監査ログ・AI要約承認',
         ),
       ],
     );
@@ -244,9 +277,11 @@ class _OpsMetricsPanel extends ConsumerWidget {
       future: _loadOpsMetrics(),
       builder: (context, snapshot) {
         final data = snapshot.data ?? _emptyMetrics();
-        final useDummy = (data['pending'] == 0 && data['delayed'] == 0 && data['retention'] == 0);
+        final useDummy = (data['pending'] == 0 &&
+            data['today_submitted'] == 0 &&
+            data['today_reviewed'] == 0);
         final display = useDummy
-            ? {'pending': 3, 'delayed': 1, 'retention': 85}
+            ? {'pending': 3, 'today_submitted': 5, 'today_reviewed': 2}
             : data;
         final colorScheme = Theme.of(context).colorScheme;
 
@@ -281,22 +316,47 @@ class _OpsMetricsPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '運用監視でできること',
+                      '日課提出運用の状況',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '未対応の提出件数・レビュー遅延・週間継続率を一覧し、対応が必要な案件を把握できます。',
+                      '未対応の報告・本日の提出数・本日のレビュー数を把握できます。',
                       style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 16),
-                    _metricRow('未対応提出', '${display['pending']}件'),
-                    _metricRow('レビュー遅延', '${display['delayed']}件'),
-                    _metricRow('週間継続率', '${display['retention']}%'),
+                    _metricRow('未対応の報告', '${display['pending']}件'),
+                    _metricRow('本日の提出数', '${display['today_submitted']}件'),
+                    _metricRow('本日のレビュー数', '${display['today_reviewed']}件'),
                   ],
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '日課提出運用の全体状況を把握できます。'
+                      '次フェーズでレビュー遅延アラート・週間継続率を追加予定。',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -307,17 +367,31 @@ class _OpsMetricsPanel extends ConsumerWidget {
 
   Future<Map<String, dynamic>> _loadOpsMetrics() async {
     try {
+      final today = DateTime.now().toIso8601String().split('T')[0];
+
       final pendingRes = await Supabase.instance.client
           .from('voice_submissions')
-          .select('id')
-          .eq('submission_type', 'submitted')
-          .eq('review_status', 'pending');
-      final pending = (pendingRes as List).length;
+          .select('id, created_at, reviewed_at, review_status')
+          .eq('submission_type', 'submitted');
+      final rows = pendingRes as List;
+      final pending = rows
+          .where((r) => (r as Map<String, dynamic>)['review_status'] == 'pending')
+          .length;
+
+      int todaySubmitted = 0;
+      int todayReviewed = 0;
+      for (final r in rows) {
+        final map = r as Map<String, dynamic>;
+        final createdAt = map['created_at'] as String?;
+        if (createdAt != null && createdAt.startsWith(today)) todaySubmitted++;
+        final reviewedAt = map['reviewed_at'] as String?;
+        if (reviewedAt != null && reviewedAt.startsWith(today)) todayReviewed++;
+      }
 
       return {
         'pending': pending,
-        'delayed': 0, // TODO: 閾値超過の件数
-        'retention': 0, // TODO: 週間継続率
+        'today_submitted': todaySubmitted,
+        'today_reviewed': todayReviewed,
       };
     } catch (_) {
       return _emptyMetrics();
@@ -325,7 +399,7 @@ class _OpsMetricsPanel extends ConsumerWidget {
   }
 
   Map<String, dynamic> _emptyMetrics() =>
-      {'pending': 0, 'delayed': 0, 'retention': 0};
+      {'pending': 0, 'today_submitted': 0, 'today_reviewed': 0};
 
   Widget _metricRow(String label, String value) {
     return Padding(

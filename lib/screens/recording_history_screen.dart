@@ -7,8 +7,65 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voice_submission.dart';
 import '../services/voice_submission_service.dart';
 import '../providers/auth_provider.dart';
+import '../providers/daily_report_status_provider.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/submission/share_boundary_notice.dart';
+
+/// 今日の提出ステータスバナー
+class _TodayReportStatusBanner extends ConsumerWidget {
+  const _TodayReportStatusBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(dailyReportStatusProvider);
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) return const SizedBox.shrink();
+
+    return statusAsync.when(
+      data: (state) {
+        final (label, color) = _statusLabel(state.status);
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.today, size: 20, color: color),
+              const SizedBox(width: 8),
+              Text(
+                '今日の報告: $label',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  (String, Color) _statusLabel(DailyReportStatus status) {
+    switch (status) {
+      case DailyReportStatus.notStarted:
+        return ('未報告', EngrowthColors.primary);
+      case DailyReportStatus.recorded:
+        return ('録音済み', Colors.orange);
+      case DailyReportStatus.submitted:
+        return ('提出済み', Colors.teal);
+      case DailyReportStatus.reviewed:
+        return ('完了', EngrowthColors.success);
+    }
+  }
+}
 
 /// マイ録音履歴画面
 /// 練習 / 提出済み タブ、ステータス表示、再生、提出遷移
@@ -118,6 +175,7 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
       ),
       body: Column(
         children: [
+          const _TodayReportStatusBanner(),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: ShareBoundaryNotice(),
@@ -201,6 +259,7 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
             onPlay: () => _playAudio(s),
             showSubmitButton: type == 'practice',
             onSubmitted: () {
+              ref.invalidate(dailyReportStatusProvider);
               _tabController.animateTo(1);
               _loadSubmissions();
             },
@@ -303,7 +362,7 @@ class _RecordingCard extends StatelessWidget {
                     _showSubmitConfirm(context, submission, onSubmitted);
                   },
                   icon: const Icon(Icons.send, size: 18),
-                  label: const Text('先生に送る'),
+                  label: const Text('今日の報告を送る'),
                 ),
               ),
             ],
@@ -364,7 +423,7 @@ class _RecordingCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('先生に送る'),
+        title: const Text('今日の報告を送る'),
         content: const Text(
           'この録音を担当コンサルタントに共有します。\n'
           '提出後も取り消すことはできません。送信しますか？',

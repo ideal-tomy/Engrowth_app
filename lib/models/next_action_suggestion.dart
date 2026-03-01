@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 /// 次アクション提案の種別
 enum NextActionType {
+  dailyReport, // 今日の日課報告（最優先）
   review,      // 本日の復習
   favorites,   // お気に入りで学習
   recordings,  // 録音を提出

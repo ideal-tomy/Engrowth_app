@@ -240,8 +240,8 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
           ReadableTabBar(
             controller: _tabController,
             tabs: const [
-              Tab(text: '提出キュー'),
-              Tab(text: '課題発行'),
+              Tab(text: '今日の報告'),
+              Tab(text: '日課運用'),
             ],
           ),
           Expanded(
@@ -322,10 +322,10 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.assignment_outlined, color: colorScheme.primary),
+                      Icon(Icons.today_outlined, color: colorScheme.primary),
                       const SizedBox(width: 8),
                       Text(
-                        '課題発行でできること',
+                        '日課運用でできること',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -333,12 +333,13 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _missionRow('3分会話をフルで録音して1本提出'),
-                  _missionRow('A役を3回提出'),
-                  _missionRow('指定ストーリーの音声提出'),
+                  _missionRow('今日の報告（音声）のフィードバック'),
+                  _missionRow('3分会話をフルで録音して1本提出の依頼'),
+                  _missionRow('A役・指定ストーリーの音声提出依頼'),
                   const SizedBox(height: 8),
                   Text(
-                    '担当クライアントを選択し、プリセットまたは自由文で課題を送信できます。',
+                    'クライアントの「今日の報告」は提出キューに届きます。'
+                    'フィードバックで励ましや具体的な添削を送れます。',
                     style: TextStyle(
                       fontSize: 13,
                       color: colorScheme.onSurfaceVariant,
@@ -361,7 +362,7 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'プリセット選択・送信UIは実装準備中です。',
+                    '課題プリセット・送信UIは次フェーズで実装予定です。',
                     style: TextStyle(
                       fontSize: 13,
                       color: colorScheme.onSurfaceVariant,
@@ -426,7 +427,7 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
               ],
             ),
           ),
-        _buildKpiCard(kpis),
+        _buildKpiCard(kpis, Theme.of(context).colorScheme),
         if (stats != null && !_isStatsEmptyFor(stats)) _buildLearningStatsCardFrom(stats),
         ...List.generate(
           _displaySubmissions.length,
@@ -442,8 +443,7 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
         (s['role_b_completed'] as int? ?? 0) == 0;
   }
 
-  Widget _buildKpiCard(Map<String, int> kpis) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildKpiCard(Map<String, int> kpis, ColorScheme colorScheme) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -451,9 +451,9 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _kpiItem('未対応', '${kpis['pending'] ?? 0}', colorScheme.error),
+            _kpiItem('未対応の報告', '${kpis['pending'] ?? 0}', colorScheme.error),
             _kpiItem('本日対応', '${kpis['today_reviewed'] ?? 0}', colorScheme.primary),
-            _kpiItem('担当', '${kpis['assigned_clients'] ?? 0}', colorScheme.tertiary),
+            _kpiItem('担当クライアント', '${kpis['assigned_clients'] ?? 0}', colorScheme.tertiary),
           ],
         ),
       ),
@@ -566,6 +566,16 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
+            if (!isDummy && _isToday(s.createdAt))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Chip(
+                  label: const Text('今日の報告', style: TextStyle(fontSize: 11)),
+                  backgroundColor: colorScheme.primaryContainer.withOpacity(0.6),
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
             Row(
               children: [
                 CircleAvatar(
@@ -660,6 +670,13 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
         ),
       ),
     );
+  }
+
+  bool _isToday(DateTime dt) {
+    final now = DateTime.now();
+    return dt.year == now.year &&
+        dt.month == now.month &&
+        dt.day == now.day;
   }
 
   String _formatDate(DateTime dt) {

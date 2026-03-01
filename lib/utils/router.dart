@@ -31,6 +31,7 @@ import '../screens/story_progress_board_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/review_list_screen.dart';
+import '../screens/onboarding_flow_screen.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/marquee/bottom_recommendation_rail.dart';
 
@@ -195,6 +196,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/review',
       builder: (context, state) => const ReviewListScreen(),
+    ),
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingFlowScreen(),
     ),
     GoRoute(
       path: '/recordings',

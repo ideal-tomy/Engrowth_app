@@ -37,6 +37,8 @@ class AudioControls extends StatefulWidget {
   final String? processingStateLabel;
   /// 録音完了後のSnackBarメッセージ（例文学習向けに簡潔な案内を指定可能）
   final String? recordingCompleteMessage;
+  /// 提出ボタンのラベル（デフォルト: 今日の報告を送る）
+  final String? submitButtonLabel;
 
   const AudioControls({
     super.key,
@@ -54,6 +56,7 @@ class AudioControls extends StatefulWidget {
     this.onRecordingCompleteWithFile,
     this.processingStateLabel,
     this.recordingCompleteMessage,
+    this.submitButtonLabel,
   });
 
   @override
@@ -328,6 +331,7 @@ class _AudioControlsState extends State<AudioControls> {
     try {
       await _submissionService.markAsSubmitted(_lastSubmissionId!);
       AnalyticsService().logVoiceSubmit();
+      AnalyticsService().logDailyReportSubmitted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -391,7 +395,11 @@ class _AudioControlsState extends State<AudioControls> {
                 icon: _isSubmitting
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.send, size: 18),
-                label: Text(_isSubmitting ? '送信中...' : '先生に送る'),
+                label: Text(
+                  _isSubmitting
+                      ? '送信中...'
+                      : (widget.submitButtonLabel ?? '今日の報告を送る'),
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.green[700],
                   foregroundColor: Colors.white,
