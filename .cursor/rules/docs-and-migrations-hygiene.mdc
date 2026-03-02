@@ -1,0 +1,22 @@
+---
+description: ドキュメントとマイグレーションの運用基準
+alwaysApply: true
+---
+
+# Docs Hygiene
+
+- `docs/` には現行の一次資料のみ置く。
+- 過去計画・参考資料は `docs/archive/` に移すか、先頭に `ARCHIVED` を明示する。
+- 一次資料を追加/更新したら `docs/ACTIVE_DOCS_INDEX.md` も更新する。
+
+# SQL Hygiene
+
+- `supabase/migrations` のSQLは履歴保全のため移動・改名しない。
+- 実行済み判定はファイル移動でなく、`docs/SUPABASE_MIGRATION_ORDER.md` と
+  `supabase/migrations/MIGRATION_CATALOG.md` で管理する。
+- 新規SQL追加時は、上記2ファイルの両方を更新する。
+
+# Change Clarity
+
+- 「何が現行基準か」を必ず明示する（`MASTER_PLAN.md` への参照）。
+- 旧資料に依存する変更を提案する場合は、先に現行方針へ正規化してから実装する。

@@ -42,12 +42,12 @@ class _DailyReportCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final (label, sublabel, icon, color) = _statusInfo(state.status);
+    final (label, sublabel, icon, color) = _statusInfo(state.status, colorScheme);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Material(
-        color: Colors.transparent,
+        color: colorScheme.surface.withOpacity(0),
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
@@ -111,7 +111,8 @@ class _DailyReportCardContent extends StatelessWidget {
     );
   }
 
-  (String, String?, IconData, Color) _statusInfo(DailyReportStatus status) {
+  (String, String?, IconData, Color) _statusInfo(
+      DailyReportStatus status, ColorScheme colorScheme) {
     switch (status) {
       case DailyReportStatus.notStarted:
         return (
@@ -125,14 +126,14 @@ class _DailyReportCardContent extends StatelessWidget {
           '録音済み',
           '${state.practiceCount}件を先生に送れます',
           Icons.mic,
-          Colors.orange,
+          colorScheme.tertiary,
         );
       case DailyReportStatus.submitted:
         return (
           '提出済み',
           'フィードバックをお待ちください',
           Icons.send,
-          Colors.teal,
+          colorScheme.secondary,
         );
       case DailyReportStatus.reviewed:
         return (

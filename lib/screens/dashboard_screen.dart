@@ -71,6 +71,7 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(height: 6),
                     const _ConversationPracticeGoalCard(),
                     const SizedBox(height: 6),
+                    const _OnboardingHandoffBanner(),
                     SizedBox(
                       height: 100,
                       child: const _ResumeLearningCard(),
@@ -390,6 +391,60 @@ class _RecommendedCard extends ConsumerWidget {
   }
 }
 
+class _OnboardingHandoffBanner extends ConsumerStatefulWidget {
+  const _OnboardingHandoffBanner();
+
+  @override
+  ConsumerState<_OnboardingHandoffBanner> createState() =>
+      _OnboardingHandoffBannerState();
+}
+
+class _OnboardingHandoffBannerState extends ConsumerState<_OnboardingHandoffBanner> {
+  bool _hasLoggedShown = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final handoffPending = ref.watch(onboardingHandoffPendingProvider);
+    if (!handoffPending) return const SizedBox.shrink();
+
+    if (!_hasLoggedShown) {
+      _hasLoggedShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(analyticsServiceProvider).logOnboardingHomeHandoffShown();
+      });
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: colorScheme.primary.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.touch_app, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '次は下の「続きから再開」をタップして学習を始めよう',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ResumeLearningCard extends ConsumerWidget {
   const _ResumeLearningCard();
 
@@ -398,12 +453,19 @@ class _ResumeLearningCard extends ConsumerWidget {
     final resumeState = ref.watch(lastStudyResumeProvider);
     final recommendedAsync = ref.watch(recommendedSentenceProvider);
     final hasResume = resumeState.sentenceId != null;
+    final handoffPending = ref.watch(onboardingHandoffPendingProvider);
 
     return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
+            if (handoffPending) {
+              ref.read(analyticsServiceProvider).logOnboardingHomeHandoffTapped(
+                    target: 'resume_card',
+                  );
+              ref.read(onboardingHandoffPendingProvider.notifier).state = false;
+            }
             ref.read(analyticsServiceProvider).logResumeCardTap(
                   source: hasResume ? 'resume' : 'recommended',
                 );

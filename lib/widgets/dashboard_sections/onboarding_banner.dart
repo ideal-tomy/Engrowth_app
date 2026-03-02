@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/analytics_provider.dart';
 import '../../providers/onboarding_provider.dart';
-import '../../theme/engrowth_theme.dart';
 
 /// 初回体験未完了時に表示するバナー
 class OnboardingBanner extends ConsumerWidget {
@@ -20,7 +19,9 @@ class OnboardingBanner extends ConsumerWidget {
         return _OnboardingBannerContent(
           onTap: () {
             HapticFeedback.selectionClick();
-            ref.read(analyticsServiceProvider).logDailyReportCardShown(status: 'onboarding_prompt');
+            ref
+                .read(analyticsServiceProvider)
+                .logOnboardingEntryTapped(variant: 'v2');
             context.push('/onboarding');
           },
         );
@@ -67,7 +68,7 @@ class _OnboardingBannerContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '初回体験をはじめる',
+                        'まず挨拶体験→1タップでホームへ',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -76,7 +77,7 @@ class _OnboardingBannerContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '30秒会話・録音・提出の流れを体験',
+                        '聞く・話す・返答を60秒で体験',
                         style: TextStyle(
                           fontSize: 13,
                           color: colorScheme.onSurfaceVariant,

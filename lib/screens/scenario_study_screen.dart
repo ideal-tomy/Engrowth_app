@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/common/engrowth_card.dart';
+import '../widgets/common/engrowth_cta.dart';
 import '../widgets/exit_confirmation_dialog.dart';
 import '../widgets/study_card.dart';
 import '../providers/scenario_provider.dart';
@@ -48,6 +50,7 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final sentencesAsync = ref.watch(scenarioSentencesProvider(widget.scenarioId));
     final progressNotifier = ref.read(progressNotifierProvider.notifier);
 
@@ -55,8 +58,8 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('シナリオ学習'),
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.surface.withOpacity(0),
+        foregroundColor: colorScheme.onSurface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -84,47 +87,61 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
           data: (sentences) {
             if (sentences.isEmpty) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_stories, size: 64, color: Colors.white70),
-                    const SizedBox(height: 16),
-                    Text(
-                      'シナリオに例文が登録されていません',
-                      style: TextStyle(fontSize: 16, color: Colors.white70),
-                    ),
-                  ],
+                child: Container(
+                  margin: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_stories, size: 64, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 16),
+                      Text(
+                        'シナリオに例文が登録されていません',
+                        style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               );
-          }
+            }
 
           if (_currentIndex >= sentences.length) {
             _markScenarioCompleted(sentences.length - 1);
             return SafeArea(
               child: Center(
-                child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, size: 64, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'シナリオ完了！',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: EngrowthCard(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle, size: 64, color: colorScheme.primary),
+                        const SizedBox(height: 16),
+                        Text(
+                          'シナリオ完了！',
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'お疲れ様でした！',
+                          style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 24),
+                        EngrowthPrimaryButton(
+                          label: '戻る',
+                          onPressed: () => context.pop(),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'お疲れ様でした！',
-                    style: TextStyle(fontSize: 16, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => context.pop(),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white),
-                    child: const Text('戻る'),
-                  ),
-                ],
+                ),
               ),
-            ),
             );
           }
 

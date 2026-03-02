@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/coach_provider.dart';
-import '../../theme/engrowth_theme.dart';
 
 /// 伴走契約ユーザー向け：今日これだけはやってほしいタスクを1点集中表示
 /// coach_missions テーブルから取得、なければデフォルト表示
@@ -19,12 +18,13 @@ class TodaysMissionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final missionAsync = ref.watch(todaysCoachMissionProvider);
     final missionText = missionAsync.valueOrNull?.missionText ?? defaultMissionText;
     final actionRoute = missionAsync.valueOrNull?.actionRoute ?? defaultActionRoute ?? '/study';
 
     return Material(
-      color: Colors.transparent,
+      color: colorScheme.surface.withOpacity(0),
       child: InkWell(
         onTap: () {
           HapticFeedback.selectionClick();
@@ -38,14 +38,14 @@ class TodaysMissionCard extends ConsumerWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                EngrowthColors.primary,
-                EngrowthColors.primaryDark,
+                colorScheme.primary,
+                colorScheme.primary.withOpacity(0.85),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: EngrowthColors.primary.withOpacity(0.3),
+                color: colorScheme.primary.withOpacity(0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -56,12 +56,12 @@ class TodaysMissionCard extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: colorScheme.onPrimary.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.flag_outlined,
-                  color: Colors.white,
+                  color: colorScheme.onPrimary,
                   size: 24,
                 ),
               ),
@@ -76,7 +76,7 @@ class TodaysMissionCard extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(0.9),
+                        color: colorScheme.onPrimary.withOpacity(0.9),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -84,10 +84,10 @@ class TodaysMissionCard extends ConsumerWidget {
                       missionText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: colorScheme.onPrimary,
                       ),
                     ),
                   ],
@@ -96,7 +96,7 @@ class TodaysMissionCard extends ConsumerWidget {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.white.withOpacity(0.9),
+                color: colorScheme.onPrimary.withOpacity(0.9),
               ),
             ],
           ),

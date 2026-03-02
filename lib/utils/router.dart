@@ -33,6 +33,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/review_list_screen.dart';
 import '../screens/onboarding_flow_screen.dart';
 import '../screens/tutorial_conversation_screen.dart';
+import '../screens/unified_result_screen.dart';
 import '../screens/help_screen.dart';
 import '../screens/concept_screen.dart';
 import '../providers/ui_experiments_provider.dart';
@@ -205,8 +206,37 @@ final appRouter = GoRouter(
       builder: (context, state) => const OnboardingFlowScreen(),
     ),
     GoRoute(
+      path: '/result',
+      builder: (context, state) {
+        final flow = state.uri.queryParameters['flow'] ?? 'study';
+        final title = state.uri.queryParameters['title'] ?? 'セッション完了！';
+        final subtitle = state.uri.queryParameters['subtitle'];
+        final count = int.tryParse(state.uri.queryParameters['count'] ?? '');
+        final countSuffix = state.uri.queryParameters['countSuffix'] ?? '問';
+        final sessionMode = state.uri.queryParameters['sessionMode'];
+        final primaryRoute = sessionMode != null
+            ? '/study?sessionMode=$sessionMode'
+            : state.uri.queryParameters['primaryRoute'];
+        final primaryCtaLabel =
+            state.uri.queryParameters['primaryCtaLabel'] ?? 'もう1セット続ける';
+        return UnifiedResultScreen(
+          flow: flow,
+          title: title,
+          subtitle: subtitle,
+          count: count,
+          countSuffix: countSuffix,
+          primaryRoute: primaryRoute,
+          primaryCtaLabel: primaryCtaLabel,
+        );
+      },
+    ),
+    GoRoute(
       path: '/tutorial-conversation',
-      builder: (context, state) => const TutorialConversationScreen(),
+      builder: (context, state) {
+        final entrySource =
+            state.uri.queryParameters['entry_source'] ?? 'direct';
+        return TutorialConversationScreen(entrySource: entrySource);
+      },
     ),
     GoRoute(
       path: '/help',

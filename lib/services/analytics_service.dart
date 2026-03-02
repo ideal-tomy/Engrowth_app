@@ -50,6 +50,47 @@ class AnalyticsService {
   void logNextTaskAccepted({String? nextType}) =>
       logEvent(eventType: 'next_task_accepted', eventProperties: {'next_type': nextType});
 
+  // B04/B05/B06: リザルト導線KPI（到達率・離脱率・遷移率算出用）
+  void logResultShown({
+    required String surface,
+    required String flow,
+    int? dwellMs,
+  }) =>
+      logEvent(
+        eventType: 'result_shown',
+        eventProperties: {
+          'surface': surface,
+          'flow': flow,
+          if (dwellMs != null) 'dwell_ms': dwellMs,
+        },
+      );
+  void logResultCtaTapped({
+    required String surface,
+    required String flow,
+    required String cta,
+  }) =>
+      logEvent(
+        eventType: 'result_cta_tapped',
+        eventProperties: {
+          'surface': surface,
+          'flow': flow,
+          'cta': cta,
+        },
+      );
+  void logResultDismissed({
+    required String surface,
+    required String flow,
+    String? reason,
+  }) =>
+      logEvent(
+        eventType: 'result_dismissed',
+        eventProperties: {
+          'surface': surface,
+          'flow': flow,
+          if (reason != null) 'reason': reason,
+        },
+      );
+
   // 匿名→登録導線
   void logAnonPromptShown() => logEvent(eventType: 'anon_prompt_shown');
   void logAnonPromptCtaGoogle() => logEvent(eventType: 'anon_prompt_cta_google');
@@ -135,23 +176,69 @@ class AnalyticsService {
       );
 
   // 初回体験・日課提出KPI（初回完了率・提出率・D1継続率算出用）
-  void logOnboardingStarted({String? step}) =>
-      logEvent(eventType: 'onboarding_started', eventProperties: {'step': step});
-  void logOnboardingStepCompleted({required String step, int? index}) =>
+  void logOnboardingStarted({String? step, String? variant}) => logEvent(
+        eventType: 'onboarding_started',
+        eventProperties: {
+          if (step != null) 'step': step,
+          if (variant != null) 'variant': variant,
+        },
+      );
+  void logOnboardingStepCompleted({
+    required String step,
+    int? index,
+    String? variant,
+  }) =>
       logEvent(
         eventType: 'onboarding_step_completed',
-        eventProperties: {'step': step, if (index != null) 'step_index': index},
+        eventProperties: {
+          'step': step,
+          if (index != null) 'step_index': index,
+          if (variant != null) 'variant': variant,
+        },
       );
-  void logOnboardingCompleted() => logEvent(eventType: 'onboarding_completed');
-  void logOnboardingSkipped({String? atStep}) =>
-      logEvent(eventType: 'onboarding_skipped', eventProperties: {'at_step': atStep});
+  void logOnboardingEntryTapped({String? variant}) => logEvent(
+        eventType: 'onboarding_entry_tapped',
+        eventProperties: {if (variant != null) 'variant': variant},
+      );
+  void logOnboardingCompleted({
+    String? variant,
+    String? nextRecommendedAction,
+  }) =>
+      logEvent(
+        eventType: 'onboarding_completed',
+        eventProperties: {
+          if (variant != null) 'variant': variant,
+          if (nextRecommendedAction != null)
+            'next_recommended_action': nextRecommendedAction,
+        },
+      );
+  void logOnboardingHomeHandoffShown() =>
+      logEvent(eventType: 'onboarding_home_handoff_shown');
+  void logOnboardingHomeHandoffTapped({String? target}) => logEvent(
+        eventType: 'onboarding_home_handoff_tapped',
+        eventProperties: {if (target != null) 'target': target},
+      );
+  void logOnboardingSkipped({String? atStep, String? variant}) => logEvent(
+        eventType: 'onboarding_skipped',
+        eventProperties: {
+          if (atStep != null) 'at_step': atStep,
+          if (variant != null) 'variant': variant,
+        },
+      );
   void logDailyReportRecorded() => logEvent(eventType: 'daily_report_recorded');
   void logDailyReportSubmitted() => logEvent(eventType: 'daily_report_submitted');
   void logDailyReportCardShown({String? status}) =>
       logEvent(eventType: 'daily_report_card_shown', eventProperties: {'status': status});
 
   // チュートリアル会話KPI（事前生成体験）
-  void logTutorialStarted() => logEvent(eventType: 'tutorial_started');
+  void logTutorialStarted({String? entrySource}) => logEvent(
+        eventType: 'tutorial_started',
+        eventProperties: {if (entrySource != null) 'entry_source': entrySource},
+      );
+  void logTutorialLoadFailed({String? reason}) => logEvent(
+        eventType: 'tutorial_load_failed',
+        eventProperties: {if (reason != null) 'reason': reason},
+      );
   void logTutorialStepStarted({required String stepId, required int stepOrder}) =>
       logEvent(
         eventType: 'tutorial_step_started',

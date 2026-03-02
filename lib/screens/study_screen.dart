@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/study_card.dart';
 import '../widgets/review_card.dart';
-import '../widgets/session_complete_dialog.dart';
 import '../widgets/exit_confirmation_dialog.dart';
 import '../providers/sentence_provider.dart';
 import '../providers/progress_provider.dart';
@@ -212,7 +211,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                     _sessionCompleteDialogShown = true;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
-                      _showSessionCompleteDialog(mode!, limitedSentences.length);
+                      _navigateToUnifiedResultScreen(mode!, limitedSentences.length);
                     });
                   }
                   return Center(
@@ -418,24 +417,17 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     );
   }
 
-  void _showSessionCompleteDialog(LearningSessionMode mode, int count) {
+  void _navigateToUnifiedResultScreen(LearningSessionMode mode, int count) {
     final analytics = ref.read(analyticsServiceProvider);
     if (mode == LearningSessionMode.quick30) {
       analytics.logQuick30Complete(count: count);
     } else {
       analytics.logFocus3Complete(count: count);
     }
-    final label = mode == LearningSessionMode.quick30 ? '30秒クリア！' : '3分クリア！';
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => SessionCompleteDialog(
-        sessionLabel: '$label（$count問）',
-        onStartAnother: () {
-          final param = mode == LearningSessionMode.quick30 ? 'quick30' : 'focus3';
-          context.push('/study?sessionMode=$param');
-        },
-      ),
+    final subtitle = mode == LearningSessionMode.quick30 ? '30秒クリア！' : '3分クリア！';
+    final sessionParam = mode == LearningSessionMode.quick30 ? 'quick30' : 'focus3';
+    context.push(
+      '/result?flow=study&title=セッション完了！&subtitle=${Uri.encodeComponent(subtitle)}&count=$count&sessionMode=$sessionParam',
     );
   }
 

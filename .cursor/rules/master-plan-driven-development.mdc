@@ -1,0 +1,30 @@
+---
+description: MASTER_PLAN準拠で計画・実装を進める
+alwaysApply: true
+---
+
+# MASTER_PLAN First
+
+- 実装や提案の前に、必ず `MASTER_PLAN.md` を確認する。
+- 判断に迷う場合は、`MASTER_PLAN.md` の「哲学」「Guardrails」「Current Phase」を最優先する。
+
+# Plan Before Build
+
+- UI改善/機能改善/新機能/新ページ追加時は、先に実装PLANを作る。
+- PLANには必ず以下を含める:
+  - Goal（何を達成するか）
+  - Non-goal（今回やらないこと）
+  - Exit Criteria（完了判定）
+  - 影響ファイル一覧
+- 1PR=1目的の粒度を守り、小さく段階的に出す。
+
+# UI/UX Guardrails
+
+- Sound-First: テキストより先に「聴く/話す」体験を優先。
+- Zero-Latency: 体験テンポを阻害する遅延を避ける（重い処理は事前準備/フォールバック）。
+- 一貫性: `engrowth_theme.dart` 準拠、色や余白の直書きを避ける。
+
+# Instrumentation
+
+- 主要アクション（再生/録音/遷移/完了）には `analytics_events` を仕込む。
+- 新導線は、到達率・離脱率が見えるイベント設計を先に決める。

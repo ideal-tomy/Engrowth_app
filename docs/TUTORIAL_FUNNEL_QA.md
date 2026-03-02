@@ -6,16 +6,20 @@
 
 | event_type | 用途 |
 |------------|------|
-| `tutorial_started` | 挨拶体験画面のオープン数 |
+| `tutorial_started` | 挨拶体験画面のオープン数（entry_source: onboarding / direct） |
 | `tutorial_step_started` | 各ステップ開始（step_id, step_order） |
 | `tutorial_step_completed` | ステップ完了（intent, used_fallback） |
 | `tutorial_fallback_used` | 意図不明→フォールバック使用（離脱リスク指標） |
 | `tutorial_completed` | チュートリアル完了 |
-| `tutorial_skipped` | スキップ（at_step_id） |
-| `onboarding_started` | 初回体験開始 |
-| `onboarding_step_completed` | 各ステップ完了 |
-| `onboarding_completed` | 初回体験完了 |
-| `onboarding_skipped` | スキップ |
+| `tutorial_skipped` | スキップ／閉じる（at_step_id・AppBar経路含む） |
+| `tutorial_load_failed` | 読み込み失敗・セッション未取得（reason） |
+| `onboarding_started` | 初回体験開始（variant で A/B 比較） |
+| `onboarding_entry_tapped` | バナー/導線タップ（daily_report_card_shown から移行） |
+| `onboarding_step_completed` | 各ステップ完了（variant） |
+| `onboarding_completed` | 初回体験完了（variant） |
+| `onboarding_skipped` | スキップ（at_step, variant） |
+| `onboarding_home_handoff_shown` | 完了後ホーム誘導バナー表示 |
+| `onboarding_home_handoff_tapped` | 誘導先タップ（target: resume_card） |
 | `marquee_tap` | Marquee導線タップ（source, label） |
 
 ## ファネル算出クエリ例（Supabase SQL）

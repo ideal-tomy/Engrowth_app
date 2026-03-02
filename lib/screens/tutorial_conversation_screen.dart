@@ -16,7 +16,12 @@ import '../utils/tutorial_intent_resolver.dart';
 /// 事前生成チュートリアル会話画面
 /// 聞く→話す→返答を低遅延で体験
 class TutorialConversationScreen extends ConsumerStatefulWidget {
-  const TutorialConversationScreen({super.key});
+  const TutorialConversationScreen({
+    super.key,
+    this.entrySource = 'direct',
+  });
+
+  final String entrySource;
 
   @override
   ConsumerState<TutorialConversationScreen> createState() =>
@@ -35,6 +40,7 @@ class _TutorialConversationScreenState
   bool _isProcessing = false;
   String? _statusMessage;
   bool _hasStarted = false;
+  bool _hasLoggedLoadFailed = false;
 
   @override
   void initState() {
@@ -166,6 +172,13 @@ class _TutorialConversationScreenState
     if (mounted) setState(() => _isProcessing = false);
   }
 
+  void _popWithSkipped() {
+    ref.read(analyticsServiceProvider).logTutorialSkipped(
+          atStepId: _currentStep?.id,
+        );
+    context.pop();
+  }
+
   Future<void> _toggleRecord(TutorialSession session) async {
     if (_isProcessing || _currentStep == null) return;
 
@@ -246,13 +259,19 @@ class _TutorialConversationScreenState
           icon: const Icon(Icons.close),
           onPressed: () {
             HapticFeedback.selectionClick();
-            context.pop();
+            _popWithSkipped();
           },
         ),
       ),
       body: sessionAsync.when(
         data: (session) {
           if (session == null) {
+            if (!_hasLoggedLoadFailed) {
+              _hasLoggedLoadFailed = true;
+              ref
+                  .read(analyticsServiceProvider)
+                  .logTutorialLoadFailed(reason: 'session_null');
+            }
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -275,7 +294,9 @@ class _TutorialConversationScreenState
 
           if (!_hasStarted && session.steps.isNotEmpty) {
             _hasStarted = true;
-            ref.read(analyticsServiceProvider).logTutorialStarted();
+            ref.read(analyticsServiceProvider).logTutorialStarted(
+                  entrySource: widget.entrySource,
+                );
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _enterStep(session, session.steps.first);
             });
@@ -366,10 +387,7 @@ class _TutorialConversationScreenState
                   TextButton(
                     onPressed: () {
                       HapticFeedback.selectionClick();
-                      ref.read(analyticsServiceProvider).logTutorialSkipped(
-                            atStepId: _currentStep?.id,
-                          );
-                      context.pop();
+                      _popWithSkipped();
                     },
                     child: const Text('スキップ'),
                   ),
@@ -379,21 +397,29 @@ class _TutorialConversationScreenState
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: colorScheme.error),
-              const SizedBox(height: 16),
-              Text('$err', style: TextStyle(color: colorScheme.error)),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => context.pop(),
-                child: const Text('戻る'),
-              ),
-            ],
-          ),
-        ),
+        error: (err, _) {
+          if (!_hasLoggedLoadFailed) {
+            _hasLoggedLoadFailed = true;
+            ref
+                .read(analyticsServiceProvider)
+                .logTutorialLoadFailed(reason: err.toString());
+          }
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                const SizedBox(height: 16),
+                Text('$err', style: TextStyle(color: colorScheme.error)),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('戻る'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

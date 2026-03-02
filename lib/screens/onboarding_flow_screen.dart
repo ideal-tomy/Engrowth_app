@@ -22,11 +22,15 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   static const int _totalSteps = 7;
+  static const String _variant = 'v2';
 
   @override
   void initState() {
     super.initState();
-    ref.read(analyticsServiceProvider).logOnboardingStarted(step: 'welcome');
+    ref.read(analyticsServiceProvider).logOnboardingStarted(
+          step: 'welcome',
+          variant: _variant,
+        );
   }
 
   @override
@@ -41,6 +45,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     ref.read(analyticsServiceProvider).logOnboardingStepCompleted(
           step: _stepId(_currentPage + 1),
           index: _currentPage + 1,
+          variant: _variant,
         );
     _pageController.nextPage(
       duration: const Duration(milliseconds: 300),
@@ -71,7 +76,11 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
   Future<void> _completeOnboarding() async {
     HapticFeedback.mediumImpact();
-    ref.read(analyticsServiceProvider).logOnboardingCompleted();
+    ref.read(analyticsServiceProvider).logOnboardingCompleted(
+          variant: _variant,
+          nextRecommendedAction: 'resume_card',
+        );
+    ref.read(onboardingHandoffPendingProvider.notifier).state = true;
     await ref.read(onboardingCompleteNotifierProvider).markCompleted();
     if (!mounted) return;
     ref.invalidate(onboardingCompletedProvider);
@@ -80,7 +89,10 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
   Future<void> _skipOnboarding() async {
     HapticFeedback.selectionClick();
-    ref.read(analyticsServiceProvider).logOnboardingSkipped(atStep: _stepId(_currentPage));
+    ref.read(analyticsServiceProvider).logOnboardingSkipped(
+          atStep: _stepId(_currentPage),
+          variant: _variant,
+        );
     await ref.read(onboardingCompleteNotifierProvider).markCompleted();
     if (!mounted) return;
     ref.invalidate(onboardingCompletedProvider);
@@ -173,7 +185,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'このアプリは「聞いて→まねして→使う」で\n会話感覚を育てます。\n\n毎日、今日の出来事を英語で話して\nコンサルタントに報告する日課が中心です。',
+            '聞いて→まねして→使う。毎日の英語報告で伴走されます。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -218,7 +230,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'AIが英語で話しかけます。\nマイクで返事をすると、返答が返ってきます。\n聞いて→話して→返答を体験しましょう。',
+            'AIが話しかける→返事する→返答が返る。まず1往復体験。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -230,7 +242,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/tutorial-conversation'),
+              onPressed: () => _tryStepAndAdvance(
+                    '/tutorial-conversation?entry_source=onboarding',
+                  ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -267,7 +281,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '隙間時間に、短い会話を聞く練習です。\nまずは聞くだけでOK。',
+            '隙間30秒で聞く練習。まずは聴くだけでOK。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -316,7 +330,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'お手本を聞いたら、録音ボタンで\n自分の声を録音します。\n聴き直して「先生に送る」で提出できます。',
+            '聞く→録音→聴き直して「先生に送る」で提出。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -365,7 +379,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '約3分の会話を聞いて、役になりきって練習。\n「次へ」で進みます。',
+            '3分の会話を聞いて役になりきる。次へで進む。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -414,7 +428,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '録音履歴から「先生に送る」をタップすると\n担当コンサルタントに共有されます。\nフィードバックが届きます。',
+            '録音→「先生に送る」で担当者に共有。フィードバックが届く。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -477,6 +491,7 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
   @override
   void initState() {
     super.initState();
+    HapticFeedback.mediumImpact();
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -503,7 +518,7 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
           Icon(
             Icons.check_circle,
             size: 72,
-            color: EngrowthColors.success,
+            color: widget.colorScheme.primary,
           ),
           const SizedBox(height: 20),
           Text(
@@ -546,10 +561,19 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
           ),
           const SizedBox(height: 24),
           Text(
-            'アカウントを作成すると、録音の保存・進捗・連続日数が記録されます。',
+            'ホームで「続きから再開」をタップすると学習を始められます。',
             style: TextStyle(
               fontSize: 13,
               color: widget.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'アカウント作成で録音・進捗・連続日数が記録されます。',
+            style: TextStyle(
+              fontSize: 12,
+              color: widget.colorScheme.onSurfaceVariant.withOpacity(0.9),
             ),
             textAlign: TextAlign.center,
           ),
@@ -559,7 +583,7 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
             child: FilledButton(
               onPressed: widget.onComplete,
               style: FilledButton.styleFrom(
-                backgroundColor: EngrowthColors.primary,
+                backgroundColor: widget.colorScheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
