@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/recording_error_helper.dart';
+
 /// 録音サービス
 /// ユーザーの発話を録音・再生
 class RecordingService {
@@ -15,7 +17,16 @@ class RecordingService {
     if (_isRecording) return;
 
     try {
-      final directory = await getApplicationDocumentsDirectory();
+      Directory directory;
+      try {
+        directory = await getApplicationDocumentsDirectory();
+      } catch (e) {
+        if (RecordingErrorHelper.isUnsupportedEnvironment(e)) {
+          throw Exception(RecordingErrorHelper.getUserMessage(e));
+        }
+        rethrow;
+      }
+
       final fileName = 'recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
       _currentRecordingPath = '${directory.path}/$fileName';
 

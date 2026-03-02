@@ -57,6 +57,8 @@
 | focus3_complete | Focus3 セッション完了 |
 | voice_attempt | 録音開始時 |
 | resume_card_tap | 再開カード（source: resume / recommended） |
+| resume_resolution | 再開先決定結果（resolution: resume / recommended_fallback / plain_fallback） |
+| study_first_content_rendered | 学習初回コンテンツ表示（entry_source, tap_to_first_content_ms） |
 | next_task_accepted | セッション完了後「もう1セット続ける」 |
 
 ### 算出
@@ -72,17 +74,49 @@
 
 | イベント | 発火タイミング |
 |----------|----------------|
-| marquee_tap | Marquee タップ時 |
-| main_tile_tap | MainTilesGrid 各タイルタップ（tile_id 付与） |
+| marquee_tap | Marquee タップ時（tap_id, target_route, source, label） |
+| main_tile_tap | MainTilesGrid 各タイルタップ（tile_id, destination, auth_stage, rank） |
+| learning_entry_started | 学習画面表示時（learning_mode, entry_source, tap_id）entry_source: marquee / resume_card / recommended_fallback / plain_fallback |
+| study_first_content_rendered | 学習初回コンテンツ表示時（entry_source, tap_to_first_content_ms）B16 |
+| home_primary_cta_impression | ホーム初回表示時（impression_at_ms） |
+| home_primary_cta_recognized | 初回3秒以内の主要導線タップ（cta_source, elapsed_sec, under_3s） |
 
 ### 算出
 
-- marquee_tap から学習開始までの到達率
+- marquee_tap から learning_entry_started までの到達率（60秒ウィンドウ、tap_id で接続）
+- resume_card_tap から learning_entry_started（entry_source=resume_card 系）までの到達率
+- resume_card_tap から study_first_content_rendered までの tap_to_first_content_ms P95（B16 Zero-Latency 検証）
 - 主要導線のタップ後離脱率
 
 ---
 
-## 5. イベント命名規約
+## 5. 担当コンサル連絡（B15）
+
+| イベント | 発火タイミング |
+|----------|----------------|
+| consultant_contact_opened | 連絡画面を開いた時（has_consultant） |
+| consultant_contact_channel_selected | チャネル選択時（channel: in_app / line / line_works） |
+| consultant_contact_message_sent | アプリ内報告送信成功時（channel, report_type） |
+| consultant_contact_message_failed | 送信失敗時（channel, reason） |
+
+## 6. コンサルタント・課題発行（B10/B11）
+
+| イベント | 発火タイミング | 備考 |
+|----------|----------------|------|
+| consultant_detail_opened | 詳細ログドロワーを開いた時 | submission_id, has_session_data |
+| consultant_detail_closed | 詳細ログドロワーを閉じた時 | submission_id |
+| consultant_detail_error | 詳細ログ取得不可・未連携時 | reason, submission_id |
+| mission_issued | 課題発行成功時 | client_id, has_preset |
+| mission_issue_failed | 課題発行失敗時 | reason |
+
+### 算出
+
+- consultant_detail_opened の has_session_data=true 率（session_uuid 連携率の目安）
+- mission_issued の日次件数・担当別件数
+
+---
+
+## 7. イベント命名規約
 
 - スネークケース: `screen_viewed`, `button_tapped`
 - 動詞過去形 or 名詞: `tutorial_completed`, `session_start`
@@ -90,13 +124,21 @@
 
 ---
 
-## 6. 分析クエリ・判定基準
+## 8. 分析クエリ・判定基準
 
 - 週次レビュー: 月曜朝に前週 KPI を確認。
 - 離脱ポイント特定: 完了率低下時はイベント順序で停滞箇所を特定。
 - A/B テスト: 大きな変更は段階ロールアウト。
 
+### B15/B16 週次確認項目
+
+- consultant_contact_opened の has_consultant=true 率
+- consultant_contact_message_sent の日次件数
+- resume_card_tap から study_first_content_rendered までの tap_to_first_content_ms P95
+- resume_resolution の fallback 率（plain_fallback が高い場合は要改善）
+
 ### 参照
 
 - docs/kpi_ux_plan.md
 - docs/TUTORIAL_FUNNEL_QA.md
+- docs/HOME_3SEC_RECOGNITION_QA.md（B09 3秒認識検証）

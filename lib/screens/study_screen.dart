@@ -10,10 +10,12 @@ import '../providers/progress_provider.dart';
 import '../providers/review_provider.dart';
 import '../providers/session_mode_provider.dart';
 import '../providers/last_study_resume_provider.dart';
+import '../providers/resume_card_tap_context_provider.dart';
 import '../services/learning_service.dart';
 import '../services/learning_completion_orchestrator.dart';
 import '../services/review_service.dart';
 import '../providers/analytics_provider.dart';
+import '../widgets/marquee/marquee_rail_data.dart';
 import '../providers/next_action_provider.dart';
 import '../models/hint_phase.dart';
 import '../models/learning_session_mode.dart';
@@ -23,11 +25,13 @@ import '../theme/engrowth_theme.dart';
 class StudyScreen extends ConsumerStatefulWidget {
   final String? initialSentenceId;
   final String? initialSessionModeParam;
+  final String? initialEntrySource;
 
   const StudyScreen({
     super.key,
     this.initialSentenceId,
     this.initialSessionModeParam,
+    this.initialEntrySource,
   });
 
   @override
@@ -40,6 +44,8 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
   DateTime? _sessionStartTime;
   Map<String, Map<String, dynamic>> _learningLogs = {};
   bool _sessionCompleteDialogShown = false;
+  bool _hasLoggedEntrySource = false;
+  bool _hasLoggedFirstContentRendered = false;
 
   @override
   void initState() {
@@ -66,6 +72,22 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ctx = ref.read(lastMarqueeTapContextProvider.notifier).consumeIfRecent();
+    if (ctx != null) {
+      final mode = _resolveSessionMode(ref);
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: mode == LearningSessionMode.review ? 'review' : 'study',
+            entrySource: 'marquee',
+            tapId: ctx.tapId,
+          );
+    } else if (widget.initialEntrySource != null && !_hasLoggedEntrySource) {
+      _hasLoggedEntrySource = true;
+      final mode = _resolveSessionMode(ref);
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: mode == LearningSessionMode.review ? 'review' : 'study',
+            entrySource: widget.initialEntrySource!,
+          );
+    }
     final sessionMode = _resolveSessionMode(ref);
     final isReviewMode = sessionMode == LearningSessionMode.review;
     final resumeState = ref.watch(lastStudyResumeProvider);
@@ -185,6 +207,14 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                 final mode = _resolveSessionMode(ref);
                 final maxCount = mode?.maxSentenceCount ?? 999;
                 final limitedSentences = sentences.take(maxCount).toList();
+                if (!_hasLoggedFirstContentRendered) {
+                  _hasLoggedFirstContentRendered = true;
+                  final tapCtx = ref.read(resumeCardTapContextProvider.notifier).consume();
+                  ref.read(analyticsServiceProvider).logStudyFirstContentRendered(
+                        entrySource: widget.initialEntrySource,
+                        tapToFirstContentMs: tapCtx?.tapToContentMs(),
+                      );
+                }
                 // studySentencesFromProvider が sentenceId に応じて既に並べ替え済み。常に _currentIndex=0 から開始。
                 if (limitedSentences.isEmpty) {
                   final colorScheme = Theme.of(context).colorScheme;

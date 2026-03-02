@@ -155,6 +155,7 @@ class VoiceSubmissionService {
         sentenceId: submission.sentenceId,
         audioUrl: submission.audioUrl,
         sessionId: submission.sessionId,
+        sessionUuid: submission.sessionUuid,
         submissionType: 'submitted',
         reviewStatus: submission.reviewStatus,
         consultantId: submission.consultantId,

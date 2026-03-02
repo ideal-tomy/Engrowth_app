@@ -9,10 +9,11 @@ import '../services/recording_service.dart';
 import '../services/voice_submission_service.dart';
 import '../services/recording_consent_service.dart';
 import '../services/analytics_service.dart';
+import '../utils/recording_error_helper.dart';
 import 'recording_waveform.dart';
 
 /// 音声操作コントロール
-/// 学習画面下部に配置。録音→アップロード→先生に送る 対応
+/// 学習画面下部に配置。録音→アップロード→コンサルタントに提出 対応
 /// 例文学習・会話トレーニング両方で使用
 class AudioControls extends StatefulWidget {
   final String englishText;
@@ -144,7 +145,7 @@ class _AudioControlsState extends State<AudioControls> {
           title: const Text('音声の記録について'),
           content: const Text(
             '学習効率向上のため、練習中の音声は記録されます。\n'
-            '納得のいく録音を「先生に送る」で講師に添削依頼できます。',
+            '納得のいく録音を「コンサルタントに提出」で講師に添削依頼できます。',
             style: TextStyle(height: 1.5),
           ),
           actions: [
@@ -253,17 +254,18 @@ class _AudioControlsState extends State<AudioControls> {
         HapticFeedback.lightImpact();
       } catch (e) {
         if (mounted) {
-          // 録音エラーはログインとは無関係（マイク権限・プラットフォームが主因）
-          String msg;
-          if (e.toString().contains('Permission') || e.toString().contains('権限')) {
-            msg = 'マイクの使用許可をください（設定アプリから）';
-          } else if (e.toString().contains('not supported') || e.toString().contains('未対応') || e.toString().contains('web') || e.toString().contains('desktop')) {
-            msg = 'この環境では録音未対応です。スマホ実機でお試しください';
-          } else {
-            msg = '録音エラー（ログイン不要。マイク権限・実機実行をご確認ください）: $e';
-          }
+          final msg = RecordingErrorHelper.getUserMessage(e);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 3)),
+            SnackBar(
+              content: Text(msg),
+              duration: const Duration(seconds: 3),
+              action: RecordingErrorHelper.isUnsupportedEnvironment(e)
+                  ? null
+                  : SnackBarAction(
+                      label: '再試行',
+                      onPressed: () => _checkConsentAndRecord(),
+                    ),
+            ),
           );
         }
       }
@@ -306,7 +308,7 @@ class _AudioControlsState extends State<AudioControls> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('先生に送る'),
+        title: const Text('コンサルタントに提出'),
         content: const Text(
           'この録音を担当コンサルタントに共有します。\n'
           '提出後は取り消すことができません。送信しますか？',
@@ -332,6 +334,10 @@ class _AudioControlsState extends State<AudioControls> {
       await _submissionService.markAsSubmitted(_lastSubmissionId!);
       AnalyticsService().logVoiceSubmit();
       AnalyticsService().logDailyReportSubmitted();
+      AnalyticsService().logSubmissionCtaTap(
+            surface: 'audio_controls',
+            submissionId: _lastSubmissionId,
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -398,7 +404,7 @@ class _AudioControlsState extends State<AudioControls> {
                 label: Text(
                   _isSubmitting
                       ? '送信中...'
-                      : (widget.submitButtonLabel ?? '今日の報告を送る'),
+                      : (widget.submitButtonLabel ?? 'コンサルタントに提出'),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.green[700],

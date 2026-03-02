@@ -14,6 +14,8 @@ import '../services/scenario_service.dart';
 import '../services/learning_service.dart';
 import '../services/learning_completion_orchestrator.dart';
 import '../models/hint_phase.dart';
+import '../providers/analytics_provider.dart';
+import '../widgets/marquee/marquee_rail_data.dart';
 
 /// シナリオ学習画面
 class ScenarioStudyScreen extends ConsumerStatefulWidget {
@@ -50,6 +52,14 @@ class _ScenarioStudyScreenState extends ConsumerState<ScenarioStudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ctx = ref.read(lastMarqueeTapContextProvider.notifier).consumeIfRecent();
+    if (ctx != null) {
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: 'scenario',
+            entrySource: 'marquee',
+            tapId: ctx.tapId,
+          );
+    }
     final colorScheme = Theme.of(context).colorScheme;
     final sentencesAsync = ref.watch(scenarioSentencesProvider(widget.scenarioId));
     final progressNotifier = ref.read(progressNotifierProvider.notifier);

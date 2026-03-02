@@ -27,13 +27,14 @@
 ### 1.2 実装済み
 
 - 4タブ UI（権限付与/監査/運用/AI承認）
-- 運用タブで未対応件数表示（プレースホルダー or 実データ）
+- 運用タブで未対応件数表示（実データ）
+- isAdminProvider の JWT app_role 判定（user_metadata / app_metadata）
+- 権限付与ロジック（consultant_assignments の CRUD、監査ログ記録）
+- 監査ログの実データ表示・フィルタ（access_audit_logs）
+- 配信デモ（LINE / LINE WORKS 連携イメージ、運用タブ内）
 
 ### 1.3 TODO
 
-- isAdminProvider の JWT claim 実装
-- 権限付与ロジック
-- 監査ログの実データ連携
 - AI承認フローの詳細設計・実装
 
 ---

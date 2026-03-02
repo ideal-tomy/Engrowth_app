@@ -20,7 +20,8 @@
 | `onboarding_skipped` | スキップ（at_step, variant） |
 | `onboarding_home_handoff_shown` | 完了後ホーム誘導バナー表示 |
 | `onboarding_home_handoff_tapped` | 誘導先タップ（target: resume_card） |
-| `marquee_tap` | Marquee導線タップ（source, label） |
+| `marquee_tap` | Marquee導線タップ（tap_id, target_route, source, label） |
+| `learning_entry_started` | 学習画面表示時（entry_source: marquee, tap_id, learning_mode） |
 
 ## ファネル算出クエリ例（Supabase SQL）
 
@@ -45,12 +46,46 @@ GROUP BY event_properties->>'step_id'
 ORDER BY fallback_count DESC;
 ```
 
+## marquee_tap から学習開始までの到達率（B08）
+
+tap_id で接続し、60秒以内の learning_entry_started を到達とみなす:
+
+```sql
+-- marquee_tap → learning_entry_started 到達率（60秒ウィンドウ）
+WITH taps AS (
+  SELECT
+    user_id,
+    (event_properties->>'tap_id')::text AS tap_id,
+    created_at AS tap_at
+  FROM analytics_events
+  WHERE event_type = 'marquee_tap'
+    AND created_at > NOW() - INTERVAL '7 days'
+    AND event_properties->>'tap_id' IS NOT NULL
+),
+reached AS (
+  SELECT t.user_id, t.tap_id
+  FROM taps t
+  WHERE EXISTS (
+    SELECT 1 FROM analytics_events e
+    WHERE e.event_type = 'learning_entry_started'
+      AND e.user_id = t.user_id
+      AND (e.event_properties->>'tap_id') = t.tap_id
+      AND e.created_at >= t.tap_at
+      AND e.created_at <= t.tap_at + INTERVAL '60 seconds'
+  )
+)
+SELECT
+  (SELECT COUNT(*) FROM taps) AS marquee_taps,
+  (SELECT COUNT(*) FROM reached) AS learning_reached,
+  ROUND(100.0 * (SELECT COUNT(*) FROM reached) / NULLIF((SELECT COUNT(*) FROM taps), 0), 1) AS reach_rate_pct;
+```
+
 ## 導線別到達率の比較
 
 Marquee ON/OFF や導線文言を変えた場合、以下を比較する:
 
 - `marquee_tap` の source（header/bottom）別、label 別タップ数
-- `/scenario-learning` や `/story-training` への遷移元（必要に応じて遷移前イベントを追加）
+- tap_id による marquee_tap → learning_entry_started 到達率
 
 ## 最適化の進め方
 

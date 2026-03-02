@@ -45,6 +45,27 @@ class AnalyticsService {
       logEvent(eventType: 'hint_auto_shown', eventProperties: {'phase': phase});
   void logResumeCardTap({String? source}) =>
       logEvent(eventType: 'resume_card_tap', eventProperties: {'source': source});
+
+  // B16: 再開先決定結果（resume / recommended_fallback / plain_fallback）
+  void logResumeResolution({required String resolution}) =>
+      logEvent(
+        eventType: 'resume_resolution',
+        eventProperties: {'resolution': resolution},
+      );
+
+  // B16: 学習初回コンテンツ表示（tap_to_first_content_ms で体感遅延を計測）
+  void logStudyFirstContentRendered({
+    String? entrySource,
+    int? tapToFirstContentMs,
+  }) =>
+      logEvent(
+        eventType: 'study_first_content_rendered',
+        eventProperties: {
+          if (entrySource != null) 'entry_source': entrySource,
+          if (tapToFirstContentMs != null)
+            'tap_to_first_content_ms': tapToFirstContentMs,
+        },
+      );
   void logStoryResumeTap({String? storyId}) =>
       logEvent(eventType: 'story_resume_tap', eventProperties: {'story_id': storyId});
   void logNextTaskAccepted({String? nextType}) =>
@@ -88,6 +109,38 @@ class AnalyticsService {
           'surface': surface,
           'flow': flow,
           if (reason != null) 'reason': reason,
+        },
+      );
+
+  // B08: marquee_tap → 学習開始 到達率（tap_id で接続）
+  void logLearningEntryStarted({
+    required String learningMode,
+    String? entrySource,
+    String? tapId,
+  }) =>
+      logEvent(
+        eventType: 'learning_entry_started',
+        eventProperties: {
+          'learning_mode': learningMode,
+          if (entrySource != null) 'entry_source': entrySource,
+          if (tapId != null) 'tap_id': tapId,
+        },
+      );
+
+  // B07: MainTilesGrid 導線KPI
+  void logMainTileTap({
+    required String tileId,
+    required String destination,
+    String? authStage,
+    int? rank,
+  }) =>
+      logEvent(
+        eventType: 'main_tile_tap',
+        eventProperties: {
+          'tile_id': tileId,
+          'destination': destination,
+          if (authStage != null) 'auth_stage': authStage,
+          if (rank != null) 'rank': rank,
         },
       );
 
@@ -265,6 +318,175 @@ class AnalyticsService {
   void logTutorialCompleted() => logEvent(eventType: 'tutorial_completed');
   void logTutorialSkipped({String? atStepId}) =>
       logEvent(eventType: 'tutorial_skipped', eventProperties: {'at_step_id': atStepId});
+  void logTutorialAutorecStarted({String? stepId}) =>
+      logEvent(
+        eventType: 'tutorial_autorec_started',
+        eventProperties: {if (stepId != null) 'step_id': stepId},
+      );
+  void logTutorialStepAutoadvanced({
+    required String stepType,
+    String? targetId,
+  }) =>
+      logEvent(
+        eventType: 'tutorial_step_autoadvanced',
+        eventProperties: {
+          'step_type': stepType,
+          if (targetId != null) 'target_id': targetId,
+        },
+      );
+  void logTutorialOneTapStartSuccess({
+    required String learningMode,
+    String? targetId,
+  }) =>
+      logEvent(
+        eventType: 'tutorial_one_tap_start_success',
+        eventProperties: {
+          'learning_mode': learningMode,
+          if (targetId != null) 'target_id': targetId,
+        },
+      );
+  void logSubmissionCtaTap({
+    required String surface,
+    String? submissionId,
+  }) =>
+      logEvent(
+        eventType: 'submission_cta_tap',
+        eventProperties: {
+          'surface': surface,
+          if (submissionId != null) 'submission_id': submissionId,
+        },
+      );
+  void logResultNextLearningTap({
+    required String flow,
+    String? targetRoute,
+  }) =>
+      logEvent(
+        eventType: 'result_next_learning_tap',
+        eventProperties: {
+          'flow': flow,
+          if (targetRoute != null) 'target_route': targetRoute,
+        },
+      );
+
+  // B10: コンサルタント詳細ログドロワー
+  void logConsultantDetailOpened({
+    String? submissionId,
+    bool? hasSessionData,
+  }) =>
+      logEvent(
+        eventType: 'consultant_detail_opened',
+        eventProperties: {
+          if (submissionId != null) 'submission_id': submissionId,
+          if (hasSessionData != null) 'has_session_data': hasSessionData,
+        },
+      );
+  void logConsultantDetailClosed({String? submissionId}) =>
+      logEvent(
+        eventType: 'consultant_detail_closed',
+        eventProperties: {
+          if (submissionId != null) 'submission_id': submissionId,
+        },
+      );
+  void logConsultantDetailError({
+    required String reason,
+    String? submissionId,
+  }) =>
+      logEvent(
+        eventType: 'consultant_detail_error',
+        eventProperties: {
+          'reason': reason,
+          if (submissionId != null) 'submission_id': submissionId,
+        },
+      );
+
+  // B15: 担当コンサル連絡導線
+  void logConsultantContactOpened({bool? hasConsultant}) =>
+      logEvent(
+        eventType: 'consultant_contact_opened',
+        eventProperties: {
+          if (hasConsultant != null) 'has_consultant': hasConsultant,
+        },
+      );
+  void logConsultantContactChannelSelected({required String channel}) =>
+      logEvent(
+        eventType: 'consultant_contact_channel_selected',
+        eventProperties: {'channel': channel},
+      );
+  void logConsultantContactMessageSent({
+    required String channel,
+    String? reportType,
+  }) =>
+      logEvent(
+        eventType: 'consultant_contact_message_sent',
+        eventProperties: {
+          'channel': channel,
+          if (reportType != null) 'report_type': reportType,
+        },
+      );
+  void logConsultantContactMessageFailed({
+    required String channel,
+    required String reason,
+  }) =>
+      logEvent(
+        eventType: 'consultant_contact_message_failed',
+        eventProperties: {'channel': channel, 'reason': reason},
+      );
+
+  // B11: 課題発行
+  void logMissionIssued({
+    required String clientId,
+    bool? hasPreset,
+  }) =>
+      logEvent(
+        eventType: 'mission_issued',
+        eventProperties: {
+          'client_id': clientId,
+          if (hasPreset != null) 'has_preset': hasPreset,
+        },
+      );
+  void logMissionIssueFailed({required String reason}) =>
+      logEvent(
+        eventType: 'mission_issue_failed',
+        eventProperties: {'reason': reason},
+      );
+
+  // B12: 管理者ダッシュボード閲覧
+  void logAdminDashboardViewed({String? tab}) =>
+      logEvent(
+        eventType: 'admin_dashboard_viewed',
+        eventProperties: {if (tab != null) 'tab': tab},
+      );
+
+  // B13: 権限付与・取り消し
+  void logAdminPermissionGranted({
+    required String consultantId,
+    required String clientId,
+  }) =>
+      logEvent(
+        eventType: 'admin_permission_granted',
+        eventProperties: {
+          'consultant_id': consultantId,
+          'client_id': clientId,
+        },
+      );
+  void logAdminPermissionRevoked({
+    required String consultantId,
+    required String clientId,
+  }) =>
+      logEvent(
+        eventType: 'admin_permission_revoked',
+        eventProperties: {
+          'consultant_id': consultantId,
+          'client_id': clientId,
+        },
+      );
+
+  // 配信デモ表示
+  void logAdminDeliveryDemoViewed({int? missionCount}) =>
+      logEvent(
+        eventType: 'admin_delivery_demo_viewed',
+        eventProperties: {if (missionCount != null) 'mission_count': missionCount},
+      );
 
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
   void logTtsPlaybackSession({

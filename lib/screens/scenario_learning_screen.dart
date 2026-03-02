@@ -4,15 +4,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/scenario_categories.dart';
 import '../models/conversation.dart';
+import '../providers/analytics_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
+import '../widgets/tutorial/simulated_finger_overlay.dart';
 
 /// シナリオ学習ページ（Netflix型: セクション + 横スクロール行）
-class ScenarioLearningScreen extends ConsumerWidget {
-  const ScenarioLearningScreen({super.key});
+class ScenarioLearningScreen extends ConsumerStatefulWidget {
+  const ScenarioLearningScreen({super.key, this.fromOnboarding = false});
+
+  final bool fromOnboarding;
+
+  @override
+  ConsumerState<ScenarioLearningScreen> createState() =>
+      _ScenarioLearningScreenState();
+}
+
+class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen> {
+  final GlobalKey _overlayTargetKey = GlobalKey();
+  bool _overlayCompleted = false;
 
   static IconData _iconForCategory(String iconName) {
     switch (iconName) {
@@ -43,8 +56,18 @@ class ScenarioLearningScreen extends ConsumerWidget {
     }
   }
 
+  void _onOverlayComplete(Conversation firstConversation) {
+    if (_overlayCompleted) return;
+    _overlayCompleted = true;
+    ref.read(analyticsServiceProvider).logTutorialOneTapStartSuccess(
+          learningMode: 'quick30',
+          targetId: firstConversation.id,
+        );
+    context.push('/conversation/${firstConversation.id}?mode=listen');
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final dataAsync = ref.watch(conversationsByCategoryWithSubsectionsProvider);
 
     ref.listen(conversationsByCategoryWithSubsectionsProvider, (_, next) {
@@ -79,31 +102,66 @@ class ScenarioLearningScreen extends ConsumerWidget {
       ),
       body: dataAsync.when(
         data: (byCategory) {
+          Conversation? firstConversation;
+          if (widget.fromOnboarding) {
+            ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
+                  stepType: 'quick30',
+                );
+            for (final category in kScenarioCategories) {
+              final subsections = byCategory[category.id] ?? [];
+              for (final sub in subsections) {
+                if (sub.conversations.isNotEmpty) {
+                  firstConversation = sub.conversations.first;
+                  break;
+                }
+              }
+              if (firstConversation != null) break;
+            }
+          }
           final items = <Widget>[];
+          bool assignedKey = false;
           for (final category in kScenarioCategories) {
             final subsections = byCategory[category.id] ?? [];
             for (final sub in subsections) {
+              final useKey = widget.fromOnboarding && !assignedKey && sub.conversations.isNotEmpty;
+              if (useKey) assignedKey = true;
               items.add(_ScenarioSection(
                 category: category,
                 icon: _iconForCategory(category.iconName),
                 subTitle: sub.subTitle,
                 conversations: sub.conversations,
+                overlayTargetKey: useKey ? _overlayTargetKey : null,
               ));
             }
-            // カテゴリに会話がない場合も空状態を1つ表示
             if (subsections.isEmpty) {
               items.add(_ScenarioSection(
                 category: category,
                 icon: _iconForCategory(category.iconName),
                 subTitle: null,
                 conversations: [],
+                overlayTargetKey: null,
               ));
             }
           }
-          return ListView(
+          final content = ListView(
             padding: const EdgeInsets.only(top: 16, bottom: 24),
             children: items,
           );
+
+          if (widget.fromOnboarding && firstConversation != null && !_overlayCompleted) {
+            return Stack(
+              children: [
+                content,
+                Positioned.fill(
+                  child: SimulatedFingerOverlay(
+                    targetKey: _overlayTargetKey,
+                    onComplete: () => _onOverlayComplete(firstConversation!),
+                  ),
+                ),
+              ],
+            );
+          }
+          return content;
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
@@ -131,12 +189,14 @@ class _ScenarioSection extends StatelessWidget {
   final IconData icon;
   final String? subTitle;
   final List<Conversation> conversations;
+  final GlobalKey? overlayTargetKey;
 
   const _ScenarioSection({
     required this.category,
     required this.icon,
     this.subTitle,
     required this.conversations,
+    this.overlayTargetKey,
   });
 
   @override
@@ -176,7 +236,9 @@ class _ScenarioSection extends StatelessWidget {
                   itemCount: conversations.length,
                   itemBuilder: (context, index) {
                     final conversation = conversations[index];
+                    final useKey = overlayTargetKey != null && index == 0;
                     return Padding(
+                      key: useKey ? overlayTargetKey : null,
                       padding: const EdgeInsets.only(right: 10),
                       child: _ScenarioConversationCard(
                         conversation: conversation,

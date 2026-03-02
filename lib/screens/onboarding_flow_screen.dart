@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/coach_provider.dart';
+import '../providers/next_action_provider.dart';
 import '../providers/onboarding_provider.dart';
 import '../theme/engrowth_theme.dart';
 
@@ -74,17 +76,17 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     _goToNext();
   }
 
-  Future<void> _completeOnboarding() async {
+  Future<void> _completeOnboarding({String? nextRoute}) async {
     HapticFeedback.mediumImpact();
     ref.read(analyticsServiceProvider).logOnboardingCompleted(
           variant: _variant,
-          nextRecommendedAction: 'resume_card',
+          nextRecommendedAction: nextRoute != null ? 'next_learning' : 'resume_card',
         );
     ref.read(onboardingHandoffPendingProvider.notifier).state = true;
     await ref.read(onboardingCompleteNotifierProvider).markCompleted();
     if (!mounted) return;
     ref.invalidate(onboardingCompletedProvider);
-    context.go('/home');
+    context.go(nextRoute ?? '/home');
   }
 
   Future<void> _skipOnboarding() async {
@@ -293,7 +295,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/scenario-learning'),
+              onPressed: () => _tryStepAndAdvance('/scenario-learning?from_onboarding=true'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -330,7 +332,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '聞く→録音→聴き直して「先生に送る」で提出。',
+            '聞く→録音→聴き直して「コンサルタントに提出」で提出。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -342,7 +344,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/pattern-sprint'),
+              onPressed: () => _tryStepAndAdvance('/pattern-sprint?from_onboarding=true'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -391,7 +393,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/story-training'),
+              onPressed: () => _tryStepAndAdvance('/story-training?from_onboarding=true'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -421,14 +423,14 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           Icon(Icons.send, size: 64, color: colorScheme.primary),
           const SizedBox(height: 20),
           Text(
-            '録音を先生に送る',
+            '録音をコンサルタントに提出',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 12),
           Text(
-            '録音→「先生に送る」で担当者に共有。フィードバックが届く。',
+            '録音→「コンサルタントに提出」で担当者に共有。フィードバックが届く。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -451,6 +453,20 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => _tryStepAndAdvance('/recordings?tab=0'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('提出する'),
+            ),
+          ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: _goToNext,
             child: const Text('あとで確認する'),
@@ -469,9 +485,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   }
 }
 
-/// 結果表示ステップ（アニメーション付き）
-class _OnboardingResultStep extends StatefulWidget {
-  final VoidCallback onComplete;
+/// 結果表示ステップ（段階表示・ハプティクス・動的CTA）
+class _OnboardingResultStep extends ConsumerStatefulWidget {
+  final void Function({String? nextRoute}) onComplete;
   final ColorScheme colorScheme;
 
   const _OnboardingResultStep({
@@ -480,36 +496,66 @@ class _OnboardingResultStep extends StatefulWidget {
   });
 
   @override
-  State<_OnboardingResultStep> createState() => _OnboardingResultStepState();
+  ConsumerState<_OnboardingResultStep> createState() =>
+      _OnboardingResultStepState();
 }
 
-class _OnboardingResultStepState extends State<_OnboardingResultStep>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _animProgress;
+class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
+    with TickerProviderStateMixin {
+  late List<AnimationController> _rowControllers;
+  late List<Animation<double>> _rowAnimations;
 
   @override
   void initState() {
     super.initState();
     HapticFeedback.mediumImpact();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
+    _rowControllers = List.generate(
+      3,
+      (i) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      ),
     );
-    _animProgress = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
-    _animController.forward();
+    _rowAnimations = _rowControllers
+        .map((c) => Tween<double>(begin: 0, end: 1)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeOut)))
+        .toList();
+    for (var i = 0; i < 3; i++) {
+      Future.delayed(Duration(milliseconds: 400 + i * 350), () {
+        if (mounted) {
+          HapticFeedback.selectionClick();
+          _rowControllers[i].forward();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    _animController.dispose();
+    for (final c in _rowControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final missionAsync = ref.watch(todaysCoachMissionProvider);
+    final nextActionsAsync = ref.watch(nextActionSuggestionsProvider);
+    final mission = missionAsync.valueOrNull;
+    final suggestions = nextActionsAsync.valueOrNull ?? [];
+    final firstSuggestion = suggestions.isNotEmpty ? suggestions.first : null;
+
+    String primaryLabel = '次の学習へ';
+    String? primaryRoute = '/study';
+    if (mission != null) {
+      primaryLabel = 'コンサルタントの課題へ';
+      primaryRoute = mission.actionRoute ?? '/study';
+    } else if (firstSuggestion != null) {
+      primaryLabel = firstSuggestion.title;
+      primaryRoute = firstSuggestion.route;
+    }
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -530,28 +576,27 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
           ),
           const SizedBox(height: 24),
           AnimatedBuilder(
-            animation: _animProgress,
+            animation: Listenable.merge(_rowAnimations),
             builder: (context, child) {
-              final p = _animProgress.value;
               return Column(
                 children: [
                   _ResultRow(
                     label: '学習時間',
-                    value: (3 * p).round(),
+                    value: (3 * _rowAnimations[0].value).round(),
                     suffix: '分',
                     colorScheme: widget.colorScheme,
                   ),
                   const SizedBox(height: 12),
                   _ResultRow(
                     label: '話した文章',
-                    value: (5 * p).round(),
+                    value: (5 * _rowAnimations[1].value).round(),
                     suffix: '文',
                     colorScheme: widget.colorScheme,
                   ),
                   const SizedBox(height: 12),
                   _ResultRow(
                     label: '新しい単語',
-                    value: (2 * p).round(),
+                    value: (2 * _rowAnimations[2].value).round(),
                     suffix: '語',
                     colorScheme: widget.colorScheme,
                   ),
@@ -581,7 +626,13 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: widget.onComplete,
+              onPressed: () {
+                ref.read(analyticsServiceProvider).logResultNextLearningTap(
+                      flow: 'onboarding',
+                      targetRoute: primaryRoute,
+                    );
+                widget.onComplete(nextRoute: primaryRoute);
+              },
               style: FilledButton.styleFrom(
                 backgroundColor: widget.colorScheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -589,8 +640,13 @@ class _OnboardingResultStepState extends State<_OnboardingResultStep>
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('ホームへ'),
+              child: Text(primaryLabel),
             ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: () => widget.onComplete(),
+            child: const Text('ホームへ'),
           ),
         ],
       ),

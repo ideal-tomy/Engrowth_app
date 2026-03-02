@@ -17,6 +17,8 @@ import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
 import '../providers/onboarding_provider.dart';
 import '../providers/ui_experiments_provider.dart';
+import '../providers/home_primary_cta_provider.dart';
+import '../providers/resume_card_tap_context_provider.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
@@ -29,11 +31,24 @@ import '../widgets/dashboard_sections/todays_mission_card.dart';
 
 /// Dashboard（Home タブ）
 /// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _hasRecordedImpression = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasRecordedImpression) {
+      _hasRecordedImpression = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(homePrimaryCtaProvider.notifier).recordImpression();
+      });
+    }
     final authStage = ref.watch(authStageProvider);
     final userPlan = ref.watch(userPlanProvider);
 
@@ -67,17 +82,20 @@ class DashboardScreen extends ConsumerWidget {
                       const TodaysMissionCard(),
                       const SizedBox(height: 6),
                     ],
+                    SizedBox(
+                      height: 100,
+                      child: const _ResumeLearningCard(),
+                    ),
+                    const SizedBox(height: 6),
                     const DailyReportCard(),
                     const SizedBox(height: 6),
                     const _ConversationPracticeGoalCard(),
                     const SizedBox(height: 6),
                     const _OnboardingHandoffBanner(),
-                    SizedBox(
-                      height: 100,
-                      child: const _ResumeLearningCard(),
-                    ),
                     const SizedBox(height: 4),
                     const _RecommendedCard(),
+                    const SizedBox(height: 8),
+                    _SectionLabel(label: 'その他の機能'),
                     const SizedBox(height: 4),
                     const _MainTilesGrid(),
                     const SizedBox(height: 14),
@@ -324,6 +342,7 @@ class _RecommendedCard extends ConsumerWidget {
           child: InkWell(
             onTap: () {
               HapticFeedback.selectionClick();
+              ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('recommended_card');
               context.push('/study?sentenceId=${sentence.id}');
             },
             borderRadius: BorderRadius.circular(12),
@@ -363,6 +382,7 @@ class _RecommendedCard extends ConsumerWidget {
                   TextButton(
                     onPressed: () {
                       HapticFeedback.selectionClick();
+                      ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('recommended_card');
                       context.push('/study?sentenceId=${sentence.id}');
                     },
                     style: TextButton.styleFrom(
@@ -458,27 +478,57 @@ class _ResumeLearningCard extends ConsumerWidget {
     return Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
+          onTap: () async {
             HapticFeedback.selectionClick();
+            ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('resume_card');
             if (handoffPending) {
               ref.read(analyticsServiceProvider).logOnboardingHomeHandoffTapped(
                     target: 'resume_card',
                   );
               ref.read(onboardingHandoffPendingProvider.notifier).state = false;
             }
-            ref.read(analyticsServiceProvider).logResumeCardTap(
-                  source: hasResume ? 'resume' : 'recommended',
+            // B16: 未ロード時は待ってから判定し、誤判定を抑制
+            var effectiveResumeState = resumeState;
+            if (!resumeState.isLoaded) {
+              await ref.read(lastStudyResumeProvider.notifier).ensureLoaded();
+              effectiveResumeState = ref.read(lastStudyResumeProvider);
+              if (effectiveResumeState.sentenceId != null) {
+                ref.read(analyticsServiceProvider).logResumeCardTap(
+                      source: 'resume',
+                    );
+                ref.read(analyticsServiceProvider).logResumeResolution(
+                      resolution: 'resume',
+                    );
+                ref.read(resumeCardTapContextProvider.notifier).record('resume_card');
+                context.push(
+                  '/study?sentenceId=${effectiveResumeState.sentenceId}&entrySource=resume_card',
                 );
-            if (hasResume) {
-              context.push('/study?sentenceId=${resumeState.sentenceId}');
-            } else {
-              final sentence = recommendedAsync.valueOrNull;
-              if (sentence != null) {
-                context.push('/study?sentenceId=${sentence.id}');
-              } else {
-                context.push('/study');
+                return;
               }
             }
+            final sentence = recommendedAsync.valueOrNull;
+            final effectiveHasResume = effectiveResumeState.sentenceId != null;
+            final resolution = effectiveHasResume
+                ? 'resume'
+                : (sentence != null ? 'recommended_fallback' : 'plain_fallback');
+            final entrySource = effectiveHasResume
+                ? 'resume_card'
+                : (sentence != null ? 'recommended_fallback' : 'plain_fallback');
+            ref.read(analyticsServiceProvider).logResumeCardTap(
+                  source: effectiveHasResume ? 'resume' : 'recommended',
+                );
+            ref.read(analyticsServiceProvider).logResumeResolution(
+                  resolution: resolution,
+                );
+            ref.read(resumeCardTapContextProvider.notifier).record(entrySource);
+            final uri = Uri.parse('/study').replace(
+              queryParameters: {
+                if (effectiveHasResume) 'sentenceId': effectiveResumeState.sentenceId!,
+                if (!effectiveHasResume && sentence != null) 'sentenceId': sentence.id,
+                'entrySource': entrySource,
+              },
+            );
+            context.push(uri.toString());
           },
           borderRadius: BorderRadius.circular(16),
           splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
@@ -522,7 +572,11 @@ class _ResumeLearningCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            hasResume ? '続きから再開' : '前回の学習を再開',
+                            !resumeState.isLoaded
+                                ? '読み込み中...'
+                                : hasResume
+                                    ? '続きから再開'
+                                    : '前回の学習を再開',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -531,11 +585,13 @@ class _ResumeLearningCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            hasResume
-                                ? '1タップで続きから'
-                                : recommendedAsync.valueOrNull != null
-                                    ? '1タップで学習開始'
-                                    : 'ここに成長が記録されます。タップして始めよう',
+                            !resumeState.isLoaded
+                                ? '少々お待ちください'
+                                : hasResume
+                                    ? '1タップで続きから'
+                                    : recommendedAsync.valueOrNull != null
+                                        ? '1タップで学習開始'
+                                        : 'タップして始めよう',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.9),
@@ -558,13 +614,13 @@ class _MainTilesGrid extends ConsumerWidget {
   const _MainTilesGrid();
 
   static const _baseItems = [
-    _GridItem('会話トレーニング', Icons.record_voice_over, '/conversation-training'),
-    _GridItem('単語検索', Icons.search, '/words'),
-    _GridItem('パターンスプリント', Icons.speed, '/pattern-sprint'),
-    _GridItem('センテンス一覧', Icons.format_list_bulleted, '/sentences'),
-    _GridItem('学習進捗', Icons.bar_chart, '/progress'),
-    _GridItem('お気に入り', Icons.favorite_border, '/favorites'),
-    _GridItem('本日の復習', Icons.history, '/review'),
+    _GridItem('conversation_training', '会話トレーニング', Icons.record_voice_over, '/conversation-training'),
+    _GridItem('word_search', '単語検索', Icons.search, '/words'),
+    _GridItem('pattern_sprint', 'パターンスプリント', Icons.speed, '/pattern-sprint'),
+    _GridItem('sentences', 'センテンス一覧', Icons.format_list_bulleted, '/sentences'),
+    _GridItem('progress', '学習進捗', Icons.bar_chart, '/progress'),
+    _GridItem('favorites', 'お気に入り', Icons.favorite_border, '/favorites'),
+    _GridItem('review', '本日の復習', Icons.history, '/review'),
   ];
 
   @override
@@ -574,8 +630,8 @@ class _MainTilesGrid extends ConsumerWidget {
         authStage == AuthStage.signedIn || authStage == AuthStage.coaching;
     final items = [
       ..._baseItems,
-      if (showRecordings) const _GridItem('録音履歴', Icons.mic, '/recordings'),
-      const _GridItem('設定', Icons.settings, 'drawer'),
+      if (showRecordings) const _GridItem('recordings', '録音履歴', Icons.mic, '/recordings'),
+      const _GridItem('settings', '設定', Icons.settings, 'drawer'),
     ];
     final width = MediaQuery.of(context).size.width - 24;
     final tileWidth = (width - 12) / 4;
@@ -601,6 +657,13 @@ class _MainTilesGrid extends ConsumerWidget {
             icon: item.icon,
             onTap: () {
               HapticFeedback.selectionClick();
+              ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('main_tile');
+              ref.read(analyticsServiceProvider).logMainTileTap(
+                    tileId: item.tileId,
+                    destination: item.route,
+                    authStage: authStage.name,
+                    rank: index + 1,
+                  );
               if (item.route == 'drawer') {
                 Scaffold.of(context).openDrawer();
               } else if (item.route == '/progress' || item.route == '/words') {
@@ -622,12 +685,37 @@ class _MainTilesGrid extends ConsumerWidget {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  final String label;
+
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GridItem {
+  final String tileId;
   final String title;
   final IconData icon;
   final String route;
 
-  const _GridItem(this.title, this.icon, this.route);
+  const _GridItem(this.tileId, this.title, this.icon, this.route);
 }
 
 class _MainTile extends StatelessWidget {
@@ -823,11 +911,7 @@ class _SettingsDrawer extends ConsumerWidget {
                 title: const Text('担当コンサルタントへ連絡'),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: メッセージ画面
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('この機能は準備中です')),
-                  );
+                  context.push('/consultant-contact');
                 },
               ),
             if (isConsultant) ...[

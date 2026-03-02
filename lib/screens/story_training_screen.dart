@@ -10,11 +10,32 @@ import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/favorite_toggle_icon.dart';
+import '../widgets/tutorial/simulated_finger_overlay.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
-class StoryTrainingScreen extends ConsumerWidget {
-  const StoryTrainingScreen({super.key});
+class StoryTrainingScreen extends ConsumerStatefulWidget {
+  const StoryTrainingScreen({super.key, this.fromOnboarding = false});
+
+  final bool fromOnboarding;
+
+  @override
+  ConsumerState<StoryTrainingScreen> createState() => _StoryTrainingScreenState();
+}
+
+class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
+  final GlobalKey _overlayTargetKey = GlobalKey();
+
+  void _onOverlayComplete(StorySequence firstStory) {
+    ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
+          stepType: 'focus3',
+        );
+    ref.read(analyticsServiceProvider).logTutorialOneTapStartSuccess(
+          learningMode: 'focus3',
+          targetId: firstStory.id,
+        );
+    context.push('/story/${firstStory.id}');
+  }
 
   static String _iconNameForTheme(String theme) {
     for (final c in kStoryThemeCategories) {
@@ -61,10 +82,10 @@ class StoryTrainingScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final dataAsync = ref.watch(storySequencesByThemeProvider);
-
     final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
@@ -83,23 +104,118 @@ class StoryTrainingScreen extends ConsumerWidget {
           if (byTheme.isEmpty) {
             return _buildEmptyState(context);
           }
-          // 表示順にソート
           final sortedThemes = byTheme.keys.toList()
             ..sort((a, b) => orderForTheme(a).compareTo(orderForTheme(b)));
-
-          return ListView(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
-            children: sortedThemes.map((theme) {
+          StorySequence? firstStory;
+          if (widget.fromOnboarding) {
+            for (final theme in sortedThemes) {
               final stories = byTheme[theme] ?? [];
-              if (stories.isEmpty) return const SizedBox.shrink();
-              return _StoryThemeSection(
-                theme: theme,
-                displayName: displayNameForTheme(theme),
-                icon: _iconForCategory(_iconNameForTheme(theme)),
-                stories: stories,
-              );
-            }).toList(),
+              if (stories.isNotEmpty) {
+                firstStory = stories.first;
+                break;
+              }
+            }
+          }
+          final content = Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(top: 16, bottom: 24),
+                  children: sortedThemes.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final theme = entry.value;
+                    final stories = byTheme[theme] ?? [];
+                    if (stories.isEmpty) return const SizedBox.shrink();
+                    final isFirstSection = index == 0;
+                    return _StoryThemeSection(
+                      theme: theme,
+                      displayName: displayNameForTheme(theme),
+                      icon: _iconForCategory(_iconNameForTheme(theme)),
+                      stories: stories,
+                      overlayTargetKey: widget.fromOnboarding && isFirstSection
+                          ? _overlayTargetKey
+                          : null,
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (widget.fromOnboarding && firstStory != null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    border: Border(
+                      top: BorderSide(
+                        color: colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '約3分・途中停止可',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '最初の挨拶を選択しました',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
+                                    stepType: 'focus3',
+                                  );
+                              ref.read(analyticsServiceProvider).logTutorialOneTapStartSuccess(
+                                    learningMode: 'focus3',
+                                    targetId: firstStory!.id,
+                                  );
+                              context.push('/story/${firstStory!.id}');
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('はじめる'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           );
+
+          if (widget.fromOnboarding && firstStory != null) {
+            final story = firstStory;
+            return Stack(
+              children: [
+                content,
+                Positioned.fill(
+                  child: SimulatedFingerOverlay(
+                    targetKey: _overlayTargetKey,
+                    onComplete: () => _onOverlayComplete(story),
+                  ),
+                ),
+              ],
+            );
+          }
+          return content;
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
@@ -150,12 +266,14 @@ class _StoryThemeSection extends ConsumerWidget {
   final String displayName;
   final IconData icon;
   final List<StorySequence> stories;
+  final GlobalKey? overlayTargetKey;
 
   const _StoryThemeSection({
     required this.theme,
     required this.displayName,
     required this.icon,
     required this.stories,
+    this.overlayTargetKey,
   });
 
   @override
@@ -165,6 +283,7 @@ class _StoryThemeSection extends ConsumerWidget {
       displayName: displayName,
       icon: icon,
       stories: stories,
+      overlayTargetKey: overlayTargetKey,
     );
   }
 }
@@ -174,12 +293,14 @@ class _StoryThemeSectionBody extends ConsumerStatefulWidget {
   final String displayName;
   final IconData icon;
   final List<StorySequence> stories;
+  final GlobalKey? overlayTargetKey;
 
   const _StoryThemeSectionBody({
     required this.theme,
     required this.displayName,
     required this.icon,
     required this.stories,
+    this.overlayTargetKey,
   });
 
   @override
@@ -257,7 +378,9 @@ class _StoryThemeSectionBodyState extends ConsumerState<_StoryThemeSectionBody> 
               final story = widget.stories[index];
               final distance = (_currentPage - index).abs();
               final cardScale = (1 - (distance * 0.06)).clamp(0.92, 1.0);
+              final useOverlayKey = index == 0 && widget.overlayTargetKey != null;
               return Padding(
+                key: useOverlayKey ? widget.overlayTargetKey : null,
                 padding: EdgeInsets.only(
                   left: index == 0 ? 12 : 4,
                   right: index == widget.stories.length - 1 ? 12 : 4,

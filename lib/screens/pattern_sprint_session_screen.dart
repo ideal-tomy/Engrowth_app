@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../widgets/marquee/marquee_rail_data.dart';
 import '../services/pattern_sprint_service.dart';
 import '../services/tts_service.dart';
 import '../services/analytics_service.dart';
@@ -253,6 +254,14 @@ class _PatternSprintSessionScreenState
 
   @override
   Widget build(BuildContext context) {
+    final ctx = ref.read(lastMarqueeTapContextProvider.notifier).consumeIfRecent();
+    if (ctx != null) {
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: 'pattern_sprint',
+            entrySource: 'marquee',
+            tapId: ctx.tapId,
+          );
+    }
     final params = (prefix: widget.prefix, durationSec: widget.durationSec);
     final itemsAsync = ref.watch(patternSprintSessionItemsProvider(params));
     final colorScheme = Theme.of(context).colorScheme;

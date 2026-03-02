@@ -30,6 +30,7 @@ import '../screens/scenario_progress_board_screen.dart';
 import '../screens/story_progress_board_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/notifications_screen.dart';
+import '../screens/consultant_contact_screen.dart';
 import '../screens/review_list_screen.dart';
 import '../screens/onboarding_flow_screen.dart';
 import '../screens/tutorial_conversation_screen.dart';
@@ -113,7 +114,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/pattern-sprint',
-      builder: (context, state) => const PatternSprintListScreen(),
+      builder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return PatternSprintListScreen(fromOnboarding: fromOnboarding);
+      },
       routes: [
         GoRoute(
           path: 'session',
@@ -134,9 +139,11 @@ final appRouter = GoRouter(
         final sentenceId = state.uri.queryParameters['sentenceId'];
         final sessionMode = state.uri.queryParameters['sessionMode'] ??
             state.uri.queryParameters['mode'];
+        final entrySource = state.uri.queryParameters['entrySource'];
         return StudyScreen(
           initialSentenceId: sentenceId,
           initialSessionModeParam: sessionMode,
+          initialEntrySource: entrySource,
         );
       },
     ),
@@ -169,11 +176,19 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/scenario-learning',
-      builder: (context, state) => const ScenarioLearningScreen(),
+      builder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return ScenarioLearningScreen(fromOnboarding: fromOnboarding);
+      },
     ),
     GoRoute(
       path: '/story-training',
-      builder: (context, state) => const StoryTrainingScreen(),
+      builder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return StoryTrainingScreen(fromOnboarding: fromOnboarding);
+      },
     ),
     GoRoute(
       path: '/scenario/:id',
@@ -196,6 +211,17 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/notifications',
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/consultant-contact',
+      builder: (context, state) {
+        final reportType = state.uri.queryParameters['reportType'];
+        final submissionId = state.uri.queryParameters['submissionId'];
+        return ConsultantContactScreen(
+          initialReportType: reportType,
+          relatedSubmissionId: submissionId,
+        );
+      },
     ),
     GoRoute(
       path: '/review',

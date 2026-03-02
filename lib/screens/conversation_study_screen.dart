@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/conversation.dart';
+import '../providers/analytics_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/story_provider.dart';
 import '../services/analytics_service.dart';
+import '../widgets/marquee/marquee_rail_data.dart';
 import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
@@ -968,6 +970,14 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
   @override
   Widget build(BuildContext context) {
+    final ctx = ref.read(lastMarqueeTapContextProvider.notifier).consumeIfRecent();
+    if (ctx != null) {
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: 'conversation',
+            entrySource: 'marquee',
+            tapId: ctx.tapId,
+          );
+    }
     final conversationAsync = ref.watch(conversationWithUtterancesProvider(widget.conversationId));
 
     return Scaffold(

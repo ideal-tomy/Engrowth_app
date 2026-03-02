@@ -47,7 +47,9 @@
 ### 5. 計測
 
 - [ ] タップ時に `marquee_tap` イベントが送信される（analytics_events テーブル）
-- [ ] イベントに `source` と `label` が含まれる
+- [ ] イベントに `tap_id`, `target_route`, `source`, `label` が含まれる
+- [ ] ホーム表示時に `home_primary_cta_impression` が送信される（B09）
+- [ ] 3秒以内の主要導線タップで `home_primary_cta_recognized` が送信される（B09）
 
 ## スクリーンショット比較
 

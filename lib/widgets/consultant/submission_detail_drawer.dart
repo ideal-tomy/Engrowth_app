@@ -56,14 +56,16 @@ class SubmissionDetailDrawer extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            if (detail != null) ...[
+            if (detail != null && detail!['reason'] != null) ...[
+              _buildReasonBox(context, detail!['reason_label'] as String? ?? 'データを取得できません'),
+            ] else if (detail != null) ...[
               _buildSection(
                 context,
                 '端末情報',
                 [
-                  _row('OS', detail!['device_os'] ?? '―'),
-                  _row('機種', detail!['device_model'] ?? '―'),
-                  _row('種別', detail!['device_type'] ?? '―'),
+                  _row('OS', detail!['device_os'] as String? ?? '―'),
+                  _row('機種', detail!['device_model'] as String? ?? '―'),
+                  _row('種別', detail!['device_type'] as String? ?? '―'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -71,48 +73,21 @@ class SubmissionDetailDrawer extends StatelessWidget {
                 context,
                 'セッション',
                 [
-                  _row('学習時間', '${detail!['duration_sec'] ?? 0}秒'),
-                  _row('試行回数', '${detail!['attempt_count'] ?? 0}'),
-                  _row('リトライ', '${detail!['retry_count'] ?? 0}'),
+                  _row('学習時間', '${detail!['duration_sec'] as int? ?? 0}秒'),
+                  _row('試行回数', '${detail!['attempt_count'] as int? ?? 0}'),
+                  _row('リトライ', '${detail!['retry_count'] as int? ?? 0}'),
+                  if (detail!['track'] != null && (detail!['track'] as String).isNotEmpty)
+                    _row('トラック', detail!['track'] as String),
                 ],
               ),
               const SizedBox(height: 16),
               _buildSection(
                 context,
                 '直近7日傾向',
-                [
-                  Text(
-                    detail!['trend_7d']?.toString() ?? '―',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                [_buildTrend7d(detail!['trend_7d'], colorScheme)],
               ),
             ] else ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 20, color: colorScheme.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'セッション詳細は user_sessions 導入後に表示されます。',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildReasonBox(context, 'データを取得しています…'),
             ],
           ],
         );
@@ -152,6 +127,46 @@ class SubmissionDetailDrawer extends StatelessWidget {
           Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+
+  Widget _buildReasonBox(BuildContext context, String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 20, color: colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrend7d(dynamic trend7d, ColorScheme colorScheme) {
+    if (trend7d == null || trend7d is! Map<String, dynamic>) {
+      return Text('―', style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant));
+    }
+    final t = trend7d as Map<String, dynamic>;
+    final count = t['session_count'] as int? ?? 0;
+    final avgDur = t['avg_duration_sec'] as int? ?? 0;
+    final avgRetry = t['avg_retry_count']?.toString() ?? '0';
+    return Text(
+      'セッション数: $count 件 / 平均学習時間: ${avgDur}秒 / 平均リトライ: $avgRetry 回',
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
     );
   }
 

@@ -7,6 +7,23 @@ import '../models/daily_summary.dart';
 class ConsultantService {
   final SupabaseClient _client = Supabase.instance.client;
 
+  /// B15: クライアントに割り当てられたコンサルタントID一覧（先頭を優先）
+  Future<List<String>> getAssignedConsultantIds(String clientId) async {
+    try {
+      final res = await _client
+          .from('consultant_assignments')
+          .select('consultant_id')
+          .eq('client_id', clientId)
+          .eq('status', 'active')
+          .order('assigned_at', ascending: true);
+      return (res as List)
+          .map((e) => e['consultant_id'] as String)
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<List<String>> getAssignedClientIds(String consultantId) async {
     try {
       final res = await _client

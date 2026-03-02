@@ -7,6 +7,8 @@ import '../providers/story_provider.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/favorite_toggle_icon.dart';
+import '../providers/analytics_provider.dart';
+import '../widgets/marquee/marquee_rail_data.dart';
 
 /// 3分ストーリー学習画面
 /// メイン: 3分一気に聴く / A役・B役で3分通し練習
@@ -88,6 +90,14 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ctx = ref.read(lastMarqueeTapContextProvider.notifier).consumeIfRecent();
+    if (ctx != null) {
+      ref.read(analyticsServiceProvider).logLearningEntryStarted(
+            learningMode: 'story',
+            entrySource: 'marquee',
+            tapId: ctx.tapId,
+          );
+    }
     final storiesAsync = ref.watch(storySequencesProvider);
     final utterancesAsync = ref.watch(storyUtterancesOrderedProvider(widget.storyId));
     final conversationsAsync = ref.watch(storyConversationsProvider(widget.storyId));

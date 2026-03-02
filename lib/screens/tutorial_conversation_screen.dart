@@ -7,11 +7,13 @@ import '../models/tutorial.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/tutorial_provider.dart';
 import '../services/recording_service.dart';
+import '../utils/recording_error_helper.dart';
 import '../services/recording_consent_service.dart';
 import '../services/stt_service.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../utils/tutorial_intent_resolver.dart';
+import '../widgets/recording_waveform.dart';
 
 /// 事前生成チュートリアル会話画面
 /// 聞く→話す→返答を低遅延で体験
@@ -86,7 +88,52 @@ class _TutorialConversationScreenState
       audioUrl: step.promptAudioUrl,
     );
     if (!mounted) return;
-    setState(() => _statusMessage = 'マイクボタンを押して話してください');
+    _scheduleAutoRecord(session);
+  }
+
+  /// TTS終了後、短いディレイで自動録音開始（同意済みの場合）
+  Future<void> _scheduleAutoRecord(TutorialSession session) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted || _currentStep == null || _isProcessing || _isRecording) return;
+
+    final hasConsent = await RecordingConsentService.hasConsent();
+    if (!hasConsent) {
+      if (mounted) {
+        setState(() => _statusMessage = 'マイクボタンを押して話してください');
+      }
+      return;
+    }
+
+    try {
+      await _recordingService.startRecording();
+      if (mounted) {
+        ref.read(analyticsServiceProvider).logTutorialAutorecStarted(
+              stepId: _currentStep?.id,
+            );
+        setState(() {
+          _isRecording = true;
+          _statusMessage = 'いま聞いています… 話したら停止を押してください';
+        });
+        HapticFeedback.lightImpact();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _statusMessage = 'マイクボタンを押して話してください');
+        final msg = RecordingErrorHelper.getUserMessage(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 3),
+            action: RecordingErrorHelper.isUnsupportedEnvironment(e)
+                ? null
+                : SnackBarAction(
+                    label: '再試行',
+                    onPressed: () => _toggleRecord(session),
+                  ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleRecordingComplete(
@@ -232,14 +279,17 @@ class _TutorialConversationScreenState
         HapticFeedback.lightImpact();
       } catch (e) {
         if (mounted) {
+          final msg = RecordingErrorHelper.getUserMessage(e);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                e.toString().contains('Permission') || e.toString().contains('権限')
-                    ? 'マイクの使用許可をください'
-                    : '録音エラー: $e',
-              ),
+              content: Text(msg),
               duration: const Duration(seconds: 3),
+              action: RecordingErrorHelper.isUnsupportedEnvironment(e)
+                  ? null
+                  : SnackBarAction(
+                      label: '再試行',
+                      onPressed: () => _toggleRecord(session),
+                    ),
             ),
           );
         }
@@ -366,11 +416,17 @@ class _TutorialConversationScreenState
                             ),
                           ],
                         ),
-                        child: Icon(
-                          _isRecording ? Icons.stop : Icons.mic,
-                          size: 40,
-                          color: Colors.white,
-                        ),
+                        child: _isRecording
+                            ? const RecordingWaveform(
+                                isActive: true,
+                                size: 40,
+                                color: Colors.white,
+                              )
+                            : Icon(
+                                Icons.mic,
+                                size: 40,
+                                color: Colors.white,
+                              ),
                       ),
                     ),
                   ),

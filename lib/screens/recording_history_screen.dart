@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voice_submission.dart';
+import '../services/analytics_service.dart';
 import '../services/voice_submission_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/daily_report_status_provider.dart';
@@ -162,9 +163,18 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    final userId = ref.watch(currentUserIdProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('マイ録音履歴'),
+        actions: [
+          if (userId != null)
+            IconButton(
+              icon: const Icon(Icons.contact_support_outlined),
+              tooltip: '担当コンサルに連絡',
+              onPressed: () => context.push('/consultant-contact'),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -362,7 +372,7 @@ class _RecordingCard extends StatelessWidget {
                     _showSubmitConfirm(context, submission, onSubmitted);
                   },
                   icon: const Icon(Icons.send, size: 18),
-                  label: const Text('今日の報告を送る'),
+                  label: const Text('コンサルタントに提出'),
                 ),
               ),
             ],
@@ -439,10 +449,14 @@ class _RecordingCard extends StatelessWidget {
               Navigator.of(ctx).pop();
               try {
                 await VoiceSubmissionService().markAsSubmitted(submission.id);
+                AnalyticsService().logSubmissionCtaTap(
+                      surface: 'recording_history',
+                      submissionId: submission.id,
+                    );
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     const SnackBar(
-                      content: Text('先生に送りました！'),
+                      content: Text('提出しました！アドバイスをお待ちください。'),
                       backgroundColor: Colors.green,
                     ),
                   );

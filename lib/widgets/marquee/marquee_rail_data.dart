@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/analytics_provider.dart';
+import '../../providers/home_primary_cta_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/conversation_practice_provider.dart';
 import '../../providers/last_study_resume_provider.dart';
@@ -234,6 +237,48 @@ List<MarqueeRailItem> _getDynamicItems(Ref ref, _MarqueeUserStage stage) {
   return items;
 }
 
+/// B08: marquee_tap → learning_entry_started 接続用（60秒ウィンドウ）
+class MarqueeTapContext {
+  final String tapId;
+  final String? targetRoute;
+  final DateTime tappedAt;
+
+  const MarqueeTapContext({
+    required this.tapId,
+    required this.targetRoute,
+    required this.tappedAt,
+  });
+
+  bool isWithin60Seconds() =>
+      DateTime.now().difference(tappedAt).inSeconds <= 60;
+}
+
+final lastMarqueeTapContextProvider =
+    StateNotifierProvider<LastMarqueeTapContextNotifier, MarqueeTapContext?>(
+        (ref) => LastMarqueeTapContextNotifier());
+
+class LastMarqueeTapContextNotifier extends StateNotifier<MarqueeTapContext?> {
+  LastMarqueeTapContextNotifier() : super(null);
+
+  void record(String tapId, String? targetRoute) {
+    state = MarqueeTapContext(
+      tapId: tapId,
+      targetRoute: targetRoute,
+      tappedAt: DateTime.now(),
+    );
+  }
+
+  MarqueeTapContext? consumeIfRecent() {
+    final ctx = state;
+    if (ctx == null || !ctx.isWithin60Seconds()) return null;
+    state = null;
+    return ctx;
+  }
+}
+
+String _generateTapId() =>
+    'mt_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
+
 /// タップ時の抑制・計測用
 final marqueeRailTapProvider =
     StateNotifierProvider<MarqueeRailTapNotifier, void>((ref) {
@@ -246,10 +291,16 @@ class MarqueeRailTapNotifier extends StateNotifier<void> {
   final Ref _ref;
 
   void onTap(MarqueeRailItem item) {
+    _ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('marquee');
     _ref.read(_marqueeTapSuppressionProvider.notifier).recordTap(item);
+    final tapId = _generateTapId();
+    final targetRoute = item.route;
+    _ref.read(lastMarqueeTapContextProvider.notifier).record(tapId, targetRoute);
     _ref.read(analyticsServiceProvider).logEvent(
           eventType: 'marquee_tap',
           eventProperties: {
+            'tap_id': tapId,
+            'target_route': targetRoute ?? '',
             if (item.analyticsSource != null) 'source': item.analyticsSource,
             'label': item.label,
           },

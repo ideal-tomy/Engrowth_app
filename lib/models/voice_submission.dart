@@ -7,6 +7,7 @@ class VoiceSubmission {
   final String? sentenceId;
   final String audioUrl;
   final String? sessionId;
+  final String? sessionUuid; // user_sessions.id（Phase A拡張、詳細ログ紐付け用）
   final String submissionType; // 'practice' | 'submitted'
   final String reviewStatus; // 'pending' | 'reviewed'
   final String? consultantId;
@@ -21,6 +22,7 @@ class VoiceSubmission {
     this.sentenceId,
     required this.audioUrl,
     this.sessionId,
+    this.sessionUuid,
     required this.submissionType,
     required this.reviewStatus,
     this.consultantId,
@@ -37,6 +39,7 @@ class VoiceSubmission {
       sentenceId: json['sentence_id'] as String?,
       audioUrl: json['audio_url'] as String,
       sessionId: json['session_id'] as String?,
+      sessionUuid: json['session_uuid'] as String?,
       submissionType: json['submission_type'] as String? ?? 'practice',
       reviewStatus: json['review_status'] as String? ?? 'pending',
       consultantId: json['consultant_id'] as String?,

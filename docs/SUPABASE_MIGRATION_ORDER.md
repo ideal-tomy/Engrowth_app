@@ -22,6 +22,11 @@ ERROR: 42P01: relation "analytics_events" does not exist
 ```
 → Phase C は各テーブル（analytics_events, conversation_learning_events, voice_feedbacks）が**存在する場合のみ**ポリシーを適用するよう修正済みです。存在しないテーブルはスキップされるため、エラーになりません。最新版の SQL を再実行してください。
 
+**よくあるエラー4**: `relation "access_audit_logs" does not exist` または `relation "coach_missions" does not exist`
+→ 管理者用マイグレーション（database_admin_*）は、該当テーブルが存在しない場合はスキップするよう修正済みです。フル機能を使うには、先に以下を実行してください:
+- `database_phase_a_access_audit_logs.sql`（access_audit_logs 作成）
+- `database_coach_missions.sql`（coach_missions 作成）
+
 **解決策**: 以下の順序で実行してください。各スクリプトは冪等（再実行可）になっているので、既に実行済みでもエラーになりません。
 
 ---
@@ -52,6 +57,18 @@ ERROR: 42P01: relation "analytics_events" does not exist
 3. **Run** で実行
 4. 続けて `supabase/migrations/seed_tutorial_greeting.sql` を実行してシード投入
 
+### ステップ5: 管理者機能（B12-B14）
+
+**前提テーブル**（未作成の場合は先に実行）:
+- `access_audit_logs`: `database_phase_a_access_audit_logs.sql`
+- `consultant_assignments`: `database_consultant_assignments.sql`
+- `coach_missions`: `database_coach_missions.sql`
+
+上記が存在しない場合、管理者用マイグレーションは該当部分をスキップします（エラーになりません）。
+
+1. `supabase/migrations/database_admin_access_audit_action.sql` を実行（action_type カラム追加）
+2. `supabase/migrations/database_admin_consultant_assignments_policy.sql` を実行（管理者用 RLS ポリシー）
+
 ---
 
 ## 3. 各マイグレーションの役割
@@ -67,6 +84,9 @@ ERROR: 42P01: relation "analytics_events" does not exist
 | `database_sentences_backfill_phrase_category.sql` | 既存 sentences の phrase_title / category_label_ja を初期バックフィル（上記の直後に実行） |
 | `database_tutorial_tables.sql` | チュートリアル専用テーブル（tutorials, tutorial_steps, tutorial_step_responses） |
 | `seed_tutorial_greeting.sql` | 初回挨拶チュートリアルのシード（上記の直後に実行） |
+| `database_admin_access_audit_action.sql` | access_audit_logs に action_type 追加（B14 監査タブ） |
+| `database_admin_consultant_assignments_policy.sql` | 管理者が consultant_assignments / coach_missions を操作できる RLS（B13, 配信デモ） |
+| `database_client_reports.sql` | B15 クライアント→コンサルタントのアプリ内クイック報告テーブル |
 
 ---
 

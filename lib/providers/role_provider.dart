@@ -77,13 +77,15 @@ final isConsultantProvider = FutureProvider<bool>((ref) async {
 });
 
 /// 現在のユーザーが管理者かどうか
-/// 本番では JWT claim app_role=admin で判定（将来実装）
+/// 本番: JWT claim app_role=admin で判定（user_metadata / app_metadata）
 /// 開発時: devViewAsAdminProvider が true なら true
 final isAdminProvider = Provider<bool>((ref) {
   if (kDebugMode) {
     final devOverride = ref.watch(devViewAsAdminProvider);
     if (devOverride) return true;
   }
-  // TODO: auth.jwt()->>'app_role' = 'admin'
-  return false;
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return false;
+  final role = user.userMetadata?['app_role'] ?? user.appMetadata['app_role'];
+  return role == 'admin';
 });

@@ -88,15 +88,113 @@ class ConsultantDashboardService {
     }
   }
 
-  /// 提出に対する詳細ログ（user_sessions があれば取得、なければ空）
-  /// Phase A 適用後は session_uuid で user_sessions を取得
+  /// 提出に対する詳細ログ（session_uuid で user_sessions を取得）
+  /// session_uuid がない場合は reason 付きで未連携を返す（UIで判別可能）
   Future<Map<String, dynamic>?> getSubmissionDetail(VoiceSubmission s) async {
-    // TODO: user_sessions 導入後に session_uuid で紐づけ
-    return null;
+    if (s.sessionUuid == null || s.sessionUuid!.isEmpty) {
+      return {
+        'reason': 'no_session_uuid',
+        'reason_label': '提出時セッション未連携（古い提出または計測前）',
+      };
+    }
+
+    try {
+      final sessionRes = await _client
+          .from('user_sessions')
+          .select()
+          .eq('id', s.sessionUuid!)
+          .maybeSingle();
+
+      if (sessionRes == null) {
+        return {
+          'reason': 'session_not_found',
+          'reason_label': 'セッションが見つかりません（削除済みの可能性）',
+        };
+      }
+
+      final ses = sessionRes as Map<String, dynamic>;
+
+      // 直近7日の傾向（同一userのuser_sessionsから算出）
+      Map<String, dynamic>? trend7d;
+      try {
+        final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+        final trendRes = await _client
+            .from('user_sessions')
+            .select('duration_sec, retry_count')
+            .eq('user_id', s.userId)
+            .gte('session_timestamp', sevenDaysAgo.toIso8601String());
+
+        final rows = trendRes as List;
+        if (rows.isNotEmpty) {
+          int totalDuration = 0;
+          int totalRetry = 0;
+          for (final r in rows) {
+            final m = r as Map<String, dynamic>;
+            totalDuration += m['duration_sec'] as int? ?? 0;
+            totalRetry += m['retry_count'] as int? ?? 0;
+          }
+          trend7d = {
+            'session_count': rows.length,
+            'avg_duration_sec': rows.length > 0 ? (totalDuration / rows.length).round() : 0,
+            'avg_retry_count': rows.length > 0 ? (totalRetry / rows.length).toStringAsFixed(1) : '0',
+          };
+        }
+      } catch (_) {
+        trend7d = null;
+      }
+
+      return {
+        'device_os': ses['device_os'] as String?,
+        'device_model': ses['device_model'] as String?,
+        'device_type': ses['device_type'] as String?,
+        'duration_sec': ses['duration_sec'] as int? ?? 0,
+        'attempt_count': ses['attempt_count'] as int? ?? 0,
+        'retry_count': ses['retry_count'] as int? ?? 0,
+        'track': ses['track'] as String?,
+        'trend_7d': trend7d,
+      };
+    } catch (e) {
+      return {
+        'reason': 'fetch_error',
+        'reason_label': '取得エラー: $e',
+      };
+    }
+  }
+
+  /// 担当クライアントID一覧
+  Future<List<String>> getAssignedClientIds() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    return _consultantService.getAssignedClientIds(uid);
   }
 
   /// 音声再生URL取得
   Future<String?> getPlaybackUrl(String audioUrl) async {
     return _submissionService.getSignedPlaybackUrl(audioUrl);
+  }
+
+  /// B15: 担当クライアントからの報告一覧
+  Future<List<Map<String, dynamic>>> getClientReports() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+
+    try {
+      final clientIds = await _consultantService.getAssignedClientIds(uid);
+      if (clientIds.isEmpty) return [];
+
+      final res = await _client
+          .from('client_reports')
+          .select()
+          .eq('consultant_id', uid)
+          .inFilter('client_id', clientIds)
+          .order('created_at', ascending: false)
+          .limit(20);
+      return (res as List)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      print('ConsultantDashboardService.getClientReports: $e');
+      return [];
+    }
   }
 }
