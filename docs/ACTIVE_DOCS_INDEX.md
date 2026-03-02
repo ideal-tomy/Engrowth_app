@@ -8,6 +8,9 @@
 ## Plans (v2 2026 Q2)
 - `docs/plans/v2_2026q2/README.md`
 
+## Tutorial / Onboarding
+- `docs/plans/TUTORIAL_INTRO_POPUP_PLAN.md`
+
 ## Consultant / Mission
 - `docs/MISSION_DELIVERY_CHANNEL_DESIGN.md`（課題配信チャネル設計・LINE連携準備）
 

@@ -11,6 +11,7 @@ import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
+import '../widgets/tutorial/learning_intro_dialog.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
@@ -34,7 +35,14 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
           learningMode: 'focus3',
           targetId: firstStory.id,
         );
-    context.push('/story/${firstStory.id}');
+    LearningIntroDialog.show(
+      context,
+      title: '3分会話',
+      body: '約3分の英会話ストーリーを体験します。会話の流れに沿って、聞いたり話したりを繰り返していきます。',
+      onStart: () {
+        context.push('/story/${firstStory.id}');
+      },
+    );
   }
 
   static String _iconNameForTheme(String theme) {

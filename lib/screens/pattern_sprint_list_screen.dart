@@ -7,6 +7,7 @@ import '../providers/analytics_provider.dart';
 import '../services/pattern_sprint_service.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
+import '../widgets/tutorial/learning_intro_dialog.dart';
 
 /// パターンスプリント: パターン選択・秒数選択・セッション開始
 class PatternSprintListScreen extends ConsumerStatefulWidget {
@@ -26,15 +27,24 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
 
   void _onOverlayComplete() {
     if (_selectedPrefix == null) return;
+    final prefix = _selectedPrefix!;
+    final duration = _selectedDurationSec;
     ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
           stepType: 'pattern_sprint',
         );
     ref.read(analyticsServiceProvider).logTutorialOneTapStartSuccess(
           learningMode: 'pattern_sprint',
-          targetId: _selectedPrefix,
+          targetId: prefix,
         );
-    context.push(
-      '/pattern-sprint/session?prefix=${Uri.encodeComponent(_selectedPrefix!)}&duration=$_selectedDurationSec',
+    LearningIntroDialog.show(
+      context,
+      title: 'パターンスプリント',
+      body: '聞く→まねして言うを短時間で繰り返します。音声を聴いたら即座にリピートしましょう。',
+      onStart: () {
+        context.push(
+          '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$duration',
+        );
+      },
     );
   }
 

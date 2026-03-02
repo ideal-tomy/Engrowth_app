@@ -11,6 +11,7 @@ import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
+import '../widgets/tutorial/learning_intro_dialog.dart';
 
 /// シナリオ学習ページ（Netflix型: セクション + 横スクロール行）
 class ScenarioLearningScreen extends ConsumerStatefulWidget {
@@ -63,7 +64,14 @@ class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen>
           learningMode: 'quick30',
           targetId: firstConversation.id,
         );
-    context.push('/conversation/${firstConversation.id}?mode=listen');
+    LearningIntroDialog.show(
+      context,
+      title: '30秒会話',
+      body: '30秒前後の会話のやりとりを体験します。全体の会話を聴いた後、A役（B役）を選択して会話の練習を行います。',
+      onStart: () {
+        context.push('/conversation/${firstConversation.id}?mode=listen');
+      },
+    );
   }
 
   @override
