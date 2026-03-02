@@ -502,40 +502,49 @@ class _OnboardingResultStep extends ConsumerStatefulWidget {
 
 class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
     with TickerProviderStateMixin {
-  late List<AnimationController> _rowControllers;
-  late List<Animation<double>> _rowAnimations;
+  late AnimationController _sequenceController;
+  late Animation<double> _sequenceAnim;
 
   @override
   void initState() {
     super.initState();
     HapticFeedback.mediumImpact();
-    _rowControllers = List.generate(
-      3,
-      (i) => AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 500),
-      ),
+    _sequenceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
     );
-    _rowAnimations = _rowControllers
-        .map((c) => Tween<double>(begin: 0, end: 1)
-            .animate(CurvedAnimation(parent: c, curve: Curves.easeOut)))
-        .toList();
-    for (var i = 0; i < 3; i++) {
-      Future.delayed(Duration(milliseconds: 400 + i * 350), () {
-        if (mounted) {
+    _sequenceAnim = CurvedAnimation(
+      parent: _sequenceController,
+      curve: Curves.easeOut,
+    );
+    double _lastHapticAt = -1;
+    _sequenceController.addListener(() {
+      final v = _sequenceAnim.value;
+      final thresholds = [0.1, 0.2, 0.4, 0.6, 0.8, 0.9];
+      for (var i = 0; i < thresholds.length; i++) {
+        if (v >= thresholds[i] && _lastHapticAt < thresholds[i]) {
+          _lastHapticAt = thresholds[i];
           HapticFeedback.selectionClick();
-          _rowControllers[i].forward();
+          break;
         }
-      });
-    }
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _sequenceController.forward();
+    });
   }
 
   @override
   void dispose() {
-    for (final c in _rowControllers) {
-      c.dispose();
-    }
+    _sequenceController.dispose();
     super.dispose();
+  }
+
+  double _opacityFor(double start, double end) {
+    final v = _sequenceAnim.value;
+    if (v < start) return 0;
+    if (v >= end) return 1;
+    return (v - start) / (end - start);
   }
 
   @override
@@ -556,100 +565,135 @@ class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
       primaryRoute = firstSuggestion.route;
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.check_circle,
-            size: 72,
-            color: widget.colorScheme.primary,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '体験完了！',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: widget.colorScheme.onSurface,
-                ),
-          ),
-          const SizedBox(height: 24),
-          AnimatedBuilder(
-            animation: Listenable.merge(_rowAnimations),
-            builder: (context, child) {
-              return Column(
-                children: [
-                  _ResultRow(
-                    label: '学習時間',
-                    value: (3 * _rowAnimations[0].value).round(),
-                    suffix: '分',
-                    colorScheme: widget.colorScheme,
-                  ),
-                  const SizedBox(height: 12),
-                  _ResultRow(
-                    label: '話した文章',
-                    value: (5 * _rowAnimations[1].value).round(),
-                    suffix: '文',
-                    colorScheme: widget.colorScheme,
-                  ),
-                  const SizedBox(height: 12),
-                  _ResultRow(
-                    label: '新しい単語',
-                    value: (2 * _rowAnimations[2].value).round(),
-                    suffix: '語',
-                    colorScheme: widget.colorScheme,
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'ホームで「続きから再開」をタップすると学習を始められます。',
-            style: TextStyle(
-              fontSize: 13,
-              color: widget.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'アカウント作成で録音・進捗・連続日数が記録されます。',
-            style: TextStyle(
-              fontSize: 12,
-              color: widget.colorScheme.onSurfaceVariant.withOpacity(0.9),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                ref.read(analyticsServiceProvider).logResultNextLearningTap(
-                      flow: 'onboarding',
-                      targetRoute: primaryRoute,
-                    );
-                widget.onComplete(nextRoute: primaryRoute);
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: widget.colorScheme.primary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+    return AnimatedBuilder(
+      animation: _sequenceAnim,
+      builder: (context, _) {
+        final op0 = _opacityFor(0.0, 0.1);
+        final op1 = _opacityFor(0.1, 0.2);
+        final op2 = _opacityFor(0.2, 0.4);
+        final op3 = _opacityFor(0.4, 0.6);
+        final op4 = _opacityFor(0.6, 0.8);
+        final op5 = _opacityFor(0.8, 0.9);
+        final op6 = _opacityFor(0.9, 1.0);
+        final v1 = (3 * ((_sequenceAnim.value - 0.2) / 0.2).clamp(0.0, 1.0)).round();
+        final v2 = (5 * ((_sequenceAnim.value - 0.4) / 0.2).clamp(0.0, 1.0)).round();
+        final v3 = (2 * ((_sequenceAnim.value - 0.6) / 0.2).clamp(0.0, 1.0)).round();
+
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Opacity(
+                opacity: op0,
+                child: Icon(
+                  Icons.check_circle,
+                  size: 72,
+                  color: widget.colorScheme.primary,
                 ),
               ),
-              child: Text(primaryLabel),
-            ),
+              const SizedBox(height: 20),
+              Opacity(
+                opacity: op1,
+                child: Text(
+                  '体験完了！',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: widget.colorScheme.onSurface,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Opacity(
+                opacity: op2,
+                child: _ResultRow(
+                  label: '学習時間',
+                  value: v1,
+                  suffix: '分',
+                  colorScheme: widget.colorScheme,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Opacity(
+                opacity: op3,
+                child: _ResultRow(
+                  label: '話した文章',
+                  value: v2,
+                  suffix: '文',
+                  colorScheme: widget.colorScheme,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Opacity(
+                opacity: op4,
+                child: _ResultRow(
+                  label: '新しい単語',
+                  value: v3,
+                  suffix: '語',
+                  colorScheme: widget.colorScheme,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Opacity(
+                opacity: op5,
+                child: Column(
+                  children: [
+                    Text(
+                      'ホームで「続きから再開」をタップすると学習を始められます。',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: widget.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'アカウント作成で録音・進捗・連続日数が記録されます。',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.colorScheme.onSurfaceVariant.withOpacity(0.9),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Opacity(
+                opacity: op6,
+                child: SizedBox(
+                  width: double.infinity,
+                      child: FilledButton(
+                    onPressed: () {
+                      ref.read(analyticsServiceProvider).logResultNextLearningTap(
+                            flow: 'onboarding',
+                            targetRoute: primaryRoute,
+                          );
+                      widget.onComplete(nextRoute: primaryRoute);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: widget.colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(primaryLabel),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Opacity(
+                opacity: op6,
+                child: TextButton(
+                  onPressed: () => widget.onComplete(),
+                  child: const Text('ホームへ'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: () => widget.onComplete(),
-            child: const Text('ホームへ'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

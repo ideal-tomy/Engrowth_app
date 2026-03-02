@@ -19,6 +19,7 @@ import '../providers/analytics_provider.dart';
 import '../services/scenario_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/engrowth_theme.dart';
+import '../widgets/luxury_page_body.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// 学習進捗ページ - 要点ダッシュボード + 深掘り分析の2層構造
@@ -55,8 +56,9 @@ class ProgressScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      body: LuxuryPageBody(
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // === 第1層: 要点ダッシュボード ===
@@ -275,6 +277,7 @@ class ProgressScreen extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

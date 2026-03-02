@@ -5,6 +5,7 @@ import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
 import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
+import '../widgets/luxury_page_body.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/favorite_toggle_icon.dart';
@@ -57,9 +58,11 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // テーマフィルター
+      body: LuxuryPageBody(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            // テーマフィルター
           if (widget.situationType != null)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -154,7 +157,8 @@ class _ConversationListScreenState extends ConsumerState<ConversationListScreen>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildThemeChip(String theme) {

@@ -40,6 +40,37 @@ import '../screens/concept_screen.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/marquee/bottom_recommendation_rail.dart';
 
+/// 高級感のある画面遷移（fade + slightSlideUp）
+/// Push時 200ms、低振幅のスライドで自然な遷移を実現
+Page<void> _luxuryTransitionPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+  Duration duration = const Duration(milliseconds: 220),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: duration,
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.03),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 /// 導線ポリシー:
 /// - タブルート直下（/home, /library, /progress, /words）: 戻る矢印なし
 /// - push で開く詳細/設定画面: 戻る矢印あり（GoRouterの自動 leading に任せる）
@@ -106,28 +137,44 @@ final appRouter = GoRouter(
     // その他のルート（モーダル/プッシュ）
     GoRoute(
       path: '/hint-settings',
-      builder: (context, state) => const HintSettingsScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const HintSettingsScreen(),
+      ),
     ),
     GoRoute(
       path: '/playback-speed-settings',
-      builder: (context, state) => const PlaybackSpeedSettingsScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const PlaybackSpeedSettingsScreen(),
+      ),
     ),
     GoRoute(
       path: '/pattern-sprint',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return PatternSprintListScreen(fromOnboarding: fromOnboarding);
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: PatternSprintListScreen(fromOnboarding: fromOnboarding),
+        );
       },
       routes: [
         GoRoute(
           path: 'session',
-          builder: (context, state) {
+          pageBuilder: (context, state) {
             final prefix = state.uri.queryParameters['prefix'] ?? '';
             final duration = int.tryParse(state.uri.queryParameters['duration'] ?? '45') ?? 45;
-            return PatternSprintSessionScreen(
-              prefix: Uri.decodeComponent(prefix),
-              durationSec: duration.clamp(30, 60),
+            return _luxuryTransitionPage(
+              context: context,
+              state: state,
+              child: PatternSprintSessionScreen(
+                prefix: Uri.decodeComponent(prefix),
+                durationSec: duration.clamp(30, 60),
+              ),
             );
           },
         ),
@@ -135,105 +182,154 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/study',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final sentenceId = state.uri.queryParameters['sentenceId'];
         final sessionMode = state.uri.queryParameters['sessionMode'] ??
             state.uri.queryParameters['mode'];
         final entrySource = state.uri.queryParameters['entrySource'];
-        return StudyScreen(
-          initialSentenceId: sentenceId,
-          initialSessionModeParam: sessionMode,
-          initialEntrySource: entrySource,
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: StudyScreen(
+            initialSentenceId: sentenceId,
+            initialSessionModeParam: sessionMode,
+            initialEntrySource: entrySource,
+          ),
         );
       },
     ),
     GoRoute(
       path: '/sentences',
-      builder: (context, state) {
-        final word = state.uri.queryParameters['word'];
-        return SentenceListScreen(initialWord: word);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: SentenceListScreen(
+          initialWord: state.uri.queryParameters['word'],
+        ),
+      ),
     ),
     GoRoute(
       path: '/search',
-      builder: (context, state) =>
-          const WordListScreen(initialFocusSearch: true),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const WordListScreen(initialFocusSearch: true),
+      ),
     ),
     GoRoute(
       path: '/account',
-      builder: (context, state) {
-        final provider = state.uri.queryParameters['provider'];
-        return AccountScreen(initialProvider: provider);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: AccountScreen(
+          initialProvider: state.uri.queryParameters['provider'],
+        ),
+      ),
     ),
     GoRoute(
       path: '/scenarios',
-      builder: (context, state) => const ScenarioListScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const ScenarioListScreen(),
+      ),
     ),
     GoRoute(
       path: '/conversation-training',
-      builder: (context, state) => const ConversationTrainingChoiceScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const ConversationTrainingChoiceScreen(),
+      ),
     ),
     GoRoute(
       path: '/scenario-learning',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return ScenarioLearningScreen(fromOnboarding: fromOnboarding);
-      },
-    ),
-    GoRoute(
-      path: '/story-training',
-      builder: (context, state) {
-        final fromOnboarding =
-            state.uri.queryParameters['from_onboarding'] == 'true';
-        return StoryTrainingScreen(fromOnboarding: fromOnboarding);
-      },
-    ),
-    GoRoute(
-      path: '/scenario/:id',
-      builder: (context, state) {
-        final scenarioId = state.pathParameters['id']!;
-        return ScenarioStudyScreen(scenarioId: scenarioId);
-      },
-    ),
-    GoRoute(
-      path: '/conversations',
-      builder: (context, state) {
-        final situationType = state.uri.queryParameters['type'];
-        return ConversationListScreen(situationType: situationType);
-      },
-    ),
-    GoRoute(
-      path: '/favorites',
-      builder: (context, state) => const FavoritesScreen(),
-    ),
-    GoRoute(
-      path: '/notifications',
-      builder: (context, state) => const NotificationsScreen(),
-    ),
-    GoRoute(
-      path: '/consultant-contact',
-      builder: (context, state) {
-        final reportType = state.uri.queryParameters['reportType'];
-        final submissionId = state.uri.queryParameters['submissionId'];
-        return ConsultantContactScreen(
-          initialReportType: reportType,
-          relatedSubmissionId: submissionId,
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: ScenarioLearningScreen(fromOnboarding: fromOnboarding),
         );
       },
     ),
     GoRoute(
+      path: '/story-training',
+      pageBuilder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: StoryTrainingScreen(fromOnboarding: fromOnboarding),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/scenario/:id',
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: ScenarioStudyScreen(scenarioId: state.pathParameters['id']!),
+      ),
+    ),
+    GoRoute(
+      path: '/conversations',
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: ConversationListScreen(
+          situationType: state.uri.queryParameters['type'],
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/favorites',
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const FavoritesScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/notifications',
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const NotificationsScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/consultant-contact',
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: ConsultantContactScreen(
+          initialReportType: state.uri.queryParameters['reportType'],
+          relatedSubmissionId: state.uri.queryParameters['submissionId'],
+        ),
+      ),
+    ),
+    GoRoute(
       path: '/review',
-      builder: (context, state) => const ReviewListScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const ReviewListScreen(),
+      ),
     ),
     GoRoute(
       path: '/onboarding',
-      builder: (context, state) => const OnboardingFlowScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const OnboardingFlowScreen(),
+      ),
     ),
     GoRoute(
       path: '/result',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final flow = state.uri.queryParameters['flow'] ?? 'study';
         final title = state.uri.queryParameters['title'] ?? 'セッション完了！';
         final subtitle = state.uri.queryParameters['subtitle'];
@@ -245,78 +341,115 @@ final appRouter = GoRouter(
             : state.uri.queryParameters['primaryRoute'];
         final primaryCtaLabel =
             state.uri.queryParameters['primaryCtaLabel'] ?? 'もう1セット続ける';
-        return UnifiedResultScreen(
-          flow: flow,
-          title: title,
-          subtitle: subtitle,
-          count: count,
-          countSuffix: countSuffix,
-          primaryRoute: primaryRoute,
-          primaryCtaLabel: primaryCtaLabel,
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: UnifiedResultScreen(
+            flow: flow,
+            title: title,
+            subtitle: subtitle,
+            count: count,
+            countSuffix: countSuffix,
+            primaryRoute: primaryRoute,
+            primaryCtaLabel: primaryCtaLabel,
+          ),
         );
       },
     ),
     GoRoute(
       path: '/tutorial-conversation',
-      builder: (context, state) {
-        final entrySource =
-            state.uri.queryParameters['entry_source'] ?? 'direct';
-        return TutorialConversationScreen(entrySource: entrySource);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: TutorialConversationScreen(
+          entrySource: state.uri.queryParameters['entry_source'] ?? 'direct',
+        ),
+      ),
     ),
     GoRoute(
       path: '/help',
-      builder: (context, state) => const HelpScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const HelpScreen(),
+      ),
     ),
     GoRoute(
       path: '/concept',
-      builder: (context, state) => const ConceptScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const ConceptScreen(),
+      ),
     ),
     GoRoute(
       path: '/recordings',
-      builder: (context, state) {
-        final tab = state.uri.queryParameters['tab'];
-        return RecordingHistoryScreen(initialTab: tab);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: RecordingHistoryScreen(
+          initialTab: state.uri.queryParameters['tab'],
+        ),
+      ),
     ),
     GoRoute(
       path: '/admin',
-      builder: (context, state) => const AdminDashboardScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const AdminDashboardScreen(),
+      ),
     ),
     GoRoute(
       path: '/consultant',
-      builder: (context, state) => const ConsultantDashboardScreen(),
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: const ConsultantDashboardScreen(),
+      ),
     ),
     GoRoute(
       path: '/conversation/:id',
-      builder: (context, state) {
-        final conversationId = state.pathParameters['id']!;
-        final mode = state.uri.queryParameters['mode'] ?? 'listen';  // listen, roleA, roleB
-        return ConversationStudyScreen(conversationId: conversationId, initialMode: mode);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: ConversationStudyScreen(
+          conversationId: state.pathParameters['id']!,
+          initialMode: state.uri.queryParameters['mode'] ?? 'listen',
+        ),
+      ),
     ),
     GoRoute(
       path: '/story/:id',
-      builder: (context, state) {
-        final storyId = state.pathParameters['id']!;
-        return StoryStudyScreen(storyId: storyId);
-      },
+      pageBuilder: (context, state) => _luxuryTransitionPage(
+        context: context,
+        state: state,
+        child: StoryStudyScreen(storyId: state.pathParameters['id']!),
+      ),
     ),
     GoRoute(
       path: '/progress/scenario-board',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final extra = state.extra;
-        return ScenarioProgressBoardScreen(
-          scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: ScenarioProgressBoardScreen(
+            scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+          ),
         );
       },
     ),
     GoRoute(
       path: '/progress/story-board',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final extra = state.extra;
-        return StoryProgressBoardScreen(
-          scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: StoryProgressBoardScreen(
+            scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+          ),
         );
       },
     ),

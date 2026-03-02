@@ -8,18 +8,13 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
-import '../providers/sentence_provider.dart';
-import '../providers/conversation_practice_provider.dart';
 import '../providers/user_plan_provider.dart';
-import '../providers/last_study_resume_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
 import '../providers/onboarding_provider.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../providers/home_primary_cta_provider.dart';
-import '../providers/resume_card_tap_context_provider.dart';
-import '../widgets/scenario_background.dart';
 import '../widgets/dashboard_sections/anonymous_data_save_banner.dart';
 import '../widgets/dashboard_sections/anonymous_lp_banner.dart';
 import '../widgets/dashboard_sections/coach_banner.dart';
@@ -28,6 +23,7 @@ import '../widgets/dashboard_sections/daily_report_card.dart';
 import '../widgets/dashboard_sections/onboarding_banner.dart';
 import '../widgets/marquee/header_marquee_rail.dart';
 import '../widgets/dashboard_sections/todays_mission_card.dart';
+import '../widgets/dashboard_sections/quick_action_fab.dart';
 
 /// Dashboard（Home タブ）
 /// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
@@ -56,6 +52,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       drawer: const _SettingsDrawer(),
+      floatingActionButton: const QuickActionFab(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: Column(
           children: [
@@ -82,18 +80,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       const TodaysMissionCard(),
                       const SizedBox(height: 6),
                     ],
-                    SizedBox(
-                      height: 100,
-                      child: const _ResumeLearningCard(),
-                    ),
-                    const SizedBox(height: 6),
                     const DailyReportCard(),
                     const SizedBox(height: 6),
-                    const _ConversationPracticeGoalCard(),
-                    const SizedBox(height: 6),
                     const _OnboardingHandoffBanner(),
-                    const SizedBox(height: 4),
-                    const _RecommendedCard(),
                     const SizedBox(height: 8),
                     _SectionLabel(label: 'その他の機能'),
                     const SizedBox(height: 4),
@@ -108,7 +97,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       const ConsultantNotificationBanner(),
                       const SizedBox(height: 6),
                     ],
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 88),
                   ],
                 ),
               ),
@@ -210,207 +199,6 @@ class _DashboardHeader extends ConsumerWidget {
   }
 }
 
-class _ConversationPracticeGoalCard extends ConsumerWidget {
-  const _ConversationPracticeGoalCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final turnsAsync = ref.watch(todayConversationTurnsProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final achieved = turnsAsync.valueOrNull != null &&
-        turnsAsync.valueOrNull! >= dailyConversationGoalTurns;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          if (achieved) {
-            context.push('/progress');
-          } else {
-            context.push('/conversations');
-          }
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.smart_toy,
-                size: 28,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '今日の会話目標',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    turnsAsync.when(
-                      data: (turns) {
-                        final remaining = (dailyConversationGoalTurns - turns).clamp(0, dailyConversationGoalTurns);
-                        final isAchieved = turns >= dailyConversationGoalTurns;
-                        final text = isAchieved
-                            ? '目標達成！タップで進捗を確認'
-                            : 'あと$remainingターンで目標達成（$turns / $dailyConversationGoalTurns）';
-                        final sub = isAchieved
-                            ? null
-                            : 'タップして会話学習を始める';
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              text,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurface.withOpacity(0.8),
-                              ),
-                            ),
-                            if (sub != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                sub,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.primary.withOpacity(0.9),
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                      loading: () => Text(
-                        'AIと会話して英語を練習',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface.withOpacity(0.8),
-                        ),
-                      ),
-                      error: (_, __) => Text(
-                        'AIと会話して英語を練習',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface.withOpacity(0.8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: colorScheme.primary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendedCard extends ConsumerWidget {
-  const _RecommendedCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recommendedAsync = ref.watch(recommendedSentenceProvider);
-    return recommendedAsync.when(
-      data: (sentence) {
-        if (sentence == null) return const SizedBox.shrink();
-        final preview = sentence.englishText.length > 30
-            ? '${sentence.englishText.substring(0, 30)}...'
-            : sentence.englishText;
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('recommended_card');
-              context.push('/study?sentenceId=${sentence.id}');
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                boxShadow: Theme.of(context).brightness == Brightness.dark
-                    ? null
-                    : EngrowthShadows.softCard,
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lightbulb_outline, size: 20, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '次に学習: $preview',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('recommended_card');
-                      context.push('/study?sentenceId=${sentence.id}');
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      '学習を始める',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-}
-
 class _OnboardingHandoffBanner extends ConsumerStatefulWidget {
   const _OnboardingHandoffBanner();
 
@@ -450,7 +238,7 @@ class _OnboardingHandoffBannerState extends ConsumerState<_OnboardingHandoffBann
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '次は下の「続きから再開」をタップして学習を始めよう',
+                '右下の＋ボタンをタップして学習を始めよう',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -462,151 +250,6 @@ class _OnboardingHandoffBannerState extends ConsumerState<_OnboardingHandoffBann
         ),
       ),
     );
-  }
-}
-
-class _ResumeLearningCard extends ConsumerWidget {
-  const _ResumeLearningCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final resumeState = ref.watch(lastStudyResumeProvider);
-    final recommendedAsync = ref.watch(recommendedSentenceProvider);
-    final hasResume = resumeState.sentenceId != null;
-    final handoffPending = ref.watch(onboardingHandoffPendingProvider);
-
-    return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            HapticFeedback.selectionClick();
-            ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('resume_card');
-            if (handoffPending) {
-              ref.read(analyticsServiceProvider).logOnboardingHomeHandoffTapped(
-                    target: 'resume_card',
-                  );
-              ref.read(onboardingHandoffPendingProvider.notifier).state = false;
-            }
-            // B16: 未ロード時は待ってから判定し、誤判定を抑制
-            var effectiveResumeState = resumeState;
-            if (!resumeState.isLoaded) {
-              await ref.read(lastStudyResumeProvider.notifier).ensureLoaded();
-              effectiveResumeState = ref.read(lastStudyResumeProvider);
-              if (effectiveResumeState.sentenceId != null) {
-                ref.read(analyticsServiceProvider).logResumeCardTap(
-                      source: 'resume',
-                    );
-                ref.read(analyticsServiceProvider).logResumeResolution(
-                      resolution: 'resume',
-                    );
-                ref.read(resumeCardTapContextProvider.notifier).record('resume_card');
-                context.push(
-                  '/study?sentenceId=${effectiveResumeState.sentenceId}&entrySource=resume_card',
-                );
-                return;
-              }
-            }
-            final sentence = recommendedAsync.valueOrNull;
-            final effectiveHasResume = effectiveResumeState.sentenceId != null;
-            final resolution = effectiveHasResume
-                ? 'resume'
-                : (sentence != null ? 'recommended_fallback' : 'plain_fallback');
-            final entrySource = effectiveHasResume
-                ? 'resume_card'
-                : (sentence != null ? 'recommended_fallback' : 'plain_fallback');
-            ref.read(analyticsServiceProvider).logResumeCardTap(
-                  source: effectiveHasResume ? 'resume' : 'recommended',
-                );
-            ref.read(analyticsServiceProvider).logResumeResolution(
-                  resolution: resolution,
-                );
-            ref.read(resumeCardTapContextProvider.notifier).record(entrySource);
-            final uri = Uri.parse('/study').replace(
-              queryParameters: {
-                if (effectiveHasResume) 'sentenceId': effectiveResumeState.sentenceId!,
-                if (!effectiveHasResume && sentence != null) 'sentenceId': sentence.id,
-                'entrySource': entrySource,
-              },
-            );
-            context.push(uri.toString());
-          },
-          borderRadius: BorderRadius.circular(16),
-          splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-          highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: Theme.of(context).brightness == Brightness.dark
-                  ? null
-                  : EngrowthShadows.softCard,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    kScenarioBgAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: Theme.of(context).colorScheme.surface),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.5),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            !resumeState.isLoaded
-                                ? '読み込み中...'
-                                : hasResume
-                                    ? '続きから再開'
-                                    : '前回の学習を再開',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            !resumeState.isLoaded
-                                ? '少々お待ちください'
-                                : hasResume
-                                    ? '1タップで続きから'
-                                    : recommendedAsync.valueOrNull != null
-                                        ? '1タップで学習開始'
-                                        : 'タップして始めよう',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
   }
 }
 

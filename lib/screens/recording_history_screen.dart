@@ -166,6 +166,14 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
     final userId = ref.watch(currentUserIdProvider);
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            context.pop();
+          },
+          tooltip: '戻る',
+        ),
         title: const Text('マイ録音履歴'),
         actions: [
           if (userId != null)

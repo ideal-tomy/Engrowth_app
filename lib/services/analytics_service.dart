@@ -53,6 +53,15 @@ class AnalyticsService {
         eventProperties: {'resolution': resolution},
       );
 
+  // ホーム QuickActionFAB 導線KPI
+  void logHomeQuickFabOpened() =>
+      logEvent(eventType: 'home_quick_fab_opened');
+  void logHomeQuickActionTapped({required String actionType}) =>
+      logEvent(
+        eventType: 'home_quick_action_tapped',
+        eventProperties: {'action_type': actionType},
+      );
+
   // B16: 学習初回コンテンツ表示（tap_to_first_content_ms で体感遅延を計測）
   void logStudyFirstContentRendered({
     String? entrySource,
