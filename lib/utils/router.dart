@@ -32,6 +32,9 @@ import '../screens/favorites_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/review_list_screen.dart';
 import '../screens/onboarding_flow_screen.dart';
+import '../screens/tutorial_conversation_screen.dart';
+import '../screens/help_screen.dart';
+import '../screens/concept_screen.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/marquee/bottom_recommendation_rail.dart';
 
@@ -200,6 +203,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/onboarding',
       builder: (context, state) => const OnboardingFlowScreen(),
+    ),
+    GoRoute(
+      path: '/tutorial-conversation',
+      builder: (context, state) => const TutorialConversationScreen(),
+    ),
+    GoRoute(
+      path: '/help',
+      builder: (context, state) => const HelpScreen(),
+    ),
+    GoRoute(
+      path: '/concept',
+      builder: (context, state) => const ConceptScreen(),
     ),
     GoRoute(
       path: '/recordings',

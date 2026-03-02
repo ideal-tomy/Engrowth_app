@@ -169,18 +169,15 @@ class _BottomRecommendationRailBodyState
               final bg =
                   MarqueeCategoryColors.tabBackground(item.category, isDark);
 
-              return Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ref.read(marqueeRailTapProvider.notifier).onTap(item);
-                    if (item.route != null) {
-                      context.push(item.route!);
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
+              return _BottomMarqueeChipWithScale(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  ref.read(marqueeRailTapProvider.notifier).onTap(item);
+                  if (item.route != null) {
+                    context.push(item.route!);
+                  }
+                },
+                child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: _chipPaddingH),
                     constraints: const BoxConstraints(minWidth: 72, maxWidth: 130),
                     alignment: Alignment.center,
@@ -203,12 +200,48 @@ class _BottomRecommendationRailBodyState
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-              );
+                );
             },
           ),
         );
       },
+    );
+  }
+}
+
+/// 押下時にスケール（凹む）効果を付与するチップ
+class _BottomMarqueeChipWithScale extends StatefulWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _BottomMarqueeChipWithScale({
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  State<_BottomMarqueeChipWithScale> createState() =>
+      _BottomMarqueeChipWithScaleState();
+}
+
+class _BottomMarqueeChipWithScaleState
+    extends State<_BottomMarqueeChipWithScale> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+        child: widget.child,
+      ),
     );
   }
 }

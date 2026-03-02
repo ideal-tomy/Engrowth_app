@@ -46,6 +46,12 @@ ERROR: 42P01: relation "analytics_events" does not exist
 2. `supabase/migrations/database_notifications.sql` の内容をコピー＆ペースト
 3. **Run** で実行
 
+### ステップ4: チュートリアルテーブルを作成（未作成の場合）
+1. **New query**
+2. `supabase/migrations/database_tutorial_tables.sql` の内容をコピー＆ペースト
+3. **Run** で実行
+4. 続けて `supabase/migrations/seed_tutorial_greeting.sql` を実行してシード投入
+
 ---
 
 ## 3. 各マイグレーションの役割
@@ -59,6 +65,8 @@ ERROR: 42P01: relation "analytics_events" does not exist
 | `database_user_favorites_add_pattern.sql` | お気に入りに `pattern` タイプ追加（パターンスプリント用） |
 | `database_sentences_phrase_title_category.sql` | sentences に phrase_title / category_label_ja 追加（センテンス一覧用） |
 | `database_sentences_backfill_phrase_category.sql` | 既存 sentences の phrase_title / category_label_ja を初期バックフィル（上記の直後に実行） |
+| `database_tutorial_tables.sql` | チュートリアル専用テーブル（tutorials, tutorial_steps, tutorial_step_responses） |
+| `seed_tutorial_greeting.sql` | 初回挨拶チュートリアルのシード（上記の直後に実行） |
 
 ---
 

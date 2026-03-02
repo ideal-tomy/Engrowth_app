@@ -189,40 +189,71 @@ class _HeaderMarqueeRailBodyState extends State<_HeaderMarqueeRailBody>
     final bg = MarqueeCategoryColors.tabBackground(item.category, isDark);
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          ref.read(marqueeRailTapProvider.notifier).onTap(item);
-          if (item.route != null) {
-            context.push(item.route!);
-          }
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: _chipPaddingH),
-          constraints: const BoxConstraints(minWidth: 80, maxWidth: 140),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.4),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            item.label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    return _MarqueeChipWithScale(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        ref.read(marqueeRailTapProvider.notifier).onTap(item);
+        if (item.route != null) {
+          context.push(item.route!);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: _chipPaddingH),
+        constraints: const BoxConstraints(minWidth: 80, maxWidth: 140),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withOpacity(0.4),
+            width: 1,
           ),
         ),
+        child: Text(
+          item.label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+}
+
+/// 押下時にスケール（凹む）効果を付与するチップ
+class _MarqueeChipWithScale extends StatefulWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _MarqueeChipWithScale({
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  State<_MarqueeChipWithScale> createState() => _MarqueeChipWithScaleState();
+}
+
+class _MarqueeChipWithScaleState extends State<_MarqueeChipWithScale> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+        child: widget.child,
       ),
     );
   }

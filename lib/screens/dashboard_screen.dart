@@ -69,8 +69,6 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                     const DailyReportCard(),
                     const SizedBox(height: 6),
-                    const _QuickStartCtaBar(),
-                    const SizedBox(height: 6),
                     const _ConversationPracticeGoalCard(),
                     const SizedBox(height: 6),
                     SizedBox(
@@ -186,109 +184,6 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickStartCtaBar extends ConsumerWidget {
-  const _QuickStartCtaBar();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickStartButton(
-            label: '30秒',
-            sublabel: '隙間時間',
-            icon: Icons.timer,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.push('/scenario-learning');
-            },
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _QuickStartButton(
-            label: '3分',
-            sublabel: '英会話',
-            icon: Icons.auto_stories,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(analyticsServiceProvider).logSessionStart(sessionMode: 'focus3');
-              context.push('/story-training');
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickStartButton extends StatelessWidget {
-  final String label;
-  final String sublabel;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _QuickStartButton({
-    required this.label,
-    required this.sublabel,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-            boxShadow: Theme.of(context).brightness == Brightness.dark
-                ? null
-                : EngrowthShadows.softCard,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 8),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    sublabel,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ),
@@ -574,7 +469,11 @@ class _ResumeLearningCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            hasResume ? '1タップで続きから' : '1タップで学習開始',
+                            hasResume
+                                ? '1タップで続きから'
+                                : recommendedAsync.valueOrNull != null
+                                    ? '1タップで学習開始'
+                                    : 'ここに成長が記録されます。タップして始めよう',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.9),
@@ -759,15 +658,6 @@ class _SettingsDrawer extends ConsumerWidget {
             ),
             if (kDebugMode) ...[
               SwitchListTile(
-                secondary: const Icon(Icons.view_carousel_outlined),
-                title: const Text('Marquee導線'),
-                subtitle: const Text('ヘッダー・フッターの流れるタブを表示'),
-                value: ref.watch(enableMarqueeRailProvider),
-                onChanged: (_) {
-                  ref.read(enableMarqueeRailProvider.notifier).toggle();
-                },
-              ),
-              SwitchListTile(
                 secondary: const Icon(Icons.bug_report_outlined),
                 title: const Text('開発: ログイン済み画面'),
                 subtitle: const Text('匿名のままログイン後UIを表示'),
@@ -847,6 +737,22 @@ class _SettingsDrawer extends ConsumerWidget {
               onTap: () {
                 Navigator.pop(context);
                 context.push('/playback-speed-settings');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: const Text('使い方'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/help');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_stories_outlined),
+              title: const Text('Engrowthが選ばれる理由'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/concept');
               },
             ),
             if (isSignedIn)

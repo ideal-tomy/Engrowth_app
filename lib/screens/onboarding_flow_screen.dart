@@ -21,7 +21,7 @@ class OnboardingFlowScreen extends ConsumerStatefulWidget {
 class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  static const int _totalSteps = 6;
+  static const int _totalSteps = 7;
 
   @override
   void initState() {
@@ -52,6 +52,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   String _stepId(int index) {
     const ids = [
       'welcome',
+      'greeting_experience',
       'quick30',
       'pattern_sprint',
       'focus3',
@@ -134,6 +135,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 children: [
                   _buildWelcomeStep(),
+                  _buildGreetingExperienceStep(),
                   _buildQuick30Step(),
                   _buildPatternSprintStep(),
                   _buildFocus3Step(),
@@ -193,6 +195,55 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
               ),
               child: const Text('はじめる'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGreetingExperienceStep() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.waving_hand, size: 64, color: colorScheme.primary),
+          const SizedBox(height: 20),
+          Text(
+            '挨拶体験',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'AIが英語で話しかけます。\nマイクで返事をすると、返答が返ってきます。\n聞いて→話して→返答を体験しましょう。',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => _tryStepAndAdvance('/tutorial-conversation'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('体験する'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: _goToNext,
+            child: const Text('あとで体験する'),
           ),
         ],
       ),

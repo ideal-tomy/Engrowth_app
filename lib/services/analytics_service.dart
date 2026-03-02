@@ -150,6 +150,35 @@ class AnalyticsService {
   void logDailyReportCardShown({String? status}) =>
       logEvent(eventType: 'daily_report_card_shown', eventProperties: {'status': status});
 
+  // チュートリアル会話KPI（事前生成体験）
+  void logTutorialStarted() => logEvent(eventType: 'tutorial_started');
+  void logTutorialStepStarted({required String stepId, required int stepOrder}) =>
+      logEvent(
+        eventType: 'tutorial_step_started',
+        eventProperties: {'step_id': stepId, 'step_order': stepOrder},
+      );
+  void logTutorialStepCompleted({
+    required String stepId,
+    required String intent,
+    bool? usedFallback,
+  }) =>
+      logEvent(
+        eventType: 'tutorial_step_completed',
+        eventProperties: {
+          'step_id': stepId,
+          'intent': intent,
+          if (usedFallback != null) 'used_fallback': usedFallback,
+        },
+      );
+  void logTutorialFallbackUsed({required String stepId, String? sttText}) =>
+      logEvent(
+        eventType: 'tutorial_fallback_used',
+        eventProperties: {'step_id': stepId, if (sttText != null) 'stt_text': sttText},
+      );
+  void logTutorialCompleted() => logEvent(eventType: 'tutorial_completed');
+  void logTutorialSkipped({String? atStepId}) =>
+      logEvent(eventType: 'tutorial_skipped', eventProperties: {'at_step_id': atStepId});
+
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
   void logTtsPlaybackSession({
     required String conversationId,
