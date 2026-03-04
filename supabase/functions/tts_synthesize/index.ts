@@ -19,6 +19,7 @@ interface ReqBody {
   speakingRate?: number;
   speed?: number; // alias for speakingRate (prefill 等の互換用)
   voice?: string;
+  tts_session_id?: string; // クライアントログとの相関用
 }
 
 function errResponse(code: string, message: string, status: number): Response {
@@ -133,9 +134,11 @@ async function handleRequest(req: Request): Promise<Response> {
   const key = cacheKey(text, language, voice, speakingRate, MODEL);
   const keyHash = await sha256Hex(key);
   const storagePath = `${keyHash}.mp3`;
+  const ttsSessionId = typeof body.tts_session_id === "string" ? body.tts_session_id : undefined;
 
   const client = createClient(supabaseUrl, supabaseServiceKey);
 
+  const dbQueryStart = Date.now();
   // 1. キャッシュ参照
   const { data: asset } = await client
     .from("tts_assets")
@@ -143,14 +146,17 @@ async function handleRequest(req: Request): Promise<Response> {
     .eq("cache_key", keyHash)
     .maybeSingle();
 
+  const dbQueryMs = Date.now() - dbQueryStart;
+
   if (asset?.storage_path) {
     await client
       .from("tts_assets")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", asset.id);
 
-    // Public URL: createSignedUrl の往復を省略し即時返却（爆速化）
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${storagePath}`;
+    // Public URL: asset.storage_path を優先（過去データの不整合を避ける）
+    const pathToUse = asset.storage_path;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${pathToUse}`;
 
     console.log(
       JSON.stringify({
@@ -159,6 +165,8 @@ async function handleRequest(req: Request): Promise<Response> {
         voice,
         speed: speakingRate,
         text_length: text.length,
+        db_query_ms: dbQueryMs,
+        tts_session_id: ttsSessionId,
       })
     );
 
@@ -178,6 +186,7 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 
   // 2. ミス: OpenAI 合成
+  const openAiStart = Date.now();
   const openAiBody = {
     model: MODEL,
     input: text,
@@ -220,6 +229,7 @@ async function handleRequest(req: Request): Promise<Response> {
     }
     return errResponse("upstream_error", msg, 502);
   }
+  const openAiMs = Date.now() - openAiStart;
 
   // 3. Storage 保存
   const { error: uploadErr } = await client.storage
@@ -263,6 +273,9 @@ async function handleRequest(req: Request): Promise<Response> {
       voice,
       speed: speakingRate,
       text_length: text.length,
+      db_query_ms: dbQueryMs,
+      openai_ms: openAiMs,
+      tts_session_id: ttsSessionId,
     })
   );
 

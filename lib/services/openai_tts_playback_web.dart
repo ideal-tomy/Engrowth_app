@@ -3,9 +3,11 @@
 import 'dart:html' as html;
 
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+
+import 'analytics_service.dart';
+import 'tts_playback_blocked_exception.dart';
 
 html.AudioElement? _current;
 String? _currentUrl;
@@ -20,13 +22,50 @@ String _audioErrorDetail(html.Event e) {
   return 'type=${e.type}';
 }
 
+/// 再生エラー種別を分類（観測用）
+String _classifyPlayError(dynamic e) {
+  final msg = e.toString().toLowerCase();
+  if (msg.contains('notallowed') || msg.contains('not allowed')) {
+    return 'not_allowed';
+  }
+  if (msg.contains('decode') || msg.contains('mediasource')) {
+    return 'decode';
+  }
+  if (msg.contains('network') || msg.contains('fetch') || msg.contains('failed to load')) {
+    return 'network';
+  }
+  return 'other';
+}
+
+/// MediaError の code を分類
+String _classifyMediaError(int code) {
+  switch (code) {
+    case 2:
+      return 'network';
+    case 3:
+      return 'decode';
+    case 4:
+      return 'decode';
+    default:
+      return 'other';
+  }
+}
+
 /// URL から再生（キャッシュヒット時など）
-Future<void> playFromUrl(String url) async {
+Future<void> playFromUrl(String url, {String? ttsSessionId}) async {
   stop();
   _currentUrl = url;
   _current = html.AudioElement()..src = url;
 
   final completer = Completer<void>();
+
+  void logAndCompleteError(String errorType, [String? urlHost]) {
+    AnalyticsService().logTtsWebPlayError(
+      errorType: errorType,
+      ttsSessionId: ttsSessionId,
+      urlHost: urlHost ?? (url.startsWith('http') ? Uri.tryParse(url)?.host : null),
+    );
+  }
 
   _current!.onEnded.listen((_) {
     _currentUrl = null;
@@ -45,13 +84,18 @@ Future<void> playFromUrl(String url) async {
       if (!completer.isCompleted) completer.complete();
       return;
     }
+    final el = target is html.AudioElement ? target : null;
+    final errorType = el?.error != null
+        ? _classifyMediaError(el!.error!.code)
+        : 'other';
+    logAndCompleteError(errorType, Uri.tryParse(url)?.host);
     if (kDebugMode) {
       debugPrint('OpenAI TTS (Web) playback error: $detail');
     }
-    final el = _current;
-    if (el != null) {
-      el.pause();
-      el.src = '';
+    final currentEl = _current;
+    if (currentEl != null) {
+      currentEl.pause();
+      currentEl.src = '';
     }
     _currentUrl = null;
     _current = null;
@@ -64,9 +108,10 @@ Future<void> playFromUrl(String url) async {
   try {
     await _current!.play();
   } catch (e) {
-    final msg = e.toString().toLowerCase();
+    final errorType = _classifyPlayError(e);
+    logAndCompleteError(errorType, Uri.tryParse(url)?.host);
     if (kDebugMode) {
-      if (msg.contains('notallowed') || msg.contains('not allowed')) {
+      if (errorType == 'not_allowed') {
         debugPrint(
           'OpenAI TTS (Web): 再生がブロックされました（ブラウザのオートプレイ制限）。'
           '再生ボタンをタップした直後のみ再生可能です。',
@@ -76,12 +121,15 @@ Future<void> playFromUrl(String url) async {
     }
     _currentUrl = null;
     _current = null;
+    if (errorType == 'not_allowed') {
+      throw TtsPlaybackBlockedException('not_allowed');
+    }
     throw Exception('Audio playback error: $e');
   }
   await completer.future.timeout(const Duration(seconds: 60));
 }
 
-Future<void> playBytes(List<int> bytes) async {
+Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
   stop();
   final blob = html.Blob([Uint8List.fromList(bytes)], 'audio/mpeg');
   final url = html.Url.createObjectUrlFromBlob(blob);
@@ -89,6 +137,13 @@ Future<void> playBytes(List<int> bytes) async {
   _current = html.AudioElement()..src = url;
 
   final completer = Completer<void>();
+
+  void logAndCompleteErrorBytes(String errorType) {
+    AnalyticsService().logTtsWebPlayError(
+      errorType: errorType,
+      ttsSessionId: ttsSessionId,
+    );
+  }
 
   _current!.onEnded.listen((_) {
     _revoke();
@@ -104,13 +159,18 @@ Future<void> playBytes(List<int> bytes) async {
       if (!completer.isCompleted) completer.complete();
       return;
     }
+    final el = target is html.AudioElement ? target : null;
+    final errorType = el?.error != null
+        ? _classifyMediaError(el!.error!.code)
+        : 'other';
+    logAndCompleteErrorBytes(errorType);
     if (kDebugMode) {
       debugPrint('OpenAI TTS (Web) playback error: $detail');
     }
-    final el = _current;
-    if (el != null) {
-      el.pause();
-      el.src = '';
+    final currentEl = _current;
+    if (currentEl != null) {
+      currentEl.pause();
+      currentEl.src = '';
     }
     _revoke();
     if (!completer.isCompleted) {
@@ -122,9 +182,10 @@ Future<void> playBytes(List<int> bytes) async {
   try {
     await _current!.play();
   } catch (e) {
-    final msg = e.toString().toLowerCase();
+    final errorType = _classifyPlayError(e);
+    logAndCompleteErrorBytes(errorType);
     if (kDebugMode) {
-      if (msg.contains('notallowed') || msg.contains('not allowed')) {
+      if (errorType == 'not_allowed') {
         debugPrint(
           'OpenAI TTS (Web): 再生がブロックされました（ブラウザのオートプレイ制限）。'
           '再生ボタンをタップした直後のみ再生可能です。',
@@ -133,6 +194,9 @@ Future<void> playBytes(List<int> bytes) async {
       debugPrint('OpenAI TTS (Web) play() error: $e');
     }
     _revoke();
+    if (errorType == 'not_allowed') {
+      throw TtsPlaybackBlockedException('not_allowed');
+    }
     throw Exception('Audio playback error: $e');
   }
   await completer.future.timeout(const Duration(seconds: 30));

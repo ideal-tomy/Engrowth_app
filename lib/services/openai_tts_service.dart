@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,7 +16,8 @@ import 'tts_cache_key_util.dart';
 class OpenAiTtsService {
   static const _functionName = 'tts_synthesize';
   static const _timeout = Duration(seconds: 30);
-  static const _dbTimeout = Duration(milliseconds: 250);
+  /// デプロイWebのネットワーク遅延を考慮し、250ms→800msに拡張（毎回Edge化を抑制）
+  static const _dbTimeout = Duration(milliseconds: 800);
   static const _bucket = 'tts-audio';
 
   /// Supabase が初期化済みか（Edge Function 利用可能か）
@@ -29,20 +29,29 @@ class OpenAiTtsService {
     }
   }
 
-  Future<void> _playBytes(List<int> bytes) async {
-    await playback.playBytes(bytes);
+  Future<void> _playBytes(List<int> bytes, {String? ttsSessionId}) async {
+    await playback.playBytes(bytes, ttsSessionId: ttsSessionId);
   }
 
-  /// DB から storage_path を取得し Public URL を構築（ヒット時のみ）
-  /// タイムアウト・未ヒット時は null
-  Future<String?> _tryFetchUrlFromDb({
+  /// DB lookup 結果（観測用）
+  static const String _dbHit = 'hit';
+  static const String _dbMiss = 'miss';
+  static const String _dbResultTimeout = 'timeout';
+  static const String _dbError = 'error';
+
+  /// DB から storage_path を取得し Public URL を構築
+  /// 戻り値: (url, dbResult, dbElapsedMs, errorCode)
+  Future<({String? url, String dbResult, int dbElapsedMs, String? errorCode})>
+      _tryFetchUrlFromDb({
     required String text,
     String language = 'en-US',
     required String voice,
     double speakingRate = 1.0,
   }) async {
     final normalized = normalizeTextForCache(text);
-    if (normalized.isEmpty) return null;
+    if (normalized.isEmpty) {
+      return (url: null, dbResult: _dbMiss, dbElapsedMs: 0, errorCode: null);
+    }
 
     final keyStr = buildTtsCacheKey(
       text: normalized,
@@ -51,6 +60,7 @@ class OpenAiTtsService {
       speed: speakingRate,
     );
     final keyHash = sha256Hex(keyStr);
+    final stopwatch = Stopwatch()..start();
 
     try {
       final client = Supabase.instance.client;
@@ -59,17 +69,41 @@ class OpenAiTtsService {
           .select('storage_path')
           .eq('cache_key', keyHash)
           .maybeSingle()
-          .timeout(_dbTimeout, onTimeout: () => null);
+          .timeout(_dbTimeout, onTimeout: () {
+        throw TimeoutException('TTS DB lookup timeout');
+      });
 
-      if (response == null) return null;
+      stopwatch.stop();
+      final elapsed = stopwatch.elapsedMilliseconds;
+
       final row = response is Map<String, dynamic> ? response : null;
       final path = row?['storage_path'] as String?;
-      if (path == null || path.isEmpty) return null;
+      if (path == null || path.isEmpty) {
+        return (url: null, dbResult: _dbMiss, dbElapsedMs: elapsed, errorCode: null);
+      }
 
       final baseUrl = EnvConfig.supabaseUrl.replaceAll(RegExp(r'/$'), '');
-      return '$baseUrl/storage/v1/object/public/$_bucket/$path';
-    } catch (_) {
-      return null;
+      final url = '$baseUrl/storage/v1/object/public/$_bucket/$path';
+      return (url: url, dbResult: _dbHit, dbElapsedMs: elapsed, errorCode: null);
+    } on TimeoutException {
+      stopwatch.stop();
+      return (
+        url: null,
+        dbResult: _dbResultTimeout,
+        dbElapsedMs: stopwatch.elapsedMilliseconds,
+        errorCode: 'timeout',
+      );
+    } catch (e, st) {
+      stopwatch.stop();
+      if (kDebugMode) debugPrint('OpenAI TTS DB lookup error: $e\n$st');
+      return (
+        url: null,
+        dbResult: _dbError,
+        dbElapsedMs: stopwatch.elapsedMilliseconds,
+        errorCode: e.toString().replaceAll(RegExp(r'\s+'), ' ').length > 200
+            ? '${e.toString().substring(0, 200)}...'
+            : e.toString(),
+      );
     }
   }
 
@@ -131,13 +165,13 @@ class OpenAiTtsService {
     final stopwatch = Stopwatch()..start();
 
     // 1. DB 直参照を優先（Cold Start 回避）
-    final dbUrl = await _tryFetchUrlFromDb(
+    final dbResult = await _tryFetchUrlFromDb(
       text: text,
       language: language,
       voice: voice,
       speakingRate: speakingRate,
     );
-    if (dbUrl != null && dbUrl.isNotEmpty) {
+    if (dbResult.url != null && dbResult.url!.isNotEmpty) {
       stopwatch.stop();
       final latencyMs = stopwatch.elapsedMilliseconds;
       AnalyticsService().logTtsRequest(
@@ -145,19 +179,24 @@ class OpenAiTtsService {
         cacheHit: true,
         sessionId: ttsSessionId,
         source: 'direct_db',
+        pathTaken: 'direct_db',
+        dbResult: dbResult.dbResult,
+        dbElapsedMs: dbResult.dbElapsedMs,
       );
       onTtsRequestComplete?.call(latencyMs, true);
-      await playback.playFromUrl(dbUrl);
+      await playback.playFromUrl(dbResult.url!, ttsSessionId: ttsSessionId);
       return;
     }
 
     // 2. ミス/タイムアウト: Edge Function にフォールバック
-    final body = {
+    final edgeStopwatch = Stopwatch()..start();
+    final body = <String, dynamic>{
       'text': text,
       'language': language,
       'speakingRate': speakingRate.clamp(0.25, 4.0),
       'voice': voice,
     };
+    if (ttsSessionId != null) body['tts_session_id'] = ttsSessionId;
 
     final client = Supabase.instance.client;
     final response = await client.functions
@@ -169,8 +208,23 @@ class OpenAiTtsService {
       throw TimeoutException('TTS synthesis timeout');
     });
 
+    edgeStopwatch.stop();
+    final edgeElapsedMs = edgeStopwatch.elapsedMilliseconds;
+
     final data = response.data;
     if (data == null) {
+      stopwatch.stop();
+      AnalyticsService().logTtsRequest(
+        latencyMs: stopwatch.elapsedMilliseconds,
+        cacheHit: false,
+        sessionId: ttsSessionId,
+        source: 'edge',
+        pathTaken: 'edge',
+        dbResult: dbResult.dbResult,
+        dbElapsedMs: dbResult.dbElapsedMs,
+        edgeElapsedMs: edgeElapsedMs,
+        errorCode: 'empty_response',
+      );
       throw Exception('Empty TTS response');
     }
 
@@ -186,9 +240,13 @@ class OpenAiTtsService {
           cacheHit: cacheHit,
           sessionId: ttsSessionId,
           source: 'edge',
+          pathTaken: 'edge',
+          dbResult: dbResult.dbResult,
+          dbElapsedMs: dbResult.dbElapsedMs,
+          edgeElapsedMs: edgeElapsedMs,
         );
         onTtsRequestComplete?.call(latencyMs, cacheHit);
-        await playback.playFromUrl(url);
+        await playback.playFromUrl(url, ttsSessionId: ttsSessionId);
         return;
       }
     }
@@ -199,9 +257,15 @@ class OpenAiTtsService {
       AnalyticsService().logTtsRequest(
         latencyMs: stopwatch.elapsedMilliseconds,
         cacheHit: false,
+        sessionId: ttsSessionId,
+        source: 'edge',
+        pathTaken: 'edge',
+        dbResult: dbResult.dbResult,
+        dbElapsedMs: dbResult.dbElapsedMs,
+        edgeElapsedMs: edgeElapsedMs,
       );
       final bytes = data is Uint8List ? data : Uint8List.fromList(data as List<int>);
-      await _playBytes(bytes);
+      await _playBytes(bytes, ttsSessionId: ttsSessionId);
       return;
     }
 
@@ -221,13 +285,13 @@ class OpenAiTtsService {
     if (text.trim().isEmpty) return null;
     if (text.length > 4096) return null;
 
-    final dbUrl = await _tryFetchUrlFromDb(
+    final dbResult = await _tryFetchUrlFromDb(
       text: text,
       language: language,
       voice: voice,
       speakingRate: speakingRate,
     );
-    if (dbUrl != null && dbUrl.isNotEmpty) return dbUrl;
+    if (dbResult.url != null && dbResult.url!.isNotEmpty) return dbResult.url;
 
     final body = {
       'text': text,

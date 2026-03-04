@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/tts_playback_blocked_exception.dart';
 import '../services/tts_service.dart';
 import '../services/recording_service.dart';
 import '../services/voice_submission_service.dart';
@@ -108,8 +109,13 @@ class _AudioControlsState extends ConsumerState<AudioControls> {
       return;
     }
     setState(() => _isPlaying = true);
-    await _ttsService.speakEnglish(widget.englishText, role: widget.speakerRole);
-    if (mounted) setState(() => _isPlaying = false);
+    try {
+      await _ttsService.speakEnglish(widget.englishText, role: widget.speakerRole);
+    } on TtsPlaybackBlockedException {
+      // SnackBar は TtsService.onWebPlaybackBlocked で表示済み
+    } finally {
+      if (mounted) setState(() => _isPlaying = false);
+    }
   }
 
   Future<void> _playEnglishSlow() async {
@@ -132,8 +138,13 @@ class _AudioControlsState extends ConsumerState<AudioControls> {
       return;
     }
     setState(() => _isPlaying = true);
-    await _ttsService.speakJapanese(widget.japaneseText, role: widget.speakerRole);
-    if (mounted) setState(() => _isPlaying = false);
+    try {
+      await _ttsService.speakJapanese(widget.japaneseText, role: widget.speakerRole);
+    } on TtsPlaybackBlockedException {
+      // SnackBar は TtsService.onWebPlaybackBlocked で表示済み
+    } finally {
+      if (mounted) setState(() => _isPlaying = false);
+    }
   }
 
   Future<void> _checkConsentAndRecord() async {

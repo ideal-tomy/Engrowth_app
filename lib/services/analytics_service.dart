@@ -268,6 +268,11 @@ class AnalyticsService {
     bool? cacheHit,
     String? sessionId,
     String? source,
+    String? pathTaken,
+    String? dbResult,
+    int? dbElapsedMs,
+    int? edgeElapsedMs,
+    String? errorCode,
   }) =>
       logEvent(
         eventType: 'tts_request',
@@ -276,10 +281,45 @@ class AnalyticsService {
           'cache_hit': cacheHit,
           if (sessionId != null) 'tts_session_id': sessionId,
           if (source != null) 'tts_source': source,
+          if (pathTaken != null) 'path_taken': pathTaken,
+          if (dbResult != null) 'db_result': dbResult,
+          if (dbElapsedMs != null) 'db_elapsed_ms': dbElapsedMs,
+          if (edgeElapsedMs != null) 'edge_elapsed_ms': edgeElapsedMs,
+          if (errorCode != null) 'error_code': errorCode,
         },
       );
-  void logTtsFallback({String? reason}) =>
-      logEvent(eventType: 'tts_fallback', eventProperties: {'reason': reason});
+  void logTtsFallback({
+    String? reason,
+    String? pathTaken,
+    String? screen,
+    bool? wasPrefetched,
+    String? ttsSessionId,
+  }) =>
+      logEvent(
+        eventType: 'tts_fallback',
+        eventProperties: {
+          if (reason != null) 'reason': reason,
+          if (pathTaken != null) 'path_taken': pathTaken,
+          if (screen != null) 'screen': screen,
+          if (wasPrefetched != null) 'was_prefetched': wasPrefetched,
+          if (ttsSessionId != null) 'tts_session_id': ttsSessionId,
+        },
+      );
+  void logTtsWebPlayError({
+    required String errorType,
+    String? ttsSessionId,
+    int? elapsedFromTapMs,
+    String? urlHost,
+  }) =>
+      logEvent(
+        eventType: 'tts_web_play_error',
+        eventProperties: {
+          'error_type': errorType,
+          if (ttsSessionId != null) 'tts_session_id': ttsSessionId,
+          if (elapsedFromTapMs != null) 'elapsed_from_tap_ms': elapsedFromTapMs,
+          if (urlHost != null) 'url_host': urlHost,
+        },
+      );
   void logTtsCancel() => logEvent(eventType: 'tts_cancel');
 
   // 会話ループKPI（AI会話モード）

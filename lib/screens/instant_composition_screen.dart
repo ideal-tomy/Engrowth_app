@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/sentence.dart';
 import '../providers/sentence_provider.dart';
+import '../services/tts_playback_blocked_exception.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
@@ -85,7 +86,11 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
       _phase = _Phase.revealed;
     });
 
-    await _ttsService.speakEnglish(sentences[_currentIndex].englishText);
+    try {
+      await _ttsService.speakEnglish(sentences[_currentIndex].englishText);
+    } on TtsPlaybackBlockedException {
+      setState(() => _answerPlayed = false);
+    }
   }
 
   void _goNext() {

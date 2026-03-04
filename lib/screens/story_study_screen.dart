@@ -5,6 +5,7 @@ import '../models/conversation.dart';
 import '../models/learning_handoff_result.dart';
 import '../models/story_sequence.dart';
 import '../providers/story_provider.dart';
+import '../services/tts_playback_blocked_exception.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/favorite_toggle_icon.dart';
@@ -65,7 +66,11 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 
       final utterance = utterances[i];
       setState(() => _currentUtteranceIndex = i);
-      await _ttsService.speakEnglish(utterance.englishText);
+      try {
+        await _ttsService.speakEnglish(utterance.englishText);
+      } on TtsPlaybackBlockedException {
+        break;
+      }
 
       if (!mounted) break;
       if (_stopPlaybackRequested) break;

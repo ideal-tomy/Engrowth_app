@@ -6,7 +6,7 @@ import 'package:just_audio/just_audio.dart';
 final AudioPlayer _player = AudioPlayer();
 
 /// URL から再生（キャッシュヒット時など）
-Future<void> playFromUrl(String url) async {
+Future<void> playFromUrl(String url, {String? ttsSessionId}) async {
   await _player.stop();
   await _player.setUrl(url);
   await _player.play();
@@ -18,7 +18,7 @@ Future<void> playFromUrl(String url) async {
       .timeout(const Duration(seconds: 60));
 }
 
-Future<void> playBytes(List<int> bytes) async {
+Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
   await _player.stop();
   final uri = Uri.dataFromBytes(bytes, mimeType: 'audio/mpeg');
   await _player.setUrl(uri.toString());

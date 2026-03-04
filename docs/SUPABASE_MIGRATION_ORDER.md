@@ -57,7 +57,15 @@ ERROR: 42P01: relation "analytics_events" does not exist
 3. **Run** で実行
 4. 続けて `supabase/migrations/seed_tutorial_greeting.sql` を実行してシード投入
 
-### ステップ5: 管理者機能（B12-B14）
+### ステップ5: analytics_events（TTS 観測・KPI 用、任意）
+
+TTS_DEBUG_CHECKLIST の SQL や KPI 計測を使う場合のみ:
+
+1. **New query**
+2. `supabase/migrations/database_analytics_events.sql` の内容をコピー＆ペースト
+3. **Run** で実行
+
+### ステップ6: 管理者機能（B12-B14）
 
 **前提テーブル**（未作成の場合は先に実行）:
 - `access_audit_logs`: `database_phase_a_access_audit_logs.sql`
@@ -87,6 +95,7 @@ ERROR: 42P01: relation "analytics_events" does not exist
 | `database_admin_access_audit_action.sql` | access_audit_logs に action_type 追加（B14 監査タブ） |
 | `database_admin_consultant_assignments_policy.sql` | 管理者が consultant_assignments / coach_missions を操作できる RLS（B13, 配信デモ） |
 | `database_client_reports.sql` | B15 クライアント→コンサルタントのアプリ内クイック報告テーブル |
+| `database_analytics_events.sql` | KPI計測用イベントテーブル（TTS 観測・D1/D7継続率等。TTS_DEBUG_CHECKLIST の SQL に必要） |
 
 ---
 

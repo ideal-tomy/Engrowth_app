@@ -30,6 +30,10 @@
 - `docs/SUPABASE_MIGRATION_ORDER.md`
 - `supabase/migrations/MIGRATION_CATALOG.md`
 
+## TTS（音声再生・キャッシュ）
+- `docs/TTS_DEBUG_CHECKLIST.md`（5秒壁・direct_db 低下時の診断、デプロイ前後チェック）
+- `docs/TTS_CACHE_FULL_RUNBOOK.md`（prefill 手順）
+
 ## Archive Rules
 - 旧計画・完了済み検討メモは `docs/archive/` に集約する。
 - ルート `docs/` に残す文書は「現在進行の一次資料」のみ。

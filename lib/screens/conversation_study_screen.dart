@@ -10,6 +10,7 @@ import '../providers/conversation_provider.dart';
 import '../providers/story_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
+import '../services/tts_playback_blocked_exception.dart';
 import '../services/tts_service.dart';
 import '../services/voice_playback_service.dart';
 import '../services/conversation_learning_events_service.dart';
@@ -268,7 +269,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if (!_debounceAdvanceTap()) return;
     _cancelAutoAdvance();
     _clearPrefetch();
-    _ttsService.stop();
+    unawaited(_ttsService.stop());
     if (_currentUtteranceIndex >= utterances.length - 1) {
       _maybeLogRoleCompleted(utterances);
       return;
@@ -286,7 +287,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     _cancelAutoAdvance();
     if (_currentUtteranceIndex <= 0) return;
     _clearPrefetch();
-    _ttsService.stop();
+    unawaited(_ttsService.stop());
     setState(() => _currentUtteranceIndex--);
   }
 
@@ -595,7 +596,11 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         if (mounted) _progressController.value = 1.0;
       });
 
-      await speakFuture;
+      try {
+        await speakFuture;
+      } on TtsPlaybackBlockedException {
+        break;
+      }
 
       if (utterancesPlayedCount == 0 && tapToFirstAudioMs == null) {
         tapToFirstAudioMs = usedPrefetch

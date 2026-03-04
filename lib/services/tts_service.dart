@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../config/tts_voice_config.dart';
 import 'analytics_service.dart';
 import 'openai_tts_service.dart';
+import 'tts_playback_blocked_exception.dart';
 
 /// TTS（Text-to-Speech）サービス
 /// OpenAI TTS（Edge Function 経由）を優先、失敗時はデバイス TTS（flutter_tts）を使用
@@ -19,6 +20,12 @@ class TtsService {
   bool _isInitialized = false;
   bool _isSpeaking = false;
   bool _useOpenAiTts = false;
+  bool _disposed = false;
+  int _speakRequestId = 0;
+
+  /// Web で autoplay ブロック時: 再試行 UI を表示するコールバック（strict_no_overlap 方針）
+  /// 未設定時は例外を再スロー
+  static void Function(void Function() retry)? onWebPlaybackBlocked;
 
   /// 再生速度のデフォルト値を設定（設定画面から呼び出し）
   static void setDefaultSpeechRate(double rate) {
@@ -67,8 +74,12 @@ class TtsService {
     String? ttsSessionId,
     void Function()? onFlutterFallback,
   }) async {
+    if (_disposed) return;
     await initialize();
+    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
+      await stop();
+      final requestId = ++_speakRequestId;
       try {
         _isSpeaking = true;
         if (prefetchedUrl != null && prefetchedUrl.isNotEmpty) {
@@ -85,12 +96,24 @@ class TtsService {
       } catch (e) {
         await _openAiTts!.stop();
         await _flutterTts.stop();
+        if (e is TtsPlaybackBlockedException && kIsWeb) {
+          final retry = () => speakEnglish(
+                text,
+                role: role,
+                prefetchedUrl: prefetchedUrl,
+                onTtsRequestComplete: onTtsRequestComplete,
+                ttsSessionId: ttsSessionId,
+                onFlutterFallback: onFlutterFallback,
+              );
+          onWebPlaybackBlocked?.call(retry);
+          rethrow;
+        }
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
         onFlutterFallback?.call();
         await _speakEnglishFlutter(text);
       } finally {
-        _isSpeaking = false;
+        if (requestId == _speakRequestId) _isSpeaking = false;
       }
     } else {
       await _speakEnglishFlutter(text);
@@ -105,21 +128,30 @@ class TtsService {
 
   /// 英語で再生（ゆっくり固定）
   Future<void> speakEnglishSlow(String text, {String? role}) async {
+    if (_disposed) return;
     await initialize();
+    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
+      await stop();
+      final requestId = ++_speakRequestId;
       try {
         _isSpeaking = true;
         await _openAiTts!.speakEnglishSlow(text, role: role);
       } catch (e) {
         await _openAiTts!.stop();
         await _flutterTts.stop();
+        if (e is TtsPlaybackBlockedException && kIsWeb) {
+          final retry = () => speakEnglishSlow(text, role: role);
+          onWebPlaybackBlocked?.call(retry);
+          rethrow;
+        }
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
         await _flutterTts.setLanguage('en-US');
         await _flutterTts.setSpeechRate(0.6);
         await _flutterTts.speak(text);
       } finally {
-        _isSpeaking = false;
+        if (requestId == _speakRequestId) _isSpeaking = false;
       }
     } else {
       await _flutterTts.setLanguage('en-US');
@@ -130,8 +162,12 @@ class TtsService {
 
   /// 日本語で再生
   Future<void> speakJapanese(String text, {String? role}) async {
+    if (_disposed) return;
     await initialize();
+    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
+      await stop();
+      final requestId = ++_speakRequestId;
       try {
         _isSpeaking = true;
         await _openAiTts!.speakJapanese(
@@ -142,11 +178,16 @@ class TtsService {
       } catch (e) {
         await _openAiTts!.stop();
         await _flutterTts.stop();
+        if (e is TtsPlaybackBlockedException && kIsWeb) {
+          final retry = () => speakJapanese(text, role: role);
+          onWebPlaybackBlocked?.call(retry);
+          rethrow;
+        }
         if (kDebugMode) debugPrint('OpenAI TTS fallback to device: $e');
         AnalyticsService().logTtsFallback(reason: e.toString());
         await _speakJapaneseFlutter(text);
       } finally {
-        _isSpeaking = false;
+        if (requestId == _speakRequestId) _isSpeaking = false;
       }
     } else {
       await _speakJapaneseFlutter(text);
@@ -187,8 +228,11 @@ class TtsService {
   /// 再生中かどうか
   bool get isSpeaking => _isSpeaking;
 
-  /// 破棄
+  /// 破棄（再入防止）
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _speakRequestId++;
     _openAiTts?.dispose();
     _flutterTts.stop();
   }
