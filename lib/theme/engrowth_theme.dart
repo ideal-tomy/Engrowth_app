@@ -212,29 +212,71 @@ class EngrowthTheme {
   }
 }
 
-/// Phase B: ふわっと表示統一のアニメーション基準値
-/// 直書きを避け、共通Widget経由で参照する
-class EngrowthAnimationTokens {
-  /// 画面内切替の duration（300–500ms 許容）
-  static const Duration switchDuration = Duration(milliseconds: 360);
+/// Motion Token: Route遷移（ページ間）
+/// Zero-Latency: 1秒超は禁止。通常 <= 240ms、結果系 <= 320ms
+class EngrowthRouteTokens {
+  /// standardPush: 学習系詳細（fade + slightSlide）
+  static const Duration standardPushDuration = Duration(milliseconds: 220);
+  static const Duration standardPushReverseDuration = Duration(milliseconds: 180);
+  static const double standardPushSlideOffset = 0.03;
+  static const Curve standardPushCurve = Curves.easeOutCubic;
 
-  /// 画面内切替の curve
-  static const Curve switchCurve = Curves.easeInOutCubic;
+  /// modalPush: 設定/補助導線（fade + upFromBottom）
+  static const Duration modalPushDuration = Duration(milliseconds: 180);
+  static const Duration modalPushReverseDuration = Duration(milliseconds: 160);
+  static const double modalPushSlideOffset = 0.06;
+  static const Curve modalPushCurve = Curves.easeOutCubic;
 
-  /// 切替時の Y オフセット（端末密度換算で約 8–16px）
-  static const double switchOffsetY = 0.06;
+  /// resultPush: リザルト画面（fade + scale）
+  static const Duration resultPushDuration = Duration(milliseconds: 260);
+  static const Duration resultPushReverseDuration = Duration(milliseconds: 200);
+  static const double resultPushScaleBegin = 0.98;
+  static const Curve resultPushCurve = Curves.easeOutCubic;
+}
 
-  /// 段階表示の 1 要素あたり遅延（80–120ms 許容）
-  static const Duration staggerBaseDelay = Duration(milliseconds: 100);
+/// Motion Token: Element（画面内切替・AnimatedSwitcher）
+/// 同期された滑らかさを優先。小振幅で体感遅延を抑える
+class EngrowthElementTokens {
+  /// 画面内切替の duration
+  static const Duration switchDuration = Duration(milliseconds: 180);
 
-  /// 段階表示の各要素 duration
-  static const Duration staggerItemDuration = Duration(milliseconds: 320);
+  /// 表示側 curve
+  static const Curve switchCurveIn = Curves.easeOutCubic;
 
-  /// 段階表示の curve
+  /// 非表示側 curve
+  static const Curve switchCurveOut = Curves.easeInCubic;
+
+  /// 切替時の Y オフセット（小振幅 0.02〜0.03）
+  static const double switchOffsetY = 0.025;
+}
+
+/// Motion Token: Stagger（段階表示）
+/// 要素間の遅延を抑え、同期感を保つ
+class EngrowthStaggerTokens {
+  /// 1 要素あたり遅延
+  static const Duration itemDelay = Duration(milliseconds: 50);
+
+  /// 各要素の duration
+  static const Duration itemDuration = Duration(milliseconds: 180);
+
+  /// curve
   static const Curve staggerCurve = Curves.easeOutCubic;
 
-  /// 段階表示の Y オフセット
-  static const double staggerOffsetY = 0.05;
+  /// Y オフセット
+  static const double staggerOffsetY = 0.02;
+}
+
+/// Phase B: ふわっと表示統一のアニメーション基準値（後方互換）
+/// 新規実装は EngrowthElementTokens / EngrowthStaggerTokens を参照すること
+@Deprecated('Use EngrowthElementTokens for switch, EngrowthStaggerTokens for stagger')
+class EngrowthAnimationTokens {
+  static const Duration switchDuration = EngrowthElementTokens.switchDuration;
+  static const Curve switchCurve = EngrowthElementTokens.switchCurveIn;
+  static const double switchOffsetY = EngrowthElementTokens.switchOffsetY;
+  static const Duration staggerBaseDelay = EngrowthStaggerTokens.itemDelay;
+  static const Duration staggerItemDuration = EngrowthStaggerTokens.itemDuration;
+  static const Curve staggerCurve = EngrowthStaggerTokens.staggerCurve;
+  static const double staggerOffsetY = EngrowthStaggerTokens.staggerOffsetY;
 }
 
 class EngrowthShadows {

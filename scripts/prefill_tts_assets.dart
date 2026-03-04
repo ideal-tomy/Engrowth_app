@@ -235,9 +235,10 @@ String _voiceForRole(String role) {
   return _voiceRoleB;
 }
 
-/// Edge Function と同一の正規化（ハッシュ一致のため）
+/// Edge Function と同一の正規化（ハッシュ一致のため）: trim + 改行を \n に統一 + 小文字化
 String _normalizeTextForCache(String text) {
   return text
       .trim()
-      .replaceAll(RegExp(r'\s+'), ' ');  // 連続空白・改行を単一スペースに
+      .replaceAll(RegExp(r'\r\n|\r'), '\n')
+      .toLowerCase();
 }

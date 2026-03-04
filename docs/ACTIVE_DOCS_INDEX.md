@@ -7,6 +7,7 @@
 
 ## Plans (v2 2026 Q2)
 - `docs/plans/v2_2026q2/README.md`
+- `docs/plans/SPEAK_LIKE_GUIDED_FLOW_PLAN.md`（30秒/3分/パターンスプリント Speak風順序立てガイドフロー）
 - `docs/plans/v2_2026q2/phaseA.md`
 - `docs/plans/v2_2026q2/phaseB.md`
 - `docs/plans/v2_2026q2/phaseC.md`
@@ -29,6 +30,9 @@
 ## DB / Supabase
 - `docs/SUPABASE_MIGRATION_ORDER.md`
 - `supabase/migrations/MIGRATION_CATALOG.md`
+
+## Motion Sync（遷移・体感遅延・CTA計測）
+- `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
 
 ## TTS（音声再生・キャッシュ）
 - `docs/TTS_DEBUG_CHECKLIST.md`（5秒壁・direct_db 低下時の診断、デプロイ前後チェック）

@@ -43,9 +43,12 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-/** キャッシュキー用: 前後trim + 連続空白・改行を単一スペースに（prefill と完全一致） */
+/** キャッシュキー用: trim + 改行を \n に統一 + 小文字化（prefill・アプリと完全一致） */
 function normalizeTextForCache(text: string): string {
-  return text.trim().replace(/\s+/g, " ");
+  return text
+    .trim()
+    .replace(/\r\n|\r/g, "\n")
+    .toLowerCase();
 }
 
 function cacheKey(

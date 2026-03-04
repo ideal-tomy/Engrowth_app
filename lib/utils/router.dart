@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../theme/engrowth_theme.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/library_hub_screen.dart';
 import '../screens/word_list_screen.dart';
@@ -40,29 +41,88 @@ import '../screens/concept_screen.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/marquee/bottom_recommendation_rail.dart';
 
-/// 高級感のある画面遷移（fade + slightSlideUp）
-/// Push時 200ms、低振幅のスライドで自然な遷移を実現
-Page<void> _luxuryTransitionPage({
+/// standardPush: 学習系詳細（fade + slightSlide）
+/// 220ms / reverse 180ms
+Page<void> _standardPushPage({
   required BuildContext context,
   required GoRouterState state,
   required Widget child,
-  Duration duration = const Duration(milliseconds: 220),
 }) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: duration,
-    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionDuration: EngrowthRouteTokens.standardPushDuration,
+    reverseTransitionDuration: EngrowthRouteTokens.standardPushReverseDuration,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
         opacity: animation,
         child: SlideTransition(
           position: Tween<Offset>(
-            begin: const Offset(0, 0.03),
+            begin: Offset(0, EngrowthRouteTokens.standardPushSlideOffset),
             end: Offset.zero,
           ).animate(CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOutCubic,
+            curve: EngrowthRouteTokens.standardPushCurve,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// modalPush: 設定/補助導線（fade + upFromBottom）
+/// 180ms / reverse 160ms
+Page<void> _modalPushPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: EngrowthRouteTokens.modalPushDuration,
+    reverseTransitionDuration: EngrowthRouteTokens.modalPushReverseDuration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(0, EngrowthRouteTokens.modalPushSlideOffset),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: EngrowthRouteTokens.modalPushCurve,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// resultPush: リザルト画面（fade + scale）
+/// 260ms / reverse 200ms
+Page<void> _resultPushPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: EngrowthRouteTokens.resultPushDuration,
+    reverseTransitionDuration: EngrowthRouteTokens.resultPushReverseDuration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(
+            begin: EngrowthRouteTokens.resultPushScaleBegin,
+            end: 1.0,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: EngrowthRouteTokens.resultPushCurve,
           )),
           child: child,
         ),
@@ -137,7 +197,7 @@ final appRouter = GoRouter(
     // その他のルート（モーダル/プッシュ）
     GoRoute(
       path: '/hint-settings',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
         child: const HintSettingsScreen(),
@@ -145,7 +205,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/playback-speed-settings',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
         child: const PlaybackSpeedSettingsScreen(),
@@ -156,7 +216,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: PatternSprintListScreen(fromOnboarding: fromOnboarding),
@@ -170,7 +230,7 @@ final appRouter = GoRouter(
             final duration = int.tryParse(state.uri.queryParameters['duration'] ?? '45') ?? 45;
             final fromOnboarding =
                 state.uri.queryParameters['from_onboarding'] == 'true';
-            return _luxuryTransitionPage(
+            return _standardPushPage(
               context: context,
               state: state,
               child: PatternSprintSessionScreen(
@@ -190,7 +250,7 @@ final appRouter = GoRouter(
         final sessionMode = state.uri.queryParameters['sessionMode'] ??
             state.uri.queryParameters['mode'];
         final entrySource = state.uri.queryParameters['entrySource'];
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: StudyScreen(
@@ -203,7 +263,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/sentences',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: SentenceListScreen(
@@ -213,7 +273,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/search',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const WordListScreen(initialFocusSearch: true),
@@ -221,7 +281,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/account',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
         child: AccountScreen(
@@ -231,7 +291,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/scenarios',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const ScenarioListScreen(),
@@ -239,7 +299,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/conversation-training',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const ConversationTrainingChoiceScreen(),
@@ -250,7 +310,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: ScenarioLearningScreen(fromOnboarding: fromOnboarding),
@@ -262,7 +322,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: StoryTrainingScreen(fromOnboarding: fromOnboarding),
@@ -271,7 +331,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/scenario/:id',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: ScenarioStudyScreen(scenarioId: state.pathParameters['id']!),
@@ -279,7 +339,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/conversations',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: ConversationListScreen(
@@ -289,7 +349,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/favorites',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const FavoritesScreen(),
@@ -297,7 +357,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/notifications',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const NotificationsScreen(),
@@ -305,7 +365,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/consultant-contact',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: ConsultantContactScreen(
@@ -316,7 +376,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/review',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const ReviewListScreen(),
@@ -324,7 +384,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/onboarding',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const OnboardingFlowScreen(),
@@ -344,7 +404,7 @@ final appRouter = GoRouter(
             : state.uri.queryParameters['primaryRoute'];
         final primaryCtaLabel =
             state.uri.queryParameters['primaryCtaLabel'] ?? 'もう1セット続ける';
-        return _luxuryTransitionPage(
+        return _resultPushPage(
           context: context,
           state: state,
           child: UnifiedResultScreen(
@@ -361,7 +421,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/tutorial-conversation',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: TutorialConversationScreen(
@@ -371,7 +431,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/help',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const HelpScreen(),
@@ -379,7 +439,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/concept',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const ConceptScreen(),
@@ -387,7 +447,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/recordings',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: RecordingHistoryScreen(
@@ -397,7 +457,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const AdminDashboardScreen(),
@@ -405,7 +465,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/consultant',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
+      pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
         child: const ConsultantDashboardScreen(),
@@ -416,7 +476,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: ConversationStudyScreen(
@@ -432,7 +492,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: StoryStudyScreen(
@@ -447,7 +507,7 @@ final appRouter = GoRouter(
       path: '/progress/scenario-board',
       pageBuilder: (context, state) {
         final extra = state.extra;
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: ScenarioProgressBoardScreen(
@@ -460,7 +520,7 @@ final appRouter = GoRouter(
       path: '/progress/story-board',
       pageBuilder: (context, state) {
         final extra = state.extra;
-        return _luxuryTransitionPage(
+        return _standardPushPage(
           context: context,
           state: state,
           child: StoryProgressBoardScreen(

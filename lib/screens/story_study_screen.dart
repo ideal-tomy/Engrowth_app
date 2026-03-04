@@ -9,7 +9,12 @@ import '../services/tts_playback_blocked_exception.dart';
 import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/favorite_toggle_icon.dart';
+import '../widgets/optimized_image.dart';
+import '../widgets/scenario_background.dart';
+import '../widgets/common/fade_slide_switcher.dart';
+import '../widgets/common/content_skeleton.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/transition_metrics_provider.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
 
 /// 3分ストーリー学習画面
@@ -41,11 +46,41 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   int _currentUtteranceIndex = 0;
   bool _stopPlaybackRequested = false;
   bool _autoStarted = false;
+  bool _hasLoggedTapToFirstContent = false;
+  bool _hasLoggedPrimaryCtaVisible = false;
 
   @override
   void initState() {
     super.initState();
     _ttsService.initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _logTransitionCompleteIfNeeded());
+  }
+
+  void _logTransitionCompleteIfNeeded() {
+    if (!mounted) return;
+    final ctx = ref.read(transitionMetricsProvider.notifier).peek();
+    if (ctx != null && ctx.toRoute.contains('/story/')) {
+      ref.read(analyticsServiceProvider).logTransitionComplete(
+            transitionCompleteMs: ctx.elapsedMs(),
+            routeType: ctx.routeType,
+            fromRoute: ctx.fromRoute,
+            toRoute: ctx.toRoute,
+            variant: 'motion_sync',
+          );
+    }
+  }
+
+  void _logTapToFirstContentIfNeeded() {
+    if (!mounted) return;
+    final ctx = ref.read(transitionMetricsProvider.notifier).consume();
+    if (ctx != null && ctx.toRoute.contains('/story/')) {
+      ref.read(analyticsServiceProvider).logTapToFirstContent(
+            screenName: 'story_study',
+            tapToFirstContentMs: ctx.elapsedMs(),
+            entrySource: widget.fromOnboarding ? 'onboarding' : null,
+            variant: 'motion_sync',
+          );
+    }
   }
 
   @override
@@ -124,6 +159,10 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 
     final content = utterancesAsync.when(
         data: (utterances) {
+          if (!_hasLoggedTapToFirstContent) {
+            _hasLoggedTapToFirstContent = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) => _logTapToFirstContentIfNeeded());
+          }
           if (utterances.isEmpty) {
             return Center(
               child: Text('発話がありません', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
@@ -188,15 +227,38 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                           ),
                         ),
                       ] else
-                        FilledButton.icon(
-                          onPressed: () => _playAllUtterances(utterances),
-                          icon: const Icon(Icons.play_arrow, size: 26),
-                          label: const Text('再生して聴く'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-                          ),
+                        Builder(
+                          builder: (context) {
+                            if (!_hasLoggedPrimaryCtaVisible) {
+                              _hasLoggedPrimaryCtaVisible = true;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) {
+                                  ref.read(analyticsServiceProvider).logPrimaryCtaVisible(
+                                        screenName: 'story_study',
+                                        surface: 'play_button',
+                                        variant: 'motion_sync',
+                                      );
+                                }
+                              });
+                            }
+                            return FilledButton.icon(
+                              onPressed: () {
+                                ref.read(analyticsServiceProvider).logPrimaryCtaTapped(
+                                      screenName: 'story_study',
+                                      surface: 'play_button',
+                                      variant: 'motion_sync',
+                                    );
+                                _playAllUtterances(utterances);
+                              },
+                              icon: const Icon(Icons.play_arrow, size: 26),
+                              label: const Text('再生して聴く'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                              ),
+                            );
+                          },
                         ),
                     ],
                   ),
@@ -267,7 +329,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const StoryDetailSkeleton(),
         error: (e, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -296,7 +358,21 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             ),
           ],
         ),
-        body: content,
+        body: Column(
+          children: [
+            _StoryHeroBanner(storyId: widget.storyId, story: story),
+            Expanded(
+              child: FadeSlideSwitcher(
+                childKey: ValueKey(
+                  utterancesAsync.hasValue
+                      ? 'data'
+                      : (utterancesAsync.hasError ? 'error' : 'loading'),
+                ),
+                child: content,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -347,6 +423,50 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             ),
             Expanded(child: content),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Heroターゲット: 一覧カードのサムネイルと連続感を出す
+class _StoryHeroBanner extends StatelessWidget {
+  final String storyId;
+  final StorySequence? story;
+
+  const _StoryHeroBanner({required this.storyId, this.story});
+
+  static const _defaultGradient = LinearGradient(
+    colors: [Color(0xFFF0F1F4), Color(0xFFDDE1E8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Hero(
+      tag: 'storyHero_$storyId',
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+        child: SizedBox(
+          height: 120,
+          width: double.infinity,
+          child: story?.thumbnailUrl != null
+              ? OptimizedImage(
+                  imageUrl: story!.thumbnailUrl!,
+                  width: double.infinity,
+                  height: 120,
+                  fit: BoxFit.cover,
+                )
+              : DecoratedBox(
+                  decoration: const BoxDecoration(gradient: _defaultGradient),
+                  child: Image.asset(
+                    kScenarioBgAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                  ),
+                ),
         ),
       ),
     );

@@ -18,7 +18,10 @@ import 'package:supabase/supabase.dart';
 const _model = 'tts-1-hd';
 
 String normalizeTextForCache(String text) {
-  return text.trim().replaceAll(RegExp(r'\s+'), ' ');
+  return text
+      .trim()
+      .replaceAll(RegExp(r'\r\n|\r'), '\n')
+      .toLowerCase();
 }
 
 /// Edge と完全同一の key 文字列を生成（speed は JS の ${n} と一致させる）

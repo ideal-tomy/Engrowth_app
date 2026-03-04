@@ -710,23 +710,61 @@ class AnalyticsService {
   void logPrimaryCtaVisible({
     required String screenName,
     String? surface,
+    String? variant,
   }) =>
       logEvent(
         eventType: 'primary_cta_visible',
         eventProperties: {
           'screen_name': screenName,
           if (surface != null) 'surface': surface,
+          if (variant != null) 'variant': variant,
         },
       );
   void logPrimaryCtaTapped({
     required String screenName,
     String? surface,
+    String? variant,
   }) =>
       logEvent(
         eventType: 'primary_cta_tapped',
         eventProperties: {
           'screen_name': screenName,
           if (surface != null) 'surface': surface,
+          if (variant != null) 'variant': variant,
+        },
+      );
+
+  // Motion Sync: 遷移完了・体感遅延・CTA到達率の before/after 比較用
+  void logTransitionComplete({
+    required int transitionCompleteMs,
+    required String routeType,
+    String? fromRoute,
+    String? toRoute,
+    String? variant,
+  }) =>
+      logEvent(
+        eventType: 'transition_complete',
+        eventProperties: {
+          'transition_complete_ms': transitionCompleteMs,
+          'route_type': routeType,
+          if (fromRoute != null) 'from_route': fromRoute,
+          if (toRoute != null) 'to_route': toRoute,
+          if (variant != null) 'variant': variant,
+        },
+      );
+  void logTapToFirstContent({
+    required String screenName,
+    required int tapToFirstContentMs,
+    String? entrySource,
+    String? variant,
+  }) =>
+      logEvent(
+        eventType: 'tap_to_first_content',
+        eventProperties: {
+          'screen_name': screenName,
+          'tap_to_first_content_ms': tapToFirstContentMs,
+          if (entrySource != null) 'entry_source': entrySource,
+          if (variant != null) 'variant': variant,
         },
       );
 

@@ -6,9 +6,12 @@ import 'package:crypto/crypto.dart';
 
 const String kTtsModel = 'tts-1-hd';
 
-/// キャッシュキー用: 前後trim + 連続空白・改行を単一スペースに（Edge と完全一致）
+/// キャッシュキー用: trim + 改行を \n に統一 + 小文字化（Edge・prefill と完全一致）
 String normalizeTextForCache(String text) {
-  return text.trim().replaceAll(RegExp(r'\s+'), ' ');
+  return text
+      .trim()
+      .replaceAll(RegExp(r'\r\n|\r'), '\n')
+      .toLowerCase();
 }
 
 /// Edge と完全同一の key 文字列を生成

@@ -6,6 +6,7 @@ import '../models/story_sequence.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/feedback_provider.dart';
 import '../providers/story_provider.dart';
+import '../providers/transition_metrics_provider.dart';
 import '../models/learning_handoff_result.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
@@ -15,6 +16,7 @@ import '../widgets/tutorial/simulated_finger_overlay.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
 import '../widgets/common/fade_slide_switcher.dart';
 import '../widgets/common/stagger_reveal.dart';
+import '../widgets/common/content_skeleton.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
@@ -211,6 +213,11 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
                                     learningMode: 'focus3',
                                     targetId: firstStory!.id,
                                   );
+                              ref.read(transitionMetricsProvider.notifier).recordTap(
+                                    routeType: 'standardPush',
+                                    fromRoute: '/story-training',
+                                    toRoute: '/story/${firstStory.id}',
+                                  );
                               context.push('/story/${firstStory.id}');
                             },
                             style: FilledButton.styleFrom(
@@ -245,7 +252,7 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
           }
           return content;
         },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const StoryListSkeleton(),
           error: (error, stack) => Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -485,6 +492,11 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
         onTapUp: (_) => setState(() => _pressed = false),
         onTap: () {
           ref.read(feedbackServiceProvider).selection(trigger: 'story_card_tap');
+          ref.read(transitionMetricsProvider.notifier).recordTap(
+                routeType: 'standardPush',
+                fromRoute: '/story-training',
+                toRoute: '/story/${widget.story.id}',
+              );
           context.push('/story/${widget.story.id}');
         },
         child: Container(
@@ -502,25 +514,28 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // 背景画像
-                widget.story.thumbnailUrl != null
-                    ? OptimizedImage(
-                        imageUrl: widget.story.thumbnailUrl!,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: _gradientForTheme(widget.theme),
-                        ),
-                        child: Image.asset(
-                          kScenarioBgAsset,
+                // 背景画像（Hero: 一覧→詳細の連続感）
+                Hero(
+                  tag: 'storyHero_${widget.story.id}',
+                  child: widget.story.thumbnailUrl != null
+                      ? OptimizedImage(
+                          imageUrl: widget.story.thumbnailUrl!,
+                          width: double.infinity,
+                          height: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                        )
+                      : DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: _gradientForTheme(widget.theme),
+                          ),
+                          child: Image.asset(
+                            kScenarioBgAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                          ),
                         ),
-                      ),
+                ),
                 // 下部グラデーション（テキスト可読性確保）
                 Positioned.fill(
                   child: DecoratedBox(

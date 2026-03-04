@@ -40,10 +40,10 @@ class StaggerReveal extends StatefulWidget {
   const StaggerReveal({
     super.key,
     required this.children,
-    this.baseDelay = EngrowthAnimationTokens.staggerBaseDelay,
-    this.itemDuration = EngrowthAnimationTokens.staggerItemDuration,
-    this.curve = EngrowthAnimationTokens.staggerCurve,
-    this.offsetY = EngrowthAnimationTokens.staggerOffsetY,
+    this.baseDelay = EngrowthStaggerTokens.itemDelay,
+    this.itemDuration = EngrowthStaggerTokens.itemDuration,
+    this.curve = EngrowthStaggerTokens.staggerCurve,
+    this.offsetY = EngrowthStaggerTokens.staggerOffsetY,
     this.play = true,
     this.once = true,
   });
