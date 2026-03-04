@@ -212,6 +212,31 @@ class EngrowthTheme {
   }
 }
 
+/// Phase B: ふわっと表示統一のアニメーション基準値
+/// 直書きを避け、共通Widget経由で参照する
+class EngrowthAnimationTokens {
+  /// 画面内切替の duration（300–500ms 許容）
+  static const Duration switchDuration = Duration(milliseconds: 360);
+
+  /// 画面内切替の curve
+  static const Curve switchCurve = Curves.easeInOutCubic;
+
+  /// 切替時の Y オフセット（端末密度換算で約 8–16px）
+  static const double switchOffsetY = 0.06;
+
+  /// 段階表示の 1 要素あたり遅延（80–120ms 許容）
+  static const Duration staggerBaseDelay = Duration(milliseconds: 100);
+
+  /// 段階表示の各要素 duration
+  static const Duration staggerItemDuration = Duration(milliseconds: 320);
+
+  /// 段階表示の curve
+  static const Curve staggerCurve = Curves.easeOutCubic;
+
+  /// 段階表示の Y オフセット
+  static const double staggerOffsetY = 0.05;
+}
+
 class EngrowthShadows {
   static const List<BoxShadow> softCard = [
     BoxShadow(

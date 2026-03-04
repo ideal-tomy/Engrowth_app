@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/scenario_categories.dart';
 import '../models/conversation.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/feedback_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../services/tts_warmup_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
+import '../models/learning_handoff_result.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
+import '../widgets/common/fade_slide_switcher.dart';
+import '../widgets/common/stagger_reveal.dart';
 
 /// シナリオ学習ページ（Netflix型: セクション + 横スクロール行）
 class ScenarioLearningScreen extends ConsumerStatefulWidget {
@@ -68,8 +71,17 @@ class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen>
       context,
       title: '30秒会話',
       body: '30秒前後の会話のやりとりを体験します。全体の会話を聴いた後、A役（B役）を選択して会話の練習を行います。',
-      onStart: () {
-        context.push('/conversation/${firstConversation.id}?mode=listen');
+      onStart: () async {
+        final uri = widget.fromOnboarding
+            ? '/conversation/${firstConversation.id}?mode=listen&from_onboarding=true'
+            : '/conversation/${firstConversation.id}?mode=listen';
+        final result = await context.push<LearningHandoffResult>(uri);
+        if (widget.fromOnboarding &&
+            result != null &&
+            result.completed &&
+            mounted) {
+          context.pop(result);
+        }
       },
     );
   }
@@ -108,82 +120,89 @@ class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen>
           ),
         ],
       ),
-      body: dataAsync.when(
-        data: (byCategory) {
-          Conversation? firstConversation;
-          if (widget.fromOnboarding) {
-            ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
-                  stepType: 'quick30',
-                );
+      body: FadeSlideSwitcher(
+        childKey: ValueKey(dataAsync.valueOrNull != null ? 'data' : dataAsync.hasError ? 'error' : 'loading'),
+        child: dataAsync.when(
+          data: (byCategory) {
+            Conversation? firstConversation;
+            if (widget.fromOnboarding) {
+              ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
+                    stepType: 'quick30',
+                  );
+              for (final category in kScenarioCategories) {
+                final subsections = byCategory[category.id] ?? [];
+                for (final sub in subsections) {
+                  if (sub.conversations.isNotEmpty) {
+                    firstConversation = sub.conversations.first;
+                    break;
+                  }
+                }
+                if (firstConversation != null) break;
+              }
+            }
+            final items = <Widget>[];
+            bool assignedKey = false;
             for (final category in kScenarioCategories) {
               final subsections = byCategory[category.id] ?? [];
               for (final sub in subsections) {
-                if (sub.conversations.isNotEmpty) {
-                  firstConversation = sub.conversations.first;
-                  break;
-                }
+                final useKey = widget.fromOnboarding && !assignedKey && sub.conversations.isNotEmpty;
+                if (useKey) assignedKey = true;
+                items.add(_ScenarioSection(
+                  category: category,
+                  icon: _iconForCategory(category.iconName),
+                  subTitle: sub.subTitle,
+                  conversations: sub.conversations,
+                  overlayTargetKey: useKey ? _overlayTargetKey : null,
+                ));
               }
-              if (firstConversation != null) break;
+              if (subsections.isEmpty) {
+                items.add(_ScenarioSection(
+                  category: category,
+                  icon: _iconForCategory(category.iconName),
+                  subTitle: null,
+                  conversations: [],
+                  overlayTargetKey: null,
+                ));
+              }
             }
-          }
-          final items = <Widget>[];
-          bool assignedKey = false;
-          for (final category in kScenarioCategories) {
-            final subsections = byCategory[category.id] ?? [];
-            for (final sub in subsections) {
-              final useKey = widget.fromOnboarding && !assignedKey && sub.conversations.isNotEmpty;
-              if (useKey) assignedKey = true;
-              items.add(_ScenarioSection(
-                category: category,
-                icon: _iconForCategory(category.iconName),
-                subTitle: sub.subTitle,
-                conversations: sub.conversations,
-                overlayTargetKey: useKey ? _overlayTargetKey : null,
-              ));
-            }
-            if (subsections.isEmpty) {
-              items.add(_ScenarioSection(
-                category: category,
-                icon: _iconForCategory(category.iconName),
-                subTitle: null,
-                conversations: [],
-                overlayTargetKey: null,
-              ));
-            }
-          }
-          final content = ListView(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
-            children: items,
-          );
-
-          if (widget.fromOnboarding && firstConversation != null && !_overlayCompleted) {
-            return Stack(
+            final content = ListView(
+              padding: const EdgeInsets.only(top: 16, bottom: 24),
               children: [
-                content,
-                Positioned.fill(
-                  child: SimulatedFingerOverlay(
-                    targetKey: _overlayTargetKey,
-                    onComplete: () => _onOverlayComplete(firstConversation!),
-                  ),
+                StaggerReveal(
+                  children: items,
                 ),
               ],
             );
-          }
-          return content;
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: EngrowthColors.error),
-              const SizedBox(height: 16),
-              Text(
-                'エラー: $error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: EngrowthColors.onSurface),
-              ),
-            ],
+
+            if (widget.fromOnboarding && firstConversation != null && !_overlayCompleted) {
+              return Stack(
+                children: [
+                  content,
+                  Positioned.fill(
+                    child: SimulatedFingerOverlay(
+                      targetKey: _overlayTargetKey,
+                      onComplete: () => _onOverlayComplete(firstConversation!),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return content;
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: EngrowthColors.error),
+                const SizedBox(height: 16),
+                Text(
+                  'エラー: $error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: EngrowthColors.onSurface),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -305,7 +324,7 @@ class _ScenarioSection extends StatelessWidget {
 }
 
 /// 横スクロール用の会話カード（サムネイル + タイトル、タップで会話学習へ）
-class _ScenarioConversationCard extends StatefulWidget {
+class _ScenarioConversationCard extends ConsumerStatefulWidget {
   final Conversation conversation;
 
   const _ScenarioConversationCard({
@@ -313,10 +332,10 @@ class _ScenarioConversationCard extends StatefulWidget {
   });
 
   @override
-  State<_ScenarioConversationCard> createState() => _ScenarioConversationCardState();
+  ConsumerState<_ScenarioConversationCard> createState() => _ScenarioConversationCardState();
 }
 
-class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
+class _ScenarioConversationCardState extends ConsumerState<_ScenarioConversationCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scale;
@@ -362,7 +381,7 @@ class _ScenarioConversationCardState extends State<_ScenarioConversationCard>
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
         _controller.reverse();
-        HapticFeedback.selectionClick();
+        ref.read(feedbackServiceProvider).selection(trigger: 'scenario_card_selection');
         context.push('/conversation/${widget.conversation.id}?mode=listen');
       },
       onTapCancel: () => _controller.reverse(),

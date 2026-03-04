@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/conversation.dart';
+import '../models/learning_handoff_result.dart';
 import '../models/story_sequence.dart';
 import '../providers/story_provider.dart';
 import '../services/tts_service.dart';
@@ -18,6 +19,7 @@ class StoryStudyScreen extends ConsumerStatefulWidget {
   final bool asSheet;
   final VoidCallback? onClose;
   final bool autoStartPlayback;
+  final bool fromOnboarding;
 
   const StoryStudyScreen({
     super.key,
@@ -25,6 +27,7 @@ class StoryStudyScreen extends ConsumerStatefulWidget {
     this.asSheet = false,
     this.onClose,
     this.autoStartPlayback = false,
+    this.fromOnboarding = false,
   });
 
   @override
@@ -77,6 +80,9 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
         _isPlaying = false;
         _stopPlaybackRequested = false;
       });
+      if (widget.fromOnboarding && !widget.asSheet) {
+        context.pop(LearningHandoffResult.completedWithMode('focus3'));
+      }
     }
   }
 

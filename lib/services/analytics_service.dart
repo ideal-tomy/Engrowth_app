@@ -62,6 +62,76 @@ class AnalyticsService {
         eventProperties: {'action_type': actionType},
       );
 
+  // 起動時ショートカットポップアップ
+  void logHomeShortcutPopupShown({
+    required String source,
+    bool? hasMission,
+  }) =>
+      logEvent(
+        eventType: 'home_shortcut_popup_shown',
+        eventProperties: {
+          'source': source,
+          if (hasMission != null) 'has_mission': hasMission,
+        },
+      );
+  void logHomeShortcutPopupCtaTapped({
+    required String route,
+    required String source,
+  }) =>
+      logEvent(
+        eventType: 'home_shortcut_popup_cta_tapped',
+        eventProperties: {'route': route, 'source': source},
+      );
+  void logHomeShortcutPopupDismissed({String? reason}) =>
+      logEvent(
+        eventType: 'home_shortcut_popup_dismissed',
+        eventProperties: {if (reason != null) 'reason': reason},
+      );
+
+  // パターンスプリントカテゴリ
+  void logPatternSprintCategorySelected({
+    required String categoryId,
+    required String prefix,
+  }) =>
+      logEvent(
+        eventType: 'pattern_sprint_category_selected',
+        eventProperties: {'category_id': categoryId, 'prefix': prefix},
+      );
+  void logPatternSprintCategoryStarted({
+    required String categoryId,
+    required String prefix,
+  }) =>
+      logEvent(
+        eventType: 'pattern_sprint_category_started',
+        eventProperties: {'category_id': categoryId, 'prefix': prefix},
+      );
+
+  // パターンスプリント3段階練習
+  void logPatternSprintPhaseStarted({
+    required int phase,
+    required int itemIndex,
+  }) =>
+      logEvent(
+        eventType: 'pattern_sprint_phase_started',
+        eventProperties: {'phase': phase, 'item_index': itemIndex},
+      );
+  void logPatternSprintPhaseCompleted({
+    required int phase,
+    required int itemIndex,
+  }) =>
+      logEvent(
+        eventType: 'pattern_sprint_phase_completed',
+        eventProperties: {'phase': phase, 'item_index': itemIndex},
+      );
+  void logPatternSprintShadowingGap({
+    required int playMs,
+    required int gapMs,
+  }) =>
+      logEvent(
+        eventType: 'pattern_sprint_shadowing_gap_ms',
+        eventProperties: {'play_ms': playMs, 'gap_ms': gapMs},
+      );
+
   // B16: 学習初回コンテンツ表示（tap_to_first_content_ms で体感遅延を計測）
   void logStudyFirstContentRendered({
     String? entrySource,
@@ -354,6 +424,62 @@ class AnalyticsService {
           if (targetId != null) 'target_id': targetId,
         },
       );
+  void logLearningHandoffShown({
+    required String source,
+    required String track,
+    int? candidateCount,
+  }) =>
+      logEvent(
+        eventType: 'learning_handoff_shown',
+        eventProperties: {
+          'source': source,
+          'track': track,
+          if (candidateCount != null) 'candidate_count': candidateCount,
+        },
+      );
+  void logLearningResumeFromProgress({
+    required String route,
+    String? source,
+  }) =>
+      logEvent(
+        eventType: 'learning_resume_from_progress',
+        eventProperties: {
+          'route': route,
+          if (source != null) 'source': source,
+        },
+      );
+  void logLearningHandoffAccepted({
+    required String choice,
+    String? track,
+    String? targetRoute,
+  }) =>
+      logEvent(
+        eventType: 'learning_handoff_accepted',
+        eventProperties: {
+          'choice': choice,
+          if (track != null) 'track': track,
+          if (targetRoute != null) 'target_route': targetRoute,
+        },
+      );
+  void logHandoffQueueBlocked({String? reason}) => logEvent(
+        eventType: 'handoff_queue_blocked',
+        eventProperties: {if (reason != null) 'reason': reason},
+      );
+  void logTutorialAutoAdvanced({
+    required String learningMode,
+    required String fromStep,
+    required String toStep,
+    int? elapsedSec,
+  }) =>
+      logEvent(
+        eventType: 'tutorial_auto_advanced',
+        eventProperties: {
+          'learning_mode': learningMode,
+          'from_step': fromStep,
+          'to_step': toStep,
+          if (elapsedSec != null) 'elapsed_sec': elapsedSec,
+        },
+      );
   void logSubmissionCtaTap({
     required String surface,
     String? submissionId,
@@ -495,6 +621,73 @@ class AnalyticsService {
       logEvent(
         eventType: 'admin_delivery_demo_viewed',
         eventProperties: {if (missionCount != null) 'mission_count': missionCount},
+      );
+
+  // Phase B: ふわっと表示統一の計測
+  void logUiRevealStarted({
+    required String screenName,
+    String? surface,
+    String? animationType,
+  }) =>
+      logEvent(
+        eventType: 'ui_reveal_started',
+        eventProperties: {
+          'screen_name': screenName,
+          if (surface != null) 'surface': surface,
+          if (animationType != null) 'animation_type': animationType,
+        },
+      );
+  void logUiRevealCompleted({
+    required String screenName,
+    String? surface,
+    String? animationType,
+    int? durationMs,
+    int? delayMs,
+  }) =>
+      logEvent(
+        eventType: 'ui_reveal_completed',
+        eventProperties: {
+          'screen_name': screenName,
+          if (surface != null) 'surface': surface,
+          if (animationType != null) 'animation_type': animationType,
+          if (durationMs != null) 'duration_ms': durationMs,
+          if (delayMs != null) 'delay_ms': delayMs,
+        },
+      );
+  void logUiSwitcherTransition({
+    required String screenName,
+    String? surface,
+    int? durationMs,
+  }) =>
+      logEvent(
+        eventType: 'ui_switcher_transition',
+        eventProperties: {
+          'screen_name': screenName,
+          if (surface != null) 'surface': surface,
+          if (durationMs != null) 'duration_ms': durationMs,
+        },
+      );
+  void logPrimaryCtaVisible({
+    required String screenName,
+    String? surface,
+  }) =>
+      logEvent(
+        eventType: 'primary_cta_visible',
+        eventProperties: {
+          'screen_name': screenName,
+          if (surface != null) 'surface': surface,
+        },
+      );
+  void logPrimaryCtaTapped({
+    required String screenName,
+    String? surface,
+  }) =>
+      logEvent(
+        eventType: 'primary_cta_tapped',
+        eventProperties: {
+          'screen_name': screenName,
+          if (surface != null) 'surface': surface,
+        },
       );
 
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）

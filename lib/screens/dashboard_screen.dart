@@ -3,13 +3,13 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/engrowth_theme.dart';
 import '../providers/user_stats_provider.dart';
 import '../providers/user_plan_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/feedback_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/role_provider.dart';
 import '../providers/onboarding_provider.dart';
@@ -24,6 +24,8 @@ import '../widgets/dashboard_sections/onboarding_banner.dart';
 import '../widgets/marquee/header_marquee_rail.dart';
 import '../widgets/dashboard_sections/todays_mission_card.dart';
 import '../widgets/dashboard_sections/quick_action_fab.dart';
+import '../widgets/dashboard_sections/startup_shortcut_overlay.dart';
+import '../widgets/common/stagger_reveal.dart';
 
 /// Dashboard（Home タブ）
 /// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
@@ -54,8 +56,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       drawer: const _SettingsDrawer(),
       floatingActionButton: const QuickActionFab(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      body: SafeArea(
-        child: Column(
+      body: StartupShortcutOverlay(
+        child: SafeArea(
+          child: Column(
           children: [
             _DashboardHeader(),
             if (enableMarquee) ...[
@@ -66,38 +69,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: SingleChildScrollView(
                 primary: true,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Column(
+                child: StaggerReveal(
                   children: [
-                    const OnboardingBanner(),
-                    const SizedBox(height: 6),
-                    if (authStage == AuthStage.anonymous) ...[
-                      const AnonymousDataSaveBanner(),
-                      const SizedBox(height: 6),
-                    ],
-                    if (userPlan == UserPlan.coaching) ...[
-                      const CoachBanner(),
-                      const SizedBox(height: 6),
-                      const TodaysMissionCard(),
-                      const SizedBox(height: 6),
-                    ],
-                    const DailyReportCard(),
-                    const SizedBox(height: 6),
-                    const _OnboardingHandoffBanner(),
-                    const SizedBox(height: 8),
-                    _SectionLabel(label: 'その他の機能'),
-                    const SizedBox(height: 4),
-                    const _MainTilesGrid(),
-                    const SizedBox(height: 14),
-                    if (authStage == AuthStage.anonymous) ...[
-                      const AnonymousLpBanner(),
-                      const SizedBox(height: 6),
-                    ],
-                    if (authStage == AuthStage.signedIn ||
-                        authStage == AuthStage.coaching) ...[
-                      const ConsultantNotificationBanner(),
-                      const SizedBox(height: 6),
-                    ],
-                    const SizedBox(height: 88),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const OnboardingBanner(),
+                        const SizedBox(height: 6),
+                        if (authStage == AuthStage.anonymous) ...[
+                          const AnonymousDataSaveBanner(),
+                          const SizedBox(height: 6),
+                        ],
+                        if (userPlan == UserPlan.coaching) ...[
+                          const CoachBanner(),
+                          const SizedBox(height: 6),
+                          const TodaysMissionCard(),
+                          const SizedBox(height: 6),
+                        ],
+                        const DailyReportCard(),
+                        const SizedBox(height: 6),
+                        const _OnboardingHandoffBanner(),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+                        _SectionLabel(label: 'その他の機能'),
+                        const SizedBox(height: 4),
+                        const _MainTilesGrid(),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 14),
+                        if (authStage == AuthStage.anonymous) ...[
+                          const AnonymousLpBanner(),
+                          const SizedBox(height: 6),
+                        ],
+                        if (authStage == AuthStage.signedIn ||
+                            authStage == AuthStage.coaching) ...[
+                          const ConsultantNotificationBanner(),
+                          const SizedBox(height: 6),
+                        ],
+                        const SizedBox(height: 88),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -105,6 +123,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -133,7 +152,7 @@ class _DashboardHeader extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.menu),
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    ref.read(feedbackServiceProvider).selection(trigger: 'dashboard_menu_selection');
                     Scaffold.of(context).openDrawer();
                   },
                   tooltip: '設定',
@@ -299,7 +318,7 @@ class _MainTilesGrid extends ConsumerWidget {
             title: item.title,
             icon: item.icon,
             onTap: () {
-              HapticFeedback.selectionClick();
+              ref.read(feedbackServiceProvider).selection(trigger: 'dashboard_mainTile_selection');
               ref.read(homePrimaryCtaProvider.notifier).maybeRecordRecognized('main_tile');
               ref.read(analyticsServiceProvider).logMainTileTap(
                     tileId: item.tileId,

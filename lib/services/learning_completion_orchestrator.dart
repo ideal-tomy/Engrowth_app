@@ -14,7 +14,7 @@ import '../providers/anonymous_conversion_provider.dart';
 import '../providers/study_progress_prompt_provider.dart';
 import '../widgets/achievement_unlock_dialog.dart';
 import '../widgets/anonymous_conversion_dialog.dart';
-import '../widgets/progress_mini_popup.dart';
+import '../widgets/nudge/post_learning_next_action_sheet.dart';
 import '../widgets/streak_milestone_dialog.dart';
 
 /// 学習完了時の共通ハンドラ
@@ -24,8 +24,11 @@ import '../widgets/streak_milestone_dialog.dart';
 /// 3. checkAndUnlockAchievements
 /// 4. 新規解除演出表示
 /// 5. provider refresh
+/// ダイアログは直列表示（キュー制御）。再入時はスキップして handoff_queue_blocked を送信。
 class LearningCompletionOrchestrator {
   LearningCompletionOrchestrator._();
+
+  static bool _isRunning = false;
 
   /// 学習完了時に呼び出す
   /// [ref] RiverpodのWidgetRef（ConsumerStateから取得）
@@ -33,6 +36,31 @@ class LearningCompletionOrchestrator {
   /// [progressTrack] 'scenario' | 'story' のときのみ進捗ミニポップアップを検討
   /// [forceProgressPopup] kDebugMode用：スロットリングを無視してポップアップ強制表示
   static Future<void> onLearningCompleted(
+    WidgetRef ref,
+    BuildContext context, {
+    String? progressTrack,
+    bool forceProgressPopup = false,
+  }) async {
+    if (_isRunning) {
+      ref.read(analyticsServiceProvider).logHandoffQueueBlocked(
+            reason: 'orchestrator_reentry',
+          );
+      return;
+    }
+    _isRunning = true;
+    try {
+      await _runOnLearningCompleted(
+        ref,
+        context,
+        progressTrack: progressTrack,
+        forceProgressPopup: forceProgressPopup,
+      );
+    } finally {
+      _isRunning = false;
+    }
+  }
+
+  static Future<void> _runOnLearningCompleted(
     WidgetRef ref,
     BuildContext context, {
     String? progressTrack,
@@ -139,14 +167,11 @@ class LearningCompletionOrchestrator {
                 reason: 'adaptive',
                 track: track,
               );
-          await showDialog<void>(
-            context: context,
-            barrierDismissible: true,
-            builder: (ctx) => ProgressMiniPopup(
-              track: track,
-              parentContext: context,
-            ),
-          );
+          ref.read(analyticsServiceProvider).logLearningHandoffShown(
+                source: 'completion_orchestrator',
+                track: track,
+              );
+          await PostLearningNextActionSheet.show(context, track: track);
           if (context.mounted) {
             await promptNotifier.markShown(track);
           }

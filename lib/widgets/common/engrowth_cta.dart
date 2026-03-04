@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../providers/feedback_provider.dart';
 
 /// B05: 共通CTAコンポーネント
 /// primary / secondary の色・サイズ・タップフィードバックを統一
+/// Phase A: 触覚は FeedbackService 経由で統一
 enum EngrowthCtaVariant { primary, secondary }
 
-class EngrowthPrimaryButton extends StatelessWidget {
+class EngrowthPrimaryButton extends ConsumerWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
@@ -22,7 +25,8 @@ class EngrowthPrimaryButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feedback = ref.read(feedbackServiceProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final child = isLoading
         ? SizedBox(
@@ -38,7 +42,7 @@ class EngrowthPrimaryButton extends StatelessWidget {
                 onPressed: onPressed == null
                     ? null
                     : () {
-                        HapticFeedback.selectionClick();
+                        feedback.selection(trigger: 'cta_primary_selection');
                         onPressed!();
                       },
                 icon: Icon(icon, size: 22),
@@ -58,7 +62,7 @@ class EngrowthPrimaryButton extends StatelessWidget {
                 onPressed: onPressed == null
                     ? null
                     : () {
-                        HapticFeedback.selectionClick();
+                        feedback.selection(trigger: 'cta_primary_selection');
                         onPressed!();
                       },
                 style: FilledButton.styleFrom(
@@ -81,7 +85,7 @@ class EngrowthPrimaryButton extends StatelessWidget {
   }
 }
 
-class EngrowthSecondaryButton extends StatelessWidget {
+class EngrowthSecondaryButton extends ConsumerWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool expanded;
@@ -94,12 +98,13 @@ class EngrowthSecondaryButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feedback = ref.read(feedbackServiceProvider);
     final child = OutlinedButton(
       onPressed: onPressed == null
           ? null
           : () {
-              HapticFeedback.selectionClick();
+              feedback.selection(trigger: 'cta_secondary_selection');
               onPressed!();
             },
       style: OutlinedButton.styleFrom(

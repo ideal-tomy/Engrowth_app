@@ -5,6 +5,7 @@ import '../../models/user_stats.dart';
 import '../../providers/user_stats_provider.dart';
 import '../common/engrowth_card.dart';
 import '../common/engrowth_cta.dart';
+import '../common/stagger_reveal.dart';
 
 /// B06: 統一リザルト表示の共通コンテンツ
 /// カウントアップ・成功ハプティクス・CTA を統一的に提供
@@ -73,30 +74,35 @@ class _UnifiedResultContentState extends ConsumerState<UnifiedResultContent>
     final colorScheme = Theme.of(context).colorScheme;
     final statsAsync = ref.watch(userStatsProvider);
 
-    Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.check_circle, size: 64, color: colorScheme.primary),
-        const SizedBox(height: 16),
-        Text(
-          widget.title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-          textAlign: TextAlign.center,
-        ),
-        if (widget.subtitle != null) ...[
-          const SizedBox(height: 4),
+    final staggerChildren = <Widget>[
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, size: 64, color: colorScheme.primary),
+          const SizedBox(height: 16),
           Text(
+            widget.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+      if (widget.subtitle != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
             widget.subtitle!,
             style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
-        ],
-        if (widget.count != null) ...[
-          const SizedBox(height: 16),
-          AnimatedBuilder(
+        ),
+      if (widget.count != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: AnimatedBuilder(
             animation: _animProgress,
             builder: (context, child) {
               final p = _animProgress.value;
@@ -111,26 +117,37 @@ class _UnifiedResultContentState extends ConsumerState<UnifiedResultContent>
               );
             },
           ),
-        ],
-        if (statsAsync.valueOrNull != null) ...[
-          const SizedBox(height: 16),
-          _StreakBadge(stats: statsAsync.value!),
-        ],
-        const SizedBox(height: 24),
-        if (widget.onPrimaryCta != null)
-          EngrowthPrimaryButton(
-            label: widget.primaryCtaLabel,
-            icon: widget.primaryCtaIcon ?? Icons.play_arrow,
-            onPressed: widget.onPrimaryCta,
-          ),
-        if (widget.onSecondaryCta != null) ...[
-          if (widget.onPrimaryCta != null) const SizedBox(height: 10),
-          EngrowthSecondaryButton(
-            label: widget.secondaryCtaLabel,
-            onPressed: widget.onSecondaryCta,
-          ),
-        ],
-      ],
+        ),
+      if (statsAsync.valueOrNull != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: _StreakBadge(stats: statsAsync.value!),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.onPrimaryCta != null)
+              EngrowthPrimaryButton(
+                label: widget.primaryCtaLabel,
+                icon: widget.primaryCtaIcon ?? Icons.play_arrow,
+                onPressed: widget.onPrimaryCta,
+              ),
+            if (widget.onSecondaryCta != null) ...[
+              if (widget.onPrimaryCta != null) const SizedBox(height: 10),
+              EngrowthSecondaryButton(
+                label: widget.secondaryCtaLabel,
+                onPressed: widget.onSecondaryCta,
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
+
+    Widget content = StaggerReveal(
+      children: staggerChildren,
     );
 
     if (widget.useCard) {

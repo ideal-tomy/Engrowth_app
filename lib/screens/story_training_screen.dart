@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/story_theme_categories.dart';
 import '../models/story_sequence.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/feedback_provider.dart';
 import '../providers/story_provider.dart';
+import '../models/learning_handoff_result.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
+import '../widgets/common/fade_slide_switcher.dart';
+import '../widgets/common/stagger_reveal.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
@@ -39,8 +42,17 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
       context,
       title: '3分会話',
       body: '約3分の英会話ストーリーを体験します。会話の流れに沿って、聞いたり話したりを繰り返していきます。',
-      onStart: () {
-        context.push('/story/${firstStory.id}');
+      onStart: () async {
+        final uri = widget.fromOnboarding
+            ? '/story/${firstStory.id}?from_onboarding=true'
+            : '/story/${firstStory.id}';
+        final result = await context.push<LearningHandoffResult>(uri);
+        if (widget.fromOnboarding &&
+            result != null &&
+            result.completed &&
+            mounted) {
+          context.pop(result);
+        }
       },
     );
   }
@@ -107,8 +119,10 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
           ),
         ],
       ),
-      body: dataAsync.when(
-        data: (byTheme) {
+      body: FadeSlideSwitcher(
+        childKey: ValueKey(dataAsync.valueOrNull != null ? 'data' : dataAsync.hasError ? 'error' : 'loading'),
+        child: dataAsync.when(
+          data: (byTheme) {
           if (byTheme.isEmpty) {
             return _buildEmptyState(context);
           }
@@ -124,27 +138,33 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
               }
             }
           }
+          final sectionWidgets = sortedThemes.asMap().entries
+              .where((entry) => (byTheme[entry.value] ?? []).isNotEmpty)
+              .map((entry) {
+            final index = entry.key;
+            final theme = entry.value;
+            final stories = byTheme[theme] ?? [];
+                    final isFirstSection = index == 0;
+            return _StoryThemeSection(
+              theme: theme,
+              displayName: displayNameForTheme(theme),
+              icon: _iconForCategory(_iconNameForTheme(theme)),
+              stories: stories,
+              overlayTargetKey: widget.fromOnboarding && isFirstSection
+                  ? _overlayTargetKey
+                  : null,
+            );
+          }).toList();
           final content = Column(
             children: [
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.only(top: 16, bottom: 24),
-                  children: sortedThemes.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final theme = entry.value;
-                    final stories = byTheme[theme] ?? [];
-                    if (stories.isEmpty) return const SizedBox.shrink();
-                    final isFirstSection = index == 0;
-                    return _StoryThemeSection(
-                      theme: theme,
-                      displayName: displayNameForTheme(theme),
-                      icon: _iconForCategory(_iconNameForTheme(theme)),
-                      stories: stories,
-                      overlayTargetKey: widget.fromOnboarding && isFirstSection
-                          ? _overlayTargetKey
-                          : null,
-                    );
-                  }).toList(),
+                  children: [
+                    StaggerReveal(
+                      children: sectionWidgets,
+                    ),
+                  ],
                 ),
               ),
               if (widget.fromOnboarding && firstStory != null)
@@ -183,7 +203,7 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
                           width: double.infinity,
                           child: FilledButton(
                             onPressed: () {
-                              HapticFeedback.selectionClick();
+                              ref.read(feedbackServiceProvider).selection(trigger: 'story_onboarding_start_selection');
                               ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
                                     stepType: 'focus3',
                                   );
@@ -191,7 +211,7 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
                                     learningMode: 'focus3',
                                     targetId: firstStory!.id,
                                   );
-                              context.push('/story/${firstStory!.id}');
+                              context.push('/story/${firstStory.id}');
                             },
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -225,20 +245,21 @@ class _StoryTrainingScreenState extends ConsumerState<StoryTrainingScreen> {
           }
           return content;
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-              const SizedBox(height: 16),
-              Text(
-                'エラー: $error',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
-              ),
-            ],
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  'エラー: $error',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -463,8 +484,7 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: (_) => setState(() => _pressed = false),
         onTap: () {
-          HapticFeedback.selectionClick();
-          ref.read(analyticsServiceProvider).logHapticFired(trigger: 'story_card_tap');
+          ref.read(feedbackServiceProvider).selection(trigger: 'story_card_tap');
           context.push('/story/${widget.story.id}');
         },
         child: Container(

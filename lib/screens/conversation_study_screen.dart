@@ -17,6 +17,7 @@ import '../services/learning_completion_orchestrator.dart';
 import '../services/stt_service.dart';
 import '../services/ai_conversation_service.dart';
 
+import '../models/learning_handoff_result.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/audio_controls.dart';
 import '../widgets/favorite_toggle_icon.dart';
@@ -29,11 +30,13 @@ import '../widgets/scenario_background.dart';
 class ConversationStudyScreen extends ConsumerStatefulWidget {
   final String conversationId;
   final String initialMode;  // listen, roleA, roleB, aiConversation
+  final bool fromOnboarding;
 
   const ConversationStudyScreen({
     super.key,
     required this.conversationId,
     this.initialMode = 'listen',
+    this.fromOnboarding = false,
   });
 
   @override
@@ -638,6 +641,21 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       });
       _transcriptIsPlayingNotifier?.value = false;
         if (!wasStoppedByUser && showPromptOnComplete) {
+        // オンボーディング導線: 聴き終わったら即チュートリアル次章へ戻る
+        if (widget.fromOnboarding && _mode == 'listen') {
+          if (mounted) {
+            final userId = Supabase.instance.client.auth.currentUser?.id;
+            if (userId != null) {
+              _learningEvents.logListenCompleted(
+                userId: userId,
+                conversationId: widget.conversationId,
+                sessionId: _sessionId,
+              );
+            }
+            context.pop(LearningHandoffResult.completedWithMode('quick30'));
+          }
+          return;
+        }
         // Phase 2: 次回「もう一度」用に index 0,1 を先読み
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _prefetchNextUtterances(utterances, -1);

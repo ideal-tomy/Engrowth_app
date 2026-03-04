@@ -168,12 +168,15 @@ final appRouter = GoRouter(
           pageBuilder: (context, state) {
             final prefix = state.uri.queryParameters['prefix'] ?? '';
             final duration = int.tryParse(state.uri.queryParameters['duration'] ?? '45') ?? 45;
+            final fromOnboarding =
+                state.uri.queryParameters['from_onboarding'] == 'true';
             return _luxuryTransitionPage(
               context: context,
               state: state,
               child: PatternSprintSessionScreen(
                 prefix: Uri.decodeComponent(prefix),
                 durationSec: duration.clamp(30, 60),
+                fromOnboarding: fromOnboarding,
               ),
             );
           },
@@ -410,22 +413,35 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/conversation/:id',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
-        context: context,
-        state: state,
-        child: ConversationStudyScreen(
-          conversationId: state.pathParameters['id']!,
-          initialMode: state.uri.queryParameters['mode'] ?? 'listen',
-        ),
-      ),
+      pageBuilder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: ConversationStudyScreen(
+            conversationId: state.pathParameters['id']!,
+            initialMode: state.uri.queryParameters['mode'] ?? 'listen',
+            fromOnboarding: fromOnboarding,
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/story/:id',
-      pageBuilder: (context, state) => _luxuryTransitionPage(
-        context: context,
-        state: state,
-        child: StoryStudyScreen(storyId: state.pathParameters['id']!),
-      ),
+      pageBuilder: (context, state) {
+        final fromOnboarding =
+            state.uri.queryParameters['from_onboarding'] == 'true';
+        return _luxuryTransitionPage(
+          context: context,
+          state: state,
+          child: StoryStudyScreen(
+            storyId: state.pathParameters['id']!,
+            fromOnboarding: fromOnboarding,
+            autoStartPlayback: fromOnboarding,
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/progress/scenario-board',

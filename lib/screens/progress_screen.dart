@@ -64,6 +64,7 @@ class ProgressScreen extends ConsumerWidget {
             // === 第1層: 要点ダッシュボード ===
             const StreakDisplay(),
             const _RingProgressSection(),
+            const _ResumeLearningCta(),
             const _ProgressSummarySection(),
             const _NextActionsSection(),
             const _ConversationPracticeSection(),
@@ -283,6 +284,62 @@ class ProgressScreen extends ConsumerWidget {
 }
 
 /// 次アクション提案セクション（復習・お気に入り・録音・日次目標）
+/// 学習に戻るCTA（進捗画面から学習復帰を常時確保）
+class _ResumeLearningCta extends ConsumerWidget {
+  const _ResumeLearningCta();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final suggestionsAsync = ref.watch(nextActionSuggestionsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return suggestionsAsync.when(
+      data: (suggestions) {
+        final first = suggestions.isNotEmpty ? suggestions.first : null;
+        final route = first?.route ?? '/study';
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            onPressed: () {
+              ref.read(analyticsServiceProvider).logLearningResumeFromProgress(
+                    route: route,
+                    source: 'progress_resume_cta',
+                  );
+              context.push(route);
+            },
+            icon: const Icon(Icons.school, size: 22),
+            label: const Text('学習に戻る'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: FilledButton.icon(
+          onPressed: () {
+            ref.read(analyticsServiceProvider).logLearningResumeFromProgress(
+                  route: '/study',
+                  source: 'progress_resume_cta',
+                );
+            context.push('/study');
+          },
+          icon: const Icon(Icons.school, size: 22),
+          label: const Text('学習に戻る'),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NextActionsSection extends ConsumerWidget {
   const _NextActionsSection();
 
@@ -318,19 +375,25 @@ class _NextActionsSection extends ConsumerWidget {
   }
 }
 
-class _NextActionCard extends StatelessWidget {
+class _NextActionCard extends ConsumerWidget {
   final NextActionSuggestion suggestion;
 
   const _NextActionCard({required this.suggestion});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.push(suggestion.route),
+          onTap: () {
+            ref.read(analyticsServiceProvider).logLearningResumeFromProgress(
+                  route: suggestion.route,
+                  source: 'next_action_card',
+                );
+            context.push(suggestion.route);
+          },
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(14),

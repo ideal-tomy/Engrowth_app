@@ -3,23 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/pattern_sprint_phase.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
 import '../services/pattern_sprint_service.dart';
 import '../services/tts_service.dart';
+import '../models/learning_handoff_result.dart';
 import '../services/analytics_service.dart';
 
 /// パターンスプリント セッション実行画面
-/// 聞く→リピート猶予（2〜3秒）→次へ を自動進行
+/// 3段階練習: 1回目日英表示→2回目英文のみ→3回目テキストなし→シャドーイング待機→次へ
 class PatternSprintSessionScreen extends ConsumerStatefulWidget {
   final String prefix;
   final int durationSec;
+  final bool fromOnboarding;
 
   const PatternSprintSessionScreen({
     super.key,
     required this.prefix,
     required this.durationSec,
+    this.fromOnboarding = false,
   });
 
   @override
@@ -36,6 +40,7 @@ class _PatternSprintSessionScreenState
   bool _isPaused = false;
   bool _stopped = false;
   int _currentIndex = 0;
+  PatternSprintPhase _currentPhase = PatternSprintPhase.phase1;
   int _elapsedSec = 0;
   Timer? _elapsedTimer;
   Timer? _advanceTimer;
@@ -43,7 +48,10 @@ class _PatternSprintSessionScreenState
   Completer<void>? _delayCompleter;
   bool _loopStarted = false;
   static const _advanceDebounceMs = 300;
-  static const _repeatDelaySec = 2.5;
+  static const _phase12DelayMs = 2000;
+  static const _shadowingGapMinMs = 1200;
+  static const _shadowingGapMaxMs = 8000;
+  static const _shadowingGapMultiplier = 1.2;
 
   @override
   void initState() {
@@ -97,11 +105,13 @@ class _PatternSprintSessionScreenState
     }
   }
 
-  Future<void> _playItem(
+  /// 1回分の再生を行い、再生時間(ms)を返す
+  Future<int> _playOnce(
     PatternSprintItem item, {
     String? prefetchedUrl,
   }) async {
-    if (!mounted) return;
+    if (!mounted) return 0;
+    final stopwatch = Stopwatch()..start();
     setState(() => _isPlaying = true);
 
     await _ttsService.speakEnglish(
@@ -110,13 +120,34 @@ class _PatternSprintSessionScreenState
       prefetchedUrl: prefetchedUrl,
     );
 
-    if (!mounted || _stopped) return;
+    stopwatch.stop();
+    final playMs = stopwatch.elapsedMilliseconds;
+
+    if (!mounted || _stopped) return playMs;
     setState(() => _isPlaying = false);
+
+    return playMs;
+  }
+
+  /// フェーズ1・2後の固定待機、フェーズ3後は再生時間の1.2倍（シャドーイング用）
+  Future<void> _waitAfterPlay(PatternSprintPhase phase, int playMs) async {
+    final delayMs = phase == PatternSprintPhase.phase3
+        ? (playMs * _shadowingGapMultiplier)
+            .round()
+            .clamp(_shadowingGapMinMs, _shadowingGapMaxMs)
+        : _phase12DelayMs;
+
+    if (phase == PatternSprintPhase.phase3) {
+      AnalyticsService().logPatternSprintShadowingGap(
+        playMs: playMs,
+        gapMs: delayMs,
+      );
+    }
 
     _delayCompleter = Completer<void>();
     _advanceTimer?.cancel();
     _advanceTimer = Timer(
-      Duration(milliseconds: (_repeatDelaySec * 1000).round()),
+      Duration(milliseconds: delayMs),
       () {
         if (!_delayCompleter!.isCompleted) {
           _delayCompleter!.complete();
@@ -139,17 +170,49 @@ class _PatternSprintSessionScreenState
       _onSessionComplete(items);
       return;
     }
+
+    final item = items[_currentIndex];
     _prefetchNext(items, _currentIndex);
     final prefetched = _prefetchedUrls.remove(_currentIndex);
-    _playItem(items[_currentIndex], prefetchedUrl: prefetched).then((_) async {
+
+    _runPhase(item, prefetchedUrl: prefetched).then((_) async {
       if (!mounted || _stopped) return;
       while (_isPaused && mounted && !_stopped) {
         await Future.delayed(const Duration(milliseconds: 200));
       }
       if (!mounted || _stopped) return;
-      setState(() => _currentIndex++);
+      setState(() {
+        _currentIndex++;
+        _currentPhase = PatternSprintPhase.phase1;
+      });
       _advance(items);
     });
+  }
+
+  Future<void> _runPhase(
+    PatternSprintItem item, {
+    String? prefetchedUrl,
+  }) async {
+    for (final phase in PatternSprintPhase.values) {
+      if (!mounted || _stopped) return;
+      setState(() => _currentPhase = phase);
+
+      AnalyticsService().logPatternSprintPhaseStarted(
+        phase: phase.index,
+        itemIndex: _currentIndex,
+      );
+
+      final playMs = await _playOnce(item, prefetchedUrl: phase == PatternSprintPhase.phase1 ? prefetchedUrl : null);
+      if (!mounted || _stopped) return;
+
+      await _waitAfterPlay(phase, playMs);
+      if (!mounted || _stopped) return;
+
+      AnalyticsService().logPatternSprintPhaseCompleted(
+        phase: phase.index,
+        itemIndex: _currentIndex,
+      );
+    }
   }
 
   Future<void> _runLoop(List<PatternSprintItem> items) async {
@@ -194,7 +257,13 @@ class _PatternSprintSessionScreenState
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              if (context.mounted) context.go('/pattern-sprint');
+              if (context.mounted) {
+                if (widget.fromOnboarding) {
+                  context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
+                } else {
+                  context.go('/pattern-sprint');
+                }
+              }
             },
             child: const Text('一覧へ'),
           ),
@@ -203,6 +272,7 @@ class _PatternSprintSessionScreenState
               Navigator.of(ctx).pop();
               setState(() {
                 _currentIndex = 0;
+                _currentPhase = PatternSprintPhase.phase1;
                 _elapsedSec = 0;
                 _stopped = false;
                 _loopStarted = true;
@@ -353,7 +423,7 @@ class _PatternSprintSessionScreenState
                       ),
                     ),
                     Text(
-                      '${_currentIndex + 1} / ${items.length}',
+                      '${_currentIndex + 1} / ${items.length} (${_currentPhase.index}/3)',
                       style: TextStyle(
                         fontSize: 14,
                         color: colorScheme.onSurfaceVariant,
@@ -364,14 +434,40 @@ class _PatternSprintSessionScreenState
                 const SizedBox(height: 24),
                 Expanded(
                   child: Center(
-                    child: Text(
-                      item.japaneseText,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurface,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_currentPhase.showJapanese)
+                          Text(
+                            item.japaneseText,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        if (_currentPhase.showJapanese && _currentPhase.showEnglish)
+                          const SizedBox(height: 12),
+                        if (_currentPhase.showEnglish)
+                          Text(
+                            item.englishText,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        if (!_currentPhase.showEnglish && !_currentPhase.showJapanese)
+                          Text(
+                            _isPlaying ? 'Listen...' : 'Repeat now',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

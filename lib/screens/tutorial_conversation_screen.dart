@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/tutorial.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/feedback_provider.dart';
 import '../providers/tutorial_provider.dart';
 import '../services/recording_service.dart';
 import '../utils/recording_error_helper.dart';
@@ -114,7 +114,7 @@ class _TutorialConversationScreenState
           _isRecording = true;
           _statusMessage = 'いま聞いています… 話したら停止を押してください';
         });
-        HapticFeedback.lightImpact();
+        ref.read(feedbackServiceProvider).light(trigger: 'tutorial_autorec_start_light');
       }
     } catch (e) {
       if (mounted) {
@@ -232,7 +232,7 @@ class _TutorialConversationScreenState
     if (_isRecording) {
       final path = await _recordingService.stopRecording();
       setState(() => _isRecording = false);
-      HapticFeedback.mediumImpact();
+      ref.read(feedbackServiceProvider).medium(trigger: 'tutorial_record_stop_medium');
       if (path != null) {
         final file = File(path);
         if (await file.exists()) {
@@ -276,7 +276,7 @@ class _TutorialConversationScreenState
           _isRecording = true;
           _statusMessage = '録音中... 話したら停止を押してください';
         });
-        HapticFeedback.lightImpact();
+        ref.read(feedbackServiceProvider).light(trigger: 'tutorial_record_start_light');
       } catch (e) {
         if (mounted) {
           final msg = RecordingErrorHelper.getUserMessage(e);
@@ -308,7 +308,7 @@ class _TutorialConversationScreenState
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
-            HapticFeedback.selectionClick();
+            ref.read(feedbackServiceProvider).selection(trigger: 'tutorial_close_selection');
             _popWithSkipped();
           },
         ),
@@ -442,7 +442,7 @@ class _TutorialConversationScreenState
                   const Spacer(),
                   TextButton(
                     onPressed: () {
-                      HapticFeedback.selectionClick();
+                      ref.read(feedbackServiceProvider).selection(trigger: 'tutorial_skip_selection');
                       _popWithSkipped();
                     },
                     child: const Text('スキップ'),

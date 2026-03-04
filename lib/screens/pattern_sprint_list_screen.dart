@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/pattern_sprint_category.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../services/pattern_sprint_service.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
+import '../models/learning_handoff_result.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
 
 /// パターンスプリント: パターン選択・秒数選択・セッション開始
@@ -40,10 +42,18 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
       context,
       title: 'パターンスプリント',
       body: '聞く→まねして言うを短時間で繰り返します。音声を聴いたら即座にリピートしましょう。',
-      onStart: () {
-        context.push(
-          '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$duration',
-        );
+      onStart: () async {
+        final fromParam =
+            widget.fromOnboarding ? '&from_onboarding=true' : '';
+        final uri =
+            '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$duration$fromParam';
+        final result = await context.push<LearningHandoffResult>(uri);
+        if (widget.fromOnboarding &&
+            result != null &&
+            result.completed &&
+            mounted) {
+          context.pop(result);
+        }
       },
     );
   }
@@ -63,7 +73,8 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final patterns = ref.watch(patternListProvider);
+    final categories = ref.watch(patternCategoriesProvider);
+    final byCategory = ref.watch(patternByCategoryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -76,11 +87,16 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
           ),
         ],
       ),
-      body: _buildBody(patterns, colorScheme, textTheme),
+      body: _buildBody(categories, byCategory, colorScheme, textTheme),
     );
   }
 
-  Widget _buildBody(List<PatternDefinition> patterns, ColorScheme colorScheme, TextTheme textTheme) {
+  Widget _buildBody(
+    List<PatternSprintCategory> categories,
+    Map<String, List<PatternDefinition>> byCategory,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
     final scrollChild = SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -181,7 +197,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
           ),
           const SizedBox(height: 24),
           Text(
-            'パターン（よく使う言い回し）',
+            'カテゴリ別パターン（集中トレーニング）',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -189,68 +205,144 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
             ),
           ),
           const SizedBox(height: 8),
-          ...patterns.asMap().entries.map((entry) {
-              final index = entry.key;
-              final p = entry.value;
-              final isSelected = _selectedPrefix == p.prefix;
-              final useOverlayKey = widget.fromOnboarding && index == 0;
-              return Padding(
-                key: useOverlayKey ? _overlayTargetKey : null,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  dense: true,
-                  visualDensity: const VisualDensity(vertical: -2),
-                  leading: Icon(
-                    Icons.play_circle_outline,
-                    color: isSelected ? colorScheme.primary : colorScheme.outline,
-                    size: 24,
-                  ),
-                  title: Text(
-                    p.displayName,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                  subtitle: Text(
-                    p.japaneseHint,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  selected: isSelected,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _selectedPrefix = p.prefix);
-                  },
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+          Text(
+            '同じカテゴリのパターンを繰り返すと、音にも発音にも慣れやすくなります。',
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...categories.map((category) {
+            final patterns = byCategory[category.id] ?? [];
+            if (patterns.isEmpty) return const SizedBox.shrink();
+
+            final firstPrefix = patterns.first.prefix;
+            final isFirstCategory = categories.indexOf(category) == 0;
+            final useOverlayKey = widget.fromOnboarding && isFirstCategory;
+
+            return Padding(
+              key: useOverlayKey ? _overlayTargetKey : null,
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      FavoriteToggleIcon(
-                        targetType: 'pattern',
-                        targetId: p.prefix,
+                      Icon(
+                        category.icon,
                         size: 22,
+                        color: colorScheme.primary,
                       ),
-                      const SizedBox(width: 4),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        tooltip: 'このパターンですぐ始める',
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.displayName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            Text(
+                              category.usageHint,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      FilledButton.tonal(
                         onPressed: () {
                           HapticFeedback.selectionClick();
-                          ref.read(analyticsServiceProvider).logHapticFired(
-                                trigger: 'pattern_sprint_start_from_list_item',
+                          ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                                categoryId: category.id,
+                                prefix: firstPrefix,
                               );
                           context.push(
-                            '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
+                            '/pattern-sprint/session?prefix=${Uri.encodeComponent(firstPrefix)}&duration=$_selectedDurationSec',
                           );
                         },
+                        child: Text('${patterns.first.displayName}でスタート'),
                       ),
                     ],
                   ),
-                ),
-              );
-            }),
+                  const SizedBox(height: 8),
+                  ...patterns.map((p) {
+                    final isSelected = _selectedPrefix == p.prefix;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        dense: true,
+                        visualDensity: const VisualDensity(vertical: -2),
+                        leading: Icon(
+                          Icons.play_circle_outline,
+                          color: isSelected ? colorScheme.primary : colorScheme.outline,
+                          size: 24,
+                        ),
+                        title: Text(
+                          p.displayName,
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          p.japaneseHint,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          ref.read(analyticsServiceProvider).logPatternSprintCategorySelected(
+                                categoryId: category.id,
+                                prefix: p.prefix,
+                              );
+                          setState(() => _selectedPrefix = p.prefix);
+                        },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FavoriteToggleIcon(
+                              targetType: 'pattern',
+                              targetId: p.prefix,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton.filledTonal(
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              tooltip: 'このパターンですぐ始める',
+                              onPressed: () {
+                                HapticFeedback.selectionClick();
+                                ref.read(analyticsServiceProvider).logHapticFired(
+                                      trigger: 'pattern_sprint_start_from_list_item',
+                                    );
+                                ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                                      categoryId: category.id,
+                                      prefix: p.prefix,
+                                    );
+                                context.push(
+                                  '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }),
           const SizedBox(height: 32),
           if (widget.fromOnboarding && _selectedPrefix != null) ...[
             Container(

@@ -7,6 +7,11 @@
 
 ## Plans (v2 2026 Q2)
 - `docs/plans/v2_2026q2/README.md`
+- `docs/plans/v2_2026q2/phaseA.md`
+- `docs/plans/v2_2026q2/phaseB.md`
+- `docs/plans/v2_2026q2/phaseC.md`
+- `docs/plans/v2_2026q2/phaseB_impl.md`（Phase B 実装記録）
+- `docs/plans/v2_2026q2/phaseC_impl.md`（Phase C 迷いナッジ 実装PLAN）
 
 ## Tutorial / Onboarding
 - `docs/plans/TUTORIAL_INTRO_POPUP_PLAN.md`

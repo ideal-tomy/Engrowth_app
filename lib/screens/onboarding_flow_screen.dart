@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/learning_handoff_result.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/coach_provider.dart';
 import '../providers/next_action_provider.dart';
@@ -71,9 +72,18 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
   Future<void> _tryStepAndAdvance(String route) async {
     HapticFeedback.selectionClick();
-    await context.push(route);
+    final fromStep = _stepId(_currentPage);
+    final result = await context.push<LearningHandoffResult>(route);
     if (!mounted) return;
-    _goToNext();
+    // 学習完了時にのみ次章へ自動進行（手動戻りの場合は進行しない）
+    if (result != null && result.completed) {
+      ref.read(analyticsServiceProvider).logTutorialAutoAdvanced(
+            learningMode: result.learningMode ?? 'unknown',
+            fromStep: fromStep,
+            toStep: _stepId(_currentPage + 1),
+          );
+      _goToNext();
+    }
   }
 
   Future<void> _completeOnboarding({String? nextRoute}) async {

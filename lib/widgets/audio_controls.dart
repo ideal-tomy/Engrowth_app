@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +8,7 @@ import '../services/tts_service.dart';
 import '../services/recording_service.dart';
 import '../services/voice_submission_service.dart';
 import '../services/recording_consent_service.dart';
+import '../providers/feedback_provider.dart';
 import '../services/analytics_service.dart';
 import '../utils/recording_error_helper.dart';
 import 'recording_waveform.dart';
@@ -15,7 +16,7 @@ import 'recording_waveform.dart';
 /// 音声操作コントロール
 /// 学習画面下部に配置。録音→アップロード→コンサルタントに提出 対応
 /// 例文学習・会話トレーニング両方で使用
-class AudioControls extends StatefulWidget {
+class AudioControls extends ConsumerStatefulWidget {
   final String englishText;
   final String japaneseText;
   /// 会話の役割（'A'/'B'）を指定すると、役割別の voice で再生
@@ -61,10 +62,10 @@ class AudioControls extends StatefulWidget {
   });
 
   @override
-  State<AudioControls> createState() => _AudioControlsState();
+  ConsumerState<AudioControls> createState() => _AudioControlsState();
 }
 
-class _AudioControlsState extends State<AudioControls> {
+class _AudioControlsState extends ConsumerState<AudioControls> {
   final TtsService _ttsService = TtsService();
   final RecordingService _recordingService = RecordingService();
   final VoiceSubmissionService _submissionService = VoiceSubmissionService();
@@ -176,7 +177,7 @@ class _AudioControlsState extends State<AudioControls> {
         _isRecording = false;
         _hasRecording = path != null;
       });
-      HapticFeedback.mediumImpact();
+      ref.read(feedbackServiceProvider).medium(trigger: 'audio_record_stop_medium');
 
       if (path != null) {
         final file = File(path);
@@ -251,7 +252,7 @@ class _AudioControlsState extends State<AudioControls> {
           _hasRecording = false;
           _lastSubmissionId = null;
         });
-        HapticFeedback.lightImpact();
+        ref.read(feedbackServiceProvider).light(trigger: 'audio_record_start_light');
       } catch (e) {
         if (mounted) {
           final msg = RecordingErrorHelper.getUserMessage(e);

@@ -15,7 +15,7 @@ class LearningIntroDialog extends StatefulWidget {
 
   final String title;
   final String body;
-  final VoidCallback onStart;
+  final Future<void> Function() onStart;
   final Duration autoDismissDuration;
 
   /// モーダルで表示。フェードイン後、指定秒数で自動閉じて onStart を呼ぶ
@@ -23,7 +23,7 @@ class LearningIntroDialog extends StatefulWidget {
     BuildContext context, {
     required String title,
     required String body,
-    required VoidCallback onStart,
+    required Future<void> Function() onStart,
     Duration autoDismissDuration = const Duration(seconds: 5),
   }) {
     return showDialog<void>(
@@ -73,11 +73,11 @@ class _LearningIntroDialogState extends State<LearningIntroDialog>
     });
   }
 
-  void _dismissAndStart() {
+  Future<void> _dismissAndStart() async {
     if (!mounted) return;
     HapticFeedback.selectionClick();
     Navigator.of(context).pop();
-    widget.onStart();
+    await widget.onStart();
   }
 
   @override
