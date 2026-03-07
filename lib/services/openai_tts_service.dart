@@ -8,29 +8,23 @@ import '../config/tts_voice_config.dart';
 import 'analytics_service.dart';
 import 'openai_tts_playback_web.dart' if (dart.library.io) 'openai_tts_playback_io.dart' as playback;
 import 'tts_cache_key_util.dart';
+import 'tts_debug_collector.dart';
 
-/// Supabase Edge Function 経由で OpenAI TTS を呼び出し、MP3 を再生するサービス
-/// - ハイブリッド: DB 直参照を優先、ミス/タイムアウト時のみ Edge Function
-/// - API キーはクライアントに持たず Edge Function 内で使用
-/// - 失敗時は呼び出し元で flutter_tts へフォールバック
+/// DB 保存音声のみで再生するサービス
+/// - DB 直参照のみ。ミス時は Edge/OpenAI を呼ばず例外をスロー
+/// - 失敗時は flutter_tts へフォールバックしない（課金防止・挙動の一貫性）
 class OpenAiTtsService {
-  static const _functionName = 'tts_synthesize';
-  static const _timeout = Duration(seconds: 30);
-  /// デプロイWebのネットワーク遅延を考慮し、250ms→800msに拡張（毎回Edge化を抑制）
+  /// デプロイWebのネットワーク遅延を考慮し、250ms→800msに拡張
   static const _dbTimeout = Duration(milliseconds: 800);
   static const _bucket = 'tts-audio';
 
-  /// Supabase が初期化済みか（Edge Function 利用可能か）
+  /// Supabase が初期化済みか
   static bool get isAvailable {
     try {
       return Supabase.instance.client != null;
     } catch (_) {
       return false;
     }
-  }
-
-  Future<void> _playBytes(List<int> bytes, {String? ttsSessionId}) async {
-    await playback.playBytes(bytes, ttsSessionId: ttsSessionId);
   }
 
   /// DB lookup 結果（観測用）
@@ -188,94 +182,37 @@ class OpenAiTtsService {
       return;
     }
 
-    // 2. ミス/タイムアウト: Edge Function にフォールバック
-    final edgeStopwatch = Stopwatch()..start();
-    final body = <String, dynamic>{
-      'text': text,
-      'language': language,
-      'speakingRate': speakingRate.clamp(0.25, 4.0),
-      'voice': voice,
-    };
-    if (ttsSessionId != null) body['tts_session_id'] = ttsSessionId;
+    // DB ミス: Edge を呼ばず例外をスロー（課金防止）
+    final normalized = normalizeTextForCache(text);
+    final clampedSpeed = speakingRate.clamp(0.25, 4.0);
+    final keyStr = buildTtsCacheKey(
+      text: normalized,
+      language: language,
+      voice: voice,
+      speed: clampedSpeed,
+    );
+    final keyHash = sha256Hex(keyStr);
 
-    final client = Supabase.instance.client;
-    final response = await client.functions
-        .invoke(
-          _functionName,
-          body: body,
-        )
-        .timeout(_timeout, onTimeout: () {
-      throw TimeoutException('TTS synthesis timeout');
-    });
-
-    edgeStopwatch.stop();
-    final edgeElapsedMs = edgeStopwatch.elapsedMilliseconds;
-
-    final data = response.data;
-    if (data == null) {
-      stopwatch.stop();
-      AnalyticsService().logTtsRequest(
-        latencyMs: stopwatch.elapsedMilliseconds,
-        cacheHit: false,
-        sessionId: ttsSessionId,
-        source: 'edge',
-        pathTaken: 'edge',
-        dbResult: dbResult.dbResult,
-        dbElapsedMs: dbResult.dbElapsedMs,
-        edgeElapsedMs: edgeElapsedMs,
-        errorCode: 'empty_response',
-      );
-      throw Exception('Empty TTS response');
+    if (kDebugMode) {
+      debugPrint('🚨 【犯人特定用】アプリ側のレシピ生文字列: "$keyStr"');
     }
-
-    // 新形式: JSON { url, cache_hit }
-    if (data is Map<String, dynamic>) {
-      final url = data['url'] as String?;
-      if (url != null && url.isNotEmpty) {
-        stopwatch.stop();
-        final latencyMs = stopwatch.elapsedMilliseconds;
-        final cacheHit = data['cache_hit'] as bool?;
-        AnalyticsService().logTtsRequest(
-          latencyMs: latencyMs,
-          cacheHit: cacheHit,
-          sessionId: ttsSessionId,
-          source: 'edge',
-          pathTaken: 'edge',
-          dbResult: dbResult.dbResult,
-          dbElapsedMs: dbResult.dbElapsedMs,
-          edgeElapsedMs: edgeElapsedMs,
-        );
-        onTtsRequestComplete?.call(latencyMs, cacheHit);
-        await playback.playFromUrl(url, ttsSessionId: ttsSessionId);
-        return;
-      }
-    }
-
-    // 旧形式: bytes（後方互換）
-    if (data is List<int> || data is Uint8List) {
-      stopwatch.stop();
-      AnalyticsService().logTtsRequest(
-        latencyMs: stopwatch.elapsedMilliseconds,
-        cacheHit: false,
-        sessionId: ttsSessionId,
-        source: 'edge',
-        pathTaken: 'edge',
-        dbResult: dbResult.dbResult,
-        dbElapsedMs: dbResult.dbElapsedMs,
-        edgeElapsedMs: edgeElapsedMs,
-      );
-      final bytes = data is Uint8List ? data : Uint8List.fromList(data as List<int>);
-      await _playBytes(bytes, ttsSessionId: ttsSessionId);
-      return;
-    }
-
-    if (kDebugMode) debugPrint('OpenAI TTS: unexpected response type ${data.runtimeType}');
-    throw Exception('Invalid TTS response format');
+    TtsDebugCollector.recordDbMiss(
+      cacheKey: keyHash,
+      textPreview: normalized.length > 80 ? '${normalized.substring(0, 80)}...' : normalized,
+      dbResult: dbResult.dbResult,
+      dbElapsedMs: dbResult.dbElapsedMs,
+      edgeCalled: false,
+      recipeRaw: keyStr,
+    );
+    throw Exception(
+      'TTS cache miss: 音声がDBにありません。prefill を実行してください。'
+      ' (cache_key: ${keyHash.substring(0, 8)}...)\n'
+      '【犯人特定用】レシピ生文字列: $keyStr',
+    );
   }
 
   /// 音声 URL のみ取得（プリフェッチ用。再生はしない）
-  /// ハイブリッド: DB 直参照 → ミス時 Edge
-  /// キャンセル時は呼び出し元で generation ID 等で破棄すること
+  /// DB のみ。ミス時は null を返す（Edge は呼ばない）
   Future<String?> fetchAudioUrl({
     required String text,
     String language = 'en-US',
@@ -291,27 +228,7 @@ class OpenAiTtsService {
       voice: voice,
       speakingRate: speakingRate,
     );
-    if (dbResult.url != null && dbResult.url!.isNotEmpty) return dbResult.url;
-
-    final body = {
-      'text': text,
-      'language': language,
-      'speakingRate': speakingRate.clamp(0.25, 4.0),
-      'voice': voice,
-    };
-
-    final client = Supabase.instance.client;
-    final response = await client.functions
-        .invoke(_functionName, body: body)
-        .timeout(_timeout, onTimeout: () {
-      throw TimeoutException('TTS fetch timeout');
-    });
-
-    final data = response.data;
-    if (data is Map<String, dynamic>) {
-      return data['url'] as String?;
-    }
-    return null;
+    return dbResult.url;
   }
 
   /// プリフェッチ済み URL から直接再生

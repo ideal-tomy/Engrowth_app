@@ -55,8 +55,8 @@ class _WordListScreenState extends ConsumerState<WordListScreen> {
     if (offset == null) return;
     _listScrollController.animateTo(
       offset,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
+      duration: EngrowthElementTokens.switchDuration,
+      curve: EngrowthElementTokens.switchCurveIn,
     );
   }
 

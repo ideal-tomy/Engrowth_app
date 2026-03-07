@@ -27,7 +27,7 @@ class _ScrollTargetWrapperState extends State<ScrollTargetWrapper>
     super.initState();
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: EngrowthElementTokens.switchDuration,
     );
     if (widget.isTarget) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -51,12 +51,12 @@ class _ScrollTargetWrapperState extends State<ScrollTargetWrapper>
     final context = this.context;
     Scrollable.ensureVisible(
       context,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
+      duration: EngrowthElementTokens.switchDuration,
+      curve: EngrowthElementTokens.switchCurveIn,
     );
     _glowController.forward(from: 0);
     if (widget.unlockSnackBarMessage != null) {
-      Future.delayed(const Duration(milliseconds: 700), () {
+      Future.delayed(EngrowthElementTokens.switchDuration, () {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

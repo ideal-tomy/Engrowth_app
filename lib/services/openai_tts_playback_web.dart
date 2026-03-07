@@ -3,6 +3,7 @@
 import 'dart:html' as html;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -51,11 +52,27 @@ String _classifyMediaError(int code) {
   }
 }
 
+/// onCanPlay / onLoadedData のいずれかが発火するまで待つ（遅いネットワーク対策）
+const _loadTimeout = Duration(seconds: 20);
+
 /// URL から再生（キャッシュヒット時など）
+/// 直接 URL で失敗した場合は fetch→blob でリトライ
 Future<void> playFromUrl(String url, {String? ttsSessionId}) async {
+  try {
+    await _playFromUrlDirect(url, ttsSessionId: ttsSessionId);
+  } on TimeoutException {
+    if (kDebugMode) debugPrint('OpenAI TTS (Web): 直接URLでタイムアウト、fetch→blobでリトライ');
+    await _playFromUrlViaFetch(url, ttsSessionId: ttsSessionId);
+  }
+}
+
+Future<void> _playFromUrlDirect(String url, {String? ttsSessionId}) async {
   stop();
   _currentUrl = url;
-  _current = html.AudioElement()..src = url;
+  final el = html.AudioElement()
+    ..preload = 'auto'
+    ..src = url;
+  _current = el;
 
   final completer = Completer<void>();
 
@@ -104,7 +121,10 @@ Future<void> playFromUrl(String url, {String? ttsSessionId}) async {
     }
   });
 
-  await _current!.onCanPlay.first.timeout(const Duration(seconds: 10));
+  await Future.any([
+    _current!.onCanPlay.first,
+    _current!.onLoadedData.first,
+  ]).timeout(_loadTimeout);
   try {
     await _current!.play();
   } catch (e) {
@@ -126,7 +146,23 @@ Future<void> playFromUrl(String url, {String? ttsSessionId}) async {
     }
     throw Exception('Audio playback error: $e');
   }
-  await completer.future.timeout(const Duration(seconds: 60));
+  await completer.future.timeout(const Duration(seconds: 90));
+}
+
+/// fetch で取得して blob URL から再生（直接 URL がタイムアウトした場合のフォールバック）
+Future<void> _playFromUrlViaFetch(String url, {String? ttsSessionId}) async {
+  stop();
+  final response = await html.HttpRequest.request(
+    url,
+    responseType: 'arraybuffer',
+    requestHeaders: {'Accept': 'audio/*'},
+  ).timeout(const Duration(seconds: 15));
+  final buffer = response.response as ByteBuffer?;
+  if (buffer == null || buffer.lengthInBytes == 0) {
+    throw Exception('TTS fetch failed: empty response');
+  }
+  final bytes = Uint8List.view(buffer);
+  await playBytes(bytes.toList(), ttsSessionId: ttsSessionId);
 }
 
 Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
@@ -134,7 +170,9 @@ Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
   final blob = html.Blob([Uint8List.fromList(bytes)], 'audio/mpeg');
   final url = html.Url.createObjectUrlFromBlob(blob);
   _currentUrl = url;
-  _current = html.AudioElement()..src = url;
+  _current = html.AudioElement()
+    ..preload = 'auto'
+    ..src = url;
 
   final completer = Completer<void>();
 
@@ -178,7 +216,10 @@ Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
     }
   });
 
-  await _current!.onCanPlay.first.timeout(const Duration(seconds: 10));
+  await Future.any([
+    _current!.onCanPlay.first,
+    _current!.onLoadedData.first,
+  ]).timeout(_loadTimeout);
   try {
     await _current!.play();
   } catch (e) {
@@ -199,7 +240,7 @@ Future<void> playBytes(List<int> bytes, {String? ttsSessionId}) async {
     }
     throw Exception('Audio playback error: $e');
   }
-  await completer.future.timeout(const Duration(seconds: 30));
+  await completer.future.timeout(const Duration(seconds: 60));
 }
 
 void _revoke() {

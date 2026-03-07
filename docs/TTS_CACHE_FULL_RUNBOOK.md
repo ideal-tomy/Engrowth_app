@@ -4,6 +4,76 @@
 
 ---
 
+## 初心者向け: 各章の確認ポイント
+
+| 章 | 何を確認するか | 成功条件 | 失敗時次アクション |
+|----|----------------|----------|-------------------|
+| 前提 | プロジェクトルート・.env・Supabase ログイン | ターミナル実行・Dashboard 閲覧が可能 | 権限不足時は Owner に招待依頼、CLI 未準備時は Node/NPM セットアップ |
+| Step 2 | tts_assets テーブル・tts-audio バケット(public) | SQL で true / public=true | migration 実行、`UPDATE storage.buckets` |
+| Step 3 | Edge Secrets に OPENAI_API_KEY | Dashboard で確認可能 | Secrets に追加 |
+| Step 4 | tts_synthesize デプロイ | Deployed successfully | Project not linked なら `supabase link` |
+| Step 5 | DB と Edge の cache_key 一致 | verify で cache_hit=true または DB=なし | Edge 再デプロイ、接続先 URL 確認 |
+| Step 6-7 | prefill 実行・2回目ヒット | 2回目でキャッシュヒット増加 | `--limit` で分割、verify でキー不一致確認 |
+| Step 8 | アプリで再生 | 1回目から遅延なく再生 | Edge Logs で cache_hit 確認、TTS_DEBUG_CHECKLIST 参照 |
+
+**障害切り分け**は `docs/TTS_DEBUG_CHECKLIST.md` を参照。
+
+---
+
+## 完了判定SQL（毎回同じ手順で合否を出す）
+
+本番切替後、Supabase SQL Editor で次を実行し、期待と一致するか確認する。
+
+```sql
+-- 1) 直近24hのキャッシュ利用状況
+SELECT
+  event_properties->>'tts_source' AS tts_source,
+  COUNT(*) AS cnt,
+  ROUND(AVG((event_properties->>'latency_ms')::int)) AS avg_latency_ms
+FROM analytics_events
+WHERE event_type = 'tts_request'
+  AND created_at > NOW() - INTERVAL '24 hours'
+GROUP BY 1
+ORDER BY cnt DESC;
+
+-- 2) direct_db vs edge の内訳（edge 偏重でないか）
+SELECT
+  COUNT(*) FILTER (WHERE event_properties->>'path_taken' = 'edge') AS edge_count,
+  COUNT(*) FILTER (WHERE event_properties->>'path_taken' = 'direct_db') AS direct_db_count
+FROM analytics_events
+WHERE event_type = 'tts_request'
+  AND created_at > NOW() - INTERVAL '24 hours';
+```
+
+期待: `direct_db_count` が主、`edge_count` は未prefill文や動的文に限定。analytics_events が無い場合は Edge Logs で `cache_hit` を確認。
+
+---
+
+## 本番切替手順（固定・再実行ループを止める）
+
+**毎回同じ順で実行する。1回の切替で完了可否を判定する。**
+
+1. **Edge deploy** → `npx supabase functions deploy tts_synthesize --no-verify-jwt`
+2. **prefill（小さく試す）** → `dart run scripts/prefill_tts_assets.dart --limit 10`（初回は必ず小規模で確認）
+3. **prefill（全量）** → `dart run scripts/prefill_tts_assets.dart`
+4. **2回目 prefill（ヒット確認）** → `dart run scripts/prefill_tts_assets.dart`（キャッシュヒット数が増えていること）
+5. **app 確認** → 会話学習で「会話を聴く」を再生
+6. **完了判定** → 上記 SQL を実行し、期待と一致するか確認
+
+※ Step 2〜3（tts_assets / バケット）が未整備の場合は先に実施。詳細は下記 Step 参照。
+
+### キャッシュ整合確認フロー（再現性固定）
+
+| 手順 | コマンド | 成功条件 |
+|------|----------|----------|
+| 1. ハッシュ突合 | `dart run scripts/verify_tts_cache_hash.dart` | DB と Edge の cache_key が一致 |
+| 2. 特定テキスト検証 | `dart run scripts/verify_tts_cache_hash.dart --text "Edgeログのテキスト"` | DB=あり かつ Edge_cache_hit=true |
+| 3. 複数サンプル | `dart run scripts/verify_tts_cache_hash.dart --samples 10` | 全件 DB=あり Edge_cache_hit=true |
+
+Edge ログで `cache_hit=false` のログを1件選び、`cache_key_preview` のテキスト部分（最初の `|` より前）をコピーして `--text` に指定すると、その発話だけを検証できる。
+
+---
+
 ## コマンドだけ並べた一覧（詳細は下の Step 参照）
 
 **ローカル Docker は不要。** `supabase status` は使わず、いきなりデプロイからでよい。
@@ -13,6 +83,7 @@ cd c:\Users\ryoji\demo\engrowth_app
 npx supabase functions deploy tts_synthesize --no-verify-jwt
 dart pub get
 dart run scripts/verify_tts_cache_hash.dart
+dart run scripts/prefill_tts_assets.dart --limit 10
 dart run scripts/prefill_tts_assets.dart
 dart run scripts/prefill_tts_assets.dart
 ```
@@ -27,6 +98,8 @@ dart run scripts/prefill_tts_assets.dart
 - プロジェクトルートが `engrowth_app` であること
 - `.env` に `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY`（または `SUPABASE_ANON_KEY`）が入っていること
 - Supabase プロジェクトにログイン済み（`supabase login` 済み or リンク済み）
+
+**接続先確認**: `.\scripts\verify_supabase_env.ps1` で prefill・アプリ・デプロイ先が同じ Supabase プロジェクトか確認できる。
 
 ---
 
@@ -115,7 +188,15 @@ dart run scripts/verify_tts_cache_hash.dart
 
 ---
 
-## Step 6: prefill を1回だけ実行
+## Step 6: prefill を実行（小さく試す→全量）
+
+**初回は必ず小規模で確認する。**
+
+```powershell
+dart run scripts/prefill_tts_assets.dart --limit 10
+```
+
+- エラーなく完了すれば、全量を実行:
 
 ```powershell
 dart run scripts/prefill_tts_assets.dart
@@ -124,11 +205,7 @@ dart run scripts/prefill_tts_assets.dart
 - 最初の1件で `1件目: cache_hit=true` なら、すでにキーが揃っている。
 - `1件目: cache_hit=false` なら、この実行で約 1995 件が「今の Edge のルール」で DB に投入される。完了まで待つ（数十分かかることがある）。
 
-エラーが多発する場合は `--limit 100` を付けて試す:
-
-```powershell
-dart run scripts/prefill_tts_assets.dart --limit 100
-```
+エラーが多発する場合は `--limit 100` で段階的に試す。
 
 ---
 
@@ -166,7 +243,7 @@ dart run scripts/prefill_tts_assets.dart
 | 3 | Dashboard で OPENAI_API_KEY 設定確認 | □ |
 | 4 | `npx supabase functions deploy tts_synthesize --no-verify-jwt` を実行 | □ |
 | 5 | `dart run scripts/verify_tts_cache_hash.dart` で結果確認 | □ |
-| 6 | `dart run scripts/prefill_tts_assets.dart` を1回実行 | □ |
+| 6 | `dart run scripts/prefill_tts_assets.dart --limit 10` で小規模確認後、全量実行 | □ |
 | 7 | prefill をあと1回実行し、ヒット数確認 | □ |
 | 8 | アプリで「会話を聴く」を再生して体感確認 | □ |
 
@@ -193,6 +270,18 @@ LIMIT 20;
 
 - `tts_request`: `tts_source` が `direct_db` なら DB 直参照ヒット、`edge` なら Edge 経由
 - `tts_playback_session`: `first_utterance_prefetched`, `first_5_prefetch_hit_count`, `flutter_fallback_count` で初回・先頭5件のヒット率・フォールバック回数を確認
+
+---
+
+## 原因切り分け: cache問題 vs 再生問題
+
+| 症状 | 切り分け | 確認・対策 |
+|------|----------|------------|
+| 音が鳴らない | Edge Logs で `cache_hit` を確認 | `cache_hit=true` → 再生問題（Web autoplay / network）。`tts_web_play_error` の error_type を確認 |
+| 音が鳴らない | 同上 | `cache_hit=false` → cache問題。prefill 再実行、`verify_tts_cache_hash.dart --samples 10` で検証 |
+| 毎回遅い | direct_db 比率が低い | analytics_events で `path_taken='direct_db'` の割合を確認。低ければ prefill 不足 or キー不一致 |
+
+複数サンプル検証: `dart run scripts/verify_tts_cache_hash.dart --samples 10`
 
 ---
 

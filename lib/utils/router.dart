@@ -38,6 +38,7 @@ import '../screens/tutorial_conversation_screen.dart';
 import '../screens/unified_result_screen.dart';
 import '../screens/help_screen.dart';
 import '../screens/concept_screen.dart';
+import '../screens/guided_flow_demo_screen.dart';
 import '../providers/ui_experiments_provider.dart';
 import '../widgets/marquee/bottom_recommendation_rail.dart';
 
@@ -54,8 +55,56 @@ Page<void> _standardPushPage({
     transitionDuration: EngrowthRouteTokens.standardPushDuration,
     reverseTransitionDuration: EngrowthRouteTokens.standardPushReverseDuration,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // フェードアウトを早く: opacity を前半で完了 → 前ページの残り時間短縮
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Interval(
+          0,
+          EngrowthRouteTokens.standardPushFadeIntervalEnd,
+          curve: EngrowthRouteTokens.standardPushFadeIntervalCurve,
+        ),
+      );
       return FadeTransition(
-        opacity: animation,
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(0, EngrowthRouteTokens.standardPushSlideOffset),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: EngrowthRouteTokens.standardPushCurve,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// slowPush: ガイドフロー体感デモ用（本番と同速でデモ画面へ遷移）
+Page<void> _slowPushPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  final duration = EngrowthRouteTokens.standardPushDuration;
+  final reverseDuration = EngrowthRouteTokens.standardPushReverseDuration;
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: duration,
+    reverseTransitionDuration: reverseDuration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Interval(
+          0,
+          EngrowthRouteTokens.standardPushFadeIntervalEnd,
+          curve: EngrowthRouteTokens.standardPushFadeIntervalCurve,
+        ),
+      );
+      return FadeTransition(
+        opacity: fadeAnimation,
         child: SlideTransition(
           position: Tween<Offset>(
             begin: Offset(0, EngrowthRouteTokens.standardPushSlideOffset),
@@ -72,7 +121,6 @@ Page<void> _standardPushPage({
 }
 
 /// modalPush: 設定/補助導線（fade + upFromBottom）
-/// 180ms / reverse 160ms
 Page<void> _modalPushPage({
   required BuildContext context,
   required GoRouterState state,
@@ -84,8 +132,16 @@ Page<void> _modalPushPage({
     transitionDuration: EngrowthRouteTokens.modalPushDuration,
     reverseTransitionDuration: EngrowthRouteTokens.modalPushReverseDuration,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Interval(
+          0,
+          EngrowthRouteTokens.modalPushFadeIntervalEnd,
+          curve: EngrowthRouteTokens.modalPushFadeIntervalCurve,
+        ),
+      );
       return FadeTransition(
-        opacity: animation,
+        opacity: fadeAnimation,
         child: SlideTransition(
           position: Tween<Offset>(
             begin: Offset(0, EngrowthRouteTokens.modalPushSlideOffset),
@@ -102,7 +158,6 @@ Page<void> _modalPushPage({
 }
 
 /// resultPush: リザルト画面（fade + scale）
-/// 260ms / reverse 200ms
 Page<void> _resultPushPage({
   required BuildContext context,
   required GoRouterState state,
@@ -114,8 +169,16 @@ Page<void> _resultPushPage({
     transitionDuration: EngrowthRouteTokens.resultPushDuration,
     reverseTransitionDuration: EngrowthRouteTokens.resultPushReverseDuration,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Interval(
+          0,
+          EngrowthRouteTokens.resultPushFadeIntervalEnd,
+          curve: EngrowthRouteTokens.resultPushFadeIntervalCurve,
+        ),
+      );
       return FadeTransition(
-        opacity: animation,
+        opacity: fadeAnimation,
         child: ScaleTransition(
           scale: Tween<double>(
             begin: EngrowthRouteTokens.resultPushScaleBegin,
@@ -195,6 +258,14 @@ final appRouter = GoRouter(
       ],
     ),
     // その他のルート（モーダル/プッシュ）
+    GoRoute(
+      path: '/guided-flow-demo',
+      pageBuilder: (context, state) => _slowPushPage(
+        context: context,
+        state: state,
+        child: const GuidedFlowDemoScreen(),
+      ),
+    ),
     GoRoute(
       path: '/hint-settings',
       pageBuilder: (context, state) => _modalPushPage(
@@ -593,7 +664,15 @@ class ScaffoldWithNavBar extends ConsumerWidget {
     );
 
     return Scaffold(
-      body: navigationShell,
+      body: AnimatedSwitcher(
+        duration: EngrowthElementTokens.switchDuration,
+        switchInCurve: EngrowthElementTokens.switchCurveIn,
+        switchOutCurve: EngrowthElementTokens.switchCurveOut,
+        child: KeyedSubtree(
+          key: ValueKey<int>(navigationShell.currentIndex),
+          child: navigationShell,
+        ),
+      ),
       bottomNavigationBar: enableMarquee
           ? Column(
               mainAxisSize: MainAxisSize.min,

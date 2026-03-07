@@ -4,7 +4,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-const String kTtsModel = 'tts-1-hd';
+const String kTtsModel = 'tts-1';
 
 /// キャッシュキー用: trim + 改行を \n に統一 + 小文字化（Edge・prefill と完全一致）
 String normalizeTextForCache(String text) {
@@ -16,6 +16,8 @@ String normalizeTextForCache(String text) {
 
 /// Edge と完全同一の key 文字列を生成
 /// speed は JS の ${n} と一致（1.0 -> "1", 0.6 -> "0.6"）
+/// Dart の浮動小数点 toString 問題（0.6→0.6000000000000001）を回避するため
+/// toStringAsFixed(2) で丸め、末尾の 0 を削除
 String buildTtsCacheKey({
   required String text,
   String language = 'en-US',
@@ -25,9 +27,9 @@ String buildTtsCacheKey({
 }) {
   final clamped = speed.clamp(0.25, 4.0);
   final rounded = (clamped * 100).round() / 100;
-  final speedStr = (rounded == rounded.roundToDouble())
+  final speedStr = rounded == rounded.truncateToDouble()
       ? rounded.toInt().toString()
-      : rounded.toString();
+      : rounded.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
   return '$text|$language|$voice|$speedStr|$model';
 }
 

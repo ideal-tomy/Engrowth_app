@@ -2,8 +2,9 @@
 ///
 /// 使い方（プロジェクトルートで）:
 ///   dart run scripts/verify_tts_cache_hash.dart
+///   dart run scripts/verify_tts_cache_hash.dart --text "Hello! Welcome to the team."
 ///
-/// 1. DB から1件取得 → Edge と同じルールで cache_key を計算
+/// 1. DB から1件取得（または --text で指定）→ Edge と同じルールで cache_key を計算
 /// 2. tts_assets にその cache_key が存在するか確認
 /// 3. 同じ body で Edge を1回呼び、cache_hit を表示
 /// これで「ハッシュのすれ違い」か「デプロイ未反映」かを切り分けできる
@@ -15,7 +16,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dotenv/dotenv.dart';
 import 'package:supabase/supabase.dart';
 
-const _model = 'tts-1-hd';
+const _model = 'tts-1';
 
 String normalizeTextForCache(String text) {
   return text
@@ -49,20 +50,29 @@ void main(List<String> args) async {
 
   final client = SupabaseClient(url, key);
 
-  // 1. 会話1件取得
-  final list = await client.from('conversation_utterances').select('english_text, speaker_role').limit(1);
-  if (list is! List || list.isEmpty) {
-    print('❌ conversation_utterances にデータがありません');
-    exit(1);
-  }
-
-  final row = list.first as Map;
-  final rawEn = (row['english_text'] as String?) ?? '';
-  final en = normalizeTextForCache(rawEn);
-  final role = ((row['speaker_role'] as String?) ?? '').toUpperCase();
-  final voice = role == 'A' ? 'alloy' : (role == 'B' ? 'nova' : 'nova');
+  String en;
+  String voice;
   const language = 'en-US';
   const speed = 1.0;
+
+  final textIdx = args.indexOf('--text');
+  if (textIdx >= 0 && textIdx + 1 < args.length) {
+    final rawText = args[textIdx + 1];
+    en = normalizeTextForCache(rawText);
+    voice = 'nova';
+    print('--text で指定: ${rawText.length > 50 ? "${rawText.substring(0, 50)}..." : rawText}');
+  } else {
+    final list = await client.from('conversation_utterances').select('english_text, speaker_role').limit(1);
+    if (list is! List || list.isEmpty) {
+      print('❌ conversation_utterances にデータがありません');
+      exit(1);
+    }
+    final row = list.first as Map;
+    final rawEn = (row['english_text'] as String?) ?? '';
+    en = normalizeTextForCache(rawEn);
+    final role = ((row['speaker_role'] as String?) ?? '').toUpperCase();
+    voice = role == 'A' ? 'alloy' : (role == 'B' ? 'nova' : 'nova');
+  }
 
   if (en.isEmpty) {
     print('❌ 英語テキストが空です');

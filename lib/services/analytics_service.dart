@@ -768,6 +768,53 @@ class AnalyticsService {
         },
       );
 
+  // Speak風ガイドフロー計測
+  void logGuidedFlowPopupShown({
+    required String contentType,
+    required String step,
+    String? contentId,
+  }) =>
+      logEvent(
+        eventType: 'guided_flow_popup_shown',
+        eventProperties: {
+          'content_type': contentType,
+          'step': step,
+          if (contentId != null) 'content_id': contentId,
+        },
+      );
+  void logGuidedFlowPopupDismissed({
+    required String contentType,
+    required String step,
+    String? reason,
+  }) =>
+      logEvent(
+        eventType: 'guided_flow_popup_dismissed',
+        eventProperties: {
+          'content_type': contentType,
+          'step': step,
+          if (reason != null) 'reason': reason,
+        },
+      );
+  void logGuidedFlowPlayRevealed({required String contentType, String? contentId}) =>
+      logEvent(
+        eventType: 'guided_flow_play_revealed',
+        eventProperties: {
+          'content_type': contentType,
+          if (contentId != null) 'content_id': contentId,
+        },
+      );
+  void logGuidedFlowFirstListenCompleted({
+    required String contentType,
+    required String contentId,
+  }) =>
+      logEvent(
+        eventType: 'guided_flow_first_listen_completed',
+        eventProperties: {
+          'content_type': contentType,
+          'content_id': contentId,
+        },
+      );
+
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
   void logTtsPlaybackSession({
     required String conversationId,

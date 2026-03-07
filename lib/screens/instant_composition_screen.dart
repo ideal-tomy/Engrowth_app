@@ -37,7 +37,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
     _ttsService.initialize();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: EngrowthElementTokens.switchDuration,
     );
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -197,7 +197,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
+              duration: EngrowthElementTokens.switchDuration,
               child: Column(
                 key: ValueKey(_currentIndex),
                 children: [
@@ -206,7 +206,7 @@ class _InstantCompositionScreenState extends ConsumerState<InstantCompositionScr
                     flex: 3,
                     child: AnimatedScale(
                       scale: _phase == _Phase.speaking ? 1.0 : 0.98,
-                      duration: const Duration(milliseconds: 200),
+                      duration: EngrowthElementTokens.switchDuration,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Stack(

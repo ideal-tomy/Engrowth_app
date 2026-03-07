@@ -400,7 +400,7 @@ class _TutorialConversationScreenState
                           ? null
                           : () => _toggleRecord(session),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
+                        duration: EngrowthElementTokens.switchDuration,
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(

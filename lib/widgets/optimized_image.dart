@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/engrowth_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -41,8 +43,8 @@ class OptimizedImage extends StatelessWidget {
       maxHeightDiskCache: 675,
       placeholder: (context, url) => placeholder ?? _buildShimmerPlaceholder(),
       errorWidget: (context, url, error) => errorWidget ?? _defaultErrorWidget(groupName: groupName),
-      fadeInDuration: const Duration(milliseconds: 300),
-      fadeOutDuration: const Duration(milliseconds: 100),
+      fadeInDuration: EngrowthElementTokens.switchDuration,
+      fadeOutDuration: EngrowthElementTokens.switchDuration,
     );
   }
 

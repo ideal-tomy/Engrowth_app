@@ -94,7 +94,12 @@ class _RecordingHistoryScreenState extends ConsumerState<RecordingHistoryScreen>
   void initState() {
     super.initState();
     final initialIndex = widget.initialTab == 'submitted' ? 1 : 0;
-    _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: initialIndex,
+      animationDuration: EngrowthElementTokens.switchDuration,
+    );
     _loadSubmissions();
   }
 

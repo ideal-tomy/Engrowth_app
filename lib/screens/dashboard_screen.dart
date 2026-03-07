@@ -26,6 +26,7 @@ import '../widgets/dashboard_sections/todays_mission_card.dart';
 import '../widgets/dashboard_sections/quick_action_fab.dart';
 import '../widgets/dashboard_sections/startup_shortcut_overlay.dart';
 import '../widgets/common/stagger_reveal.dart';
+import '../services/tts_debug_collector.dart';
 
 /// Dashboard（Home タブ）
 /// ヘッダー／再開カード／4x2アイコングリッドをコンパクトに表示
@@ -507,6 +508,24 @@ class _SettingsDrawer extends ConsumerWidget {
                   if (context.mounted) context.push('/onboarding');
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.slow_motion_video_outlined),
+                title: const Text('開発: ガイドフロー体感デモ'),
+                subtitle: const Text('ページ遷移・ポップアップ・ボタン登場をゆっくり体感'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/guided-flow-demo');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.record_voice_over_outlined),
+                title: const Text('TTS デバッグ出力'),
+                subtitle: const Text('cache miss 等をコピー→debug_tts_output.txt に保存→AI に確認依頼'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showTtsDebugDialog(context);
+                },
+              ),
               const Divider(),
             ],
             if (!isSignedIn)
@@ -659,4 +678,60 @@ class _SettingsDrawer extends ConsumerWidget {
       }
     }
   }
+}
+
+void _showTtsDebugDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('TTS デバッグ出力'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '音声再生を試して cache miss が出たら、以下をコピーしてプロジェクトルートに debug_tts_output.txt として保存してください。\n\nAI に「@debug_tts_output.txt を確認して」と依頼すると、直接内容を読み取って原因を特定できます。',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  TtsDebugCollector.entries.isEmpty
+                      ? '(未記録 - 3分一気に聴く等で再生を試してください)'
+                      : TtsDebugCollector.exportText,
+                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('閉じる'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await TtsDebugCollector.copyToClipboard();
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('コピーしました。debug_tts_output.txt に貼り付けて保存してください。')),
+              );
+              Navigator.pop(ctx);
+            }
+          },
+          child: const Text('コピー'),
+        ),
+      ],
+    ),
+  );
 }

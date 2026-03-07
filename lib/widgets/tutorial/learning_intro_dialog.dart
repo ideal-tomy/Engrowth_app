@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../theme/engrowth_theme.dart';
+
 /// チュートリアル用：学習開始前に「何をするか」を説明するポップアップ
 /// 指オーバーレイ完了後に表示。フェードインし、読む時間を考慮した秒数で自然に消える。
 /// ユーザーアクションは不要（タップで早期閉じも可能）
@@ -55,7 +57,7 @@ class _LearningIntroDialogState extends State<LearningIntroDialog>
   void initState() {
     super.initState();
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: EngrowthElementTokens.switchDuration,
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(

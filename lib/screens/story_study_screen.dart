@@ -15,6 +15,8 @@ import '../widgets/common/fade_slide_switcher.dart';
 import '../widgets/common/content_skeleton.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/transition_metrics_provider.dart';
+import '../providers/first_listen_completed_provider.dart';
+import '../widgets/guided_flow/listen_first_popup.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
 
 /// 3分ストーリー学習画面
@@ -48,6 +50,11 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   bool _autoStarted = false;
   bool _hasLoggedTapToFirstContent = false;
   bool _hasLoggedPrimaryCtaVisible = false;
+
+  // Speak風ガイドフロー用
+  bool _guidedFlowPlayButtonRevealed = false;
+  bool _hasShownListenFirstPopup = false;
+  bool _hasListenedToAll = false;
 
   @override
   void initState() {
@@ -116,12 +123,40 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     }
 
     if (mounted) {
+      final wasStoppedByUser = _stopPlaybackRequested;
       setState(() {
         _isPlaying = false;
         _stopPlaybackRequested = false;
+        if (!wasStoppedByUser) _hasListenedToAll = true;
       });
       if (widget.fromOnboarding && !widget.asSheet) {
+        // オンボーディング導線: 聴き終わりで即戻る
+        final service = ref.read(firstListenCompletedServiceProvider);
+        final wasFirstTime = !await service.isCompleted('story', widget.storyId);
+        if (wasFirstTime) {
+          await service.markCompleted('story', widget.storyId);
+          ref.invalidate(firstListenCompletedProvider(('story', widget.storyId)));
+          ref.read(analyticsServiceProvider).logGuidedFlowFirstListenCompleted(
+            contentType: 'story',
+            contentId: widget.storyId,
+          );
+        }
+        if (!mounted) return;
         context.pop(LearningHandoffResult.completedWithMode('focus3'));
+        return;
+      }
+      if (!wasStoppedByUser) {
+        final service = ref.read(firstListenCompletedServiceProvider);
+        final wasFirstTime = !await service.isCompleted('story', widget.storyId);
+        if (wasFirstTime) {
+          await service.markCompleted('story', widget.storyId);
+          ref.invalidate(firstListenCompletedProvider(('story', widget.storyId)));
+          ref.read(analyticsServiceProvider).logGuidedFlowFirstListenCompleted(
+            contentType: 'story',
+            contentId: widget.storyId,
+          );
+          if (mounted) _showStoryNextActionDialog();
+        }
       }
     }
   }
@@ -132,6 +167,115 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     if (mounted) {
       setState(() => _isPlaying = false);
     }
+  }
+
+  void _showStoryNextActionDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: FutureBuilder<List<Conversation>>(
+          future: ref.read(storyConversationsProvider(widget.storyId).future),
+          builder: (ctx, snapshot) {
+            final conversations = snapshot.data ?? [];
+            final firstId = conversations.isNotEmpty ? conversations.first.id : null;
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '次はどうする？',
+                    style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 20),
+                  if (firstId != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          context.push('/conversation/$firstId?mode=roleA');
+                        },
+                        icon: const Icon(Icons.person, size: 18),
+                        label: const Text('A役で3分通し練習'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EngrowthColors.roleA,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          context.push('/conversation/$firstId?mode=roleB');
+                        },
+                        icon: const Icon(Icons.person_outline, size: 18),
+                        label: const Text('B役で3分通し練習'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EngrowthColors.roleB,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  ...conversations.asMap().entries.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          context.push('/conversation/${e.value.id}?mode=listen');
+                        },
+                        icon: const Icon(Icons.queue_music, size: 18),
+                        label: Text(conversations.length > 1 ? 'パート ${e.key + 1} で聴く' : 'チャンクで聴く'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white38),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  )),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('閉じる'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -147,6 +291,39 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     final storiesAsync = ref.watch(storySequencesProvider);
     final utterancesAsync = ref.watch(storyUtterancesOrderedProvider(widget.storyId));
     final conversationsAsync = ref.watch(storyConversationsProvider(widget.storyId));
+    final firstListenAsync = ref.watch(firstListenCompletedProvider(('story', widget.storyId)));
+
+    // Speak風ガイドフロー: 初回のみポップアップ表示
+    ref.listen(firstListenCompletedProvider(('story', widget.storyId)), (_, next) {
+      next.whenData((isCompleted) {
+        if (isCompleted) return;
+        if (_hasShownListenFirstPopup || !mounted) return;
+        _hasShownListenFirstPopup = true;
+        ListenFirstPopup.show(
+          context,
+          contentType: 'story',
+          contentId: widget.storyId,
+          onShown: () => ref.read(analyticsServiceProvider).logGuidedFlowPopupShown(
+            contentType: 'story',
+            step: 'listen_first',
+            contentId: widget.storyId,
+          ),
+          onDismiss: () {
+            if (mounted) {
+              setState(() => _guidedFlowPlayButtonRevealed = true);
+              ref.read(analyticsServiceProvider).logGuidedFlowPopupDismissed(
+                contentType: 'story',
+                step: 'listen_first',
+              );
+              ref.read(analyticsServiceProvider).logGuidedFlowPlayRevealed(
+                contentType: 'story',
+                contentId: widget.storyId,
+              );
+            }
+          },
+        );
+      });
+    });
 
     StorySequence? story;
     for (final s in storiesAsync.valueOrNull ?? <StorySequence>[]) {
@@ -168,18 +345,24 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               child: Text('発話がありません', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             );
           }
-          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying) {
+          final isFirstTimeGuidedFlow = (firstListenAsync.valueOrNull ?? true) == false;
+          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying && !isFirstTimeGuidedFlow) {
             _autoStarted = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _isPlaying) return;
               _playAllUtterances(utterances);
             });
           }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Speak風ガイドフロー Phase 1: ポップアップ表示前は何も表示しない
+                if (isFirstTimeGuidedFlow && !_guidedFlowPlayButtonRevealed)
+                  const SizedBox.shrink()
+                else ...[
                 // メイン: 3分一気に聴く
                 _SectionTitle(icon: Icons.headphones, label: '3分一気に聴く'),
                 const SizedBox(height: 8),
@@ -264,6 +447,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                // Speak風ガイドフロー: 初回聴き終わり前は A役/B役・チャンクを非表示
+                if (!isFirstTimeGuidedFlow || _hasListenedToAll) ...[
                 // A役・B役で3分通し練習
                 _SectionTitle(icon: Icons.mic, label: '役で3分通し練習'),
                 const SizedBox(height: 8),
@@ -325,6 +510,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Text('エラー: $e', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
+                ],  // !isFirstTimeGuidedFlow || _hasListenedToAll
+                ],  // else (guided flow phase 2+)
               ],
             ),
           );

@@ -37,7 +37,7 @@ class _StartupShortcutPopupState extends ConsumerState<StartupShortcutPopup>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: EngrowthElementTokens.switchDuration,
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(

@@ -43,6 +43,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# TTS デバッグ出力（AI 確認用・一時ファイル）
+debug_tts_output.txt
+check_tts_result.txt
+
 # 環境変数ファイル
 .env
 .env.local

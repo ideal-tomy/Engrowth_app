@@ -35,6 +35,7 @@
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
 
 ## TTS（音声再生・キャッシュ）
+- `docs/TTS_FLOW.md`（全体フロー・10秒タイムアウトの意味）
 - `docs/TTS_DEBUG_CHECKLIST.md`（5秒壁・direct_db 低下時の診断、デプロイ前後チェック）
 - `docs/TTS_CACHE_FULL_RUNBOOK.md`（prefill 手順）
 

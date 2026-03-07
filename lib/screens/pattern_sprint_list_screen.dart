@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../models/pattern_sprint_category.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/first_listen_completed_provider.dart';
+import '../widgets/guided_flow/listen_first_popup.dart';
 import '../services/pattern_sprint_service.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
@@ -26,6 +28,9 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
   int _selectedDurationSec = 45;
   String? _selectedPrefix;
   final GlobalKey _overlayTargetKey = GlobalKey();
+
+  // Speak風ガイドフロー: ポップアップ閉じ済みのプレフィックス
+  final Set<String> _guidedFlowPlayRevealedForPrefix = {};
 
   void _onOverlayComplete() {
     if (_selectedPrefix == null) return;
@@ -75,6 +80,48 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     final textTheme = Theme.of(context).textTheme;
     final categories = ref.watch(patternCategoriesProvider);
     final byCategory = ref.watch(patternByCategoryProvider);
+    final selectedPrefix = _selectedPrefix ?? '';
+    final firstListenAsync = selectedPrefix.isEmpty
+        ? const AsyncValue.data(true)
+        : ref.watch(firstListenCompletedProvider(('pattern', selectedPrefix)));
+
+    // Speak風ガイドフロー: 初回カテゴリアクセス時にポップアップ
+    ref.listen(
+      selectedPrefix.isNotEmpty
+          ? firstListenCompletedProvider(('pattern', selectedPrefix))
+          : firstListenCompletedProvider(('pattern', '__skip__')),
+      (_, next) {
+        if (selectedPrefix.isEmpty) return;
+        next.whenData((isCompleted) {
+          if (isCompleted) return;
+          if (_guidedFlowPlayRevealedForPrefix.contains(selectedPrefix) || !mounted) return;
+          ListenFirstPopup.show(
+          context,
+          message: 'まずは音声を聴いてから、まねして言いましょう',
+          contentType: 'pattern',
+          contentId: selectedPrefix,
+          onShown: () => ref.read(analyticsServiceProvider).logGuidedFlowPopupShown(
+            contentType: 'pattern',
+            step: 'listen_first',
+            contentId: selectedPrefix,
+          ),
+          onDismiss: () {
+            if (mounted) {
+              setState(() => _guidedFlowPlayRevealedForPrefix.add(selectedPrefix));
+              ref.read(analyticsServiceProvider).logGuidedFlowPopupDismissed(
+                contentType: 'pattern',
+                step: 'listen_first',
+              );
+              ref.read(analyticsServiceProvider).logGuidedFlowPlayRevealed(
+                contentType: 'pattern',
+                contentId: selectedPrefix,
+              );
+            }
+          },
+          );
+        });
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -87,8 +134,166 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
           ),
         ],
       ),
-      body: _buildBody(categories, byCategory, colorScheme, textTheme),
+      body: _buildBody(categories, byCategory, colorScheme, textTheme, firstListenAsync),
     );
+  }
+
+  List<Widget> _buildCategorySections(
+    List<PatternSprintCategory> categories,
+    Map<String, List<PatternDefinition>> byCategory,
+    ColorScheme colorScheme,
+    AsyncValue<bool> firstListenAsync,
+  ) {
+    final isFirstTimeGuidedFlow = (_selectedPrefix != null) &&
+        (firstListenAsync.valueOrNull ?? true) == false;
+    final isGuidedFlowRevealed = _guidedFlowPlayRevealedForPrefix.contains(_selectedPrefix ?? '');
+    final showOnlySelectedCategory = isFirstTimeGuidedFlow && isGuidedFlowRevealed;
+
+    final categoriesToShow = showOnlySelectedCategory
+        ? categories.where((c) {
+            final patterns = byCategory[c.id] ?? [];
+            return patterns.any((p) => p.prefix == _selectedPrefix);
+          }).toList()
+        : categories;
+
+    return categoriesToShow.map((category) {
+      final patterns = byCategory[category.id] ?? [];
+      if (patterns.isEmpty) return const SizedBox.shrink();
+
+      final firstPrefix = patterns.first.prefix;
+      final isFirstCategory = categories.indexOf(category) == 0;
+      final useOverlayKey = widget.fromOnboarding && isFirstCategory;
+      final isSelectedCategory = patterns.any((p) => p.prefix == _selectedPrefix);
+
+      return Padding(
+        key: useOverlayKey ? _overlayTargetKey : null,
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  category.icon,
+                  size: 22,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.displayName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        category.usageHint,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.tonal(
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                          categoryId: category.id,
+                          prefix: firstPrefix,
+                        );
+                    context.push(
+                      '/pattern-sprint/session?prefix=${Uri.encodeComponent(firstPrefix)}&duration=$_selectedDurationSec',
+                    );
+                  },
+                  style: showOnlySelectedCategory && isSelectedCategory
+                      ? FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primaryContainer,
+                          foregroundColor: colorScheme.onPrimaryContainer,
+                        )
+                      : null,
+                  child: Text('${patterns.first.displayName}でスタート'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!showOnlySelectedCategory)
+              ...patterns.map((p) {
+                final isSelected = _selectedPrefix == p.prefix;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    dense: true,
+                    visualDensity: const VisualDensity(vertical: -2),
+                    leading: Icon(
+                      Icons.play_circle_outline,
+                      color: isSelected ? colorScheme.primary : colorScheme.outline,
+                      size: 24,
+                    ),
+                    title: Text(
+                      p.displayName,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(
+                      p.japaneseHint,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    selected: isSelected,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(analyticsServiceProvider).logPatternSprintCategorySelected(
+                            categoryId: category.id,
+                            prefix: p.prefix,
+                          );
+                      setState(() => _selectedPrefix = p.prefix);
+                    },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FavoriteToggleIcon(
+                          targetType: 'pattern',
+                          targetId: p.prefix,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          tooltip: 'このパターンですぐ始める',
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            ref.read(analyticsServiceProvider).logHapticFired(
+                                  trigger: 'pattern_sprint_start_from_list_item',
+                                );
+                            ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                                  categoryId: category.id,
+                                  prefix: p.prefix,
+                                );
+                            context.push(
+                              '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   Widget _buildBody(
@@ -96,6 +301,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     Map<String, List<PatternDefinition>> byCategory,
     ColorScheme colorScheme,
     TextTheme textTheme,
+    AsyncValue<bool> firstListenAsync,
   ) {
     final scrollChild = SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -213,136 +419,12 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
             ),
           ),
           const SizedBox(height: 16),
-          ...categories.map((category) {
-            final patterns = byCategory[category.id] ?? [];
-            if (patterns.isEmpty) return const SizedBox.shrink();
-
-            final firstPrefix = patterns.first.prefix;
-            final isFirstCategory = categories.indexOf(category) == 0;
-            final useOverlayKey = widget.fromOnboarding && isFirstCategory;
-
-            return Padding(
-              key: useOverlayKey ? _overlayTargetKey : null,
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        category.icon,
-                        size: 22,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              category.displayName,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                            Text(
-                              category.usageHint,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.tonal(
-                        onPressed: () {
-                          HapticFeedback.selectionClick();
-                          ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
-                                categoryId: category.id,
-                                prefix: firstPrefix,
-                              );
-                          context.push(
-                            '/pattern-sprint/session?prefix=${Uri.encodeComponent(firstPrefix)}&duration=$_selectedDurationSec',
-                          );
-                        },
-                        child: Text('${patterns.first.displayName}でスタート'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...patterns.map((p) {
-                    final isSelected = _selectedPrefix == p.prefix;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                        dense: true,
-                        visualDensity: const VisualDensity(vertical: -2),
-                        leading: Icon(
-                          Icons.play_circle_outline,
-                          color: isSelected ? colorScheme.primary : colorScheme.outline,
-                          size: 24,
-                        ),
-                        title: Text(
-                          p.displayName,
-                          style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                        subtitle: Text(
-                          p.japaneseHint,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        selected: isSelected,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          ref.read(analyticsServiceProvider).logPatternSprintCategorySelected(
-                                categoryId: category.id,
-                                prefix: p.prefix,
-                              );
-                          setState(() => _selectedPrefix = p.prefix);
-                        },
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FavoriteToggleIcon(
-                              targetType: 'pattern',
-                              targetId: p.prefix,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton.filledTonal(
-                              icon: const Icon(Icons.play_arrow_rounded),
-                              tooltip: 'このパターンですぐ始める',
-                              onPressed: () {
-                                HapticFeedback.selectionClick();
-                                ref.read(analyticsServiceProvider).logHapticFired(
-                                      trigger: 'pattern_sprint_start_from_list_item',
-                                    );
-                                ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
-                                      categoryId: category.id,
-                                      prefix: p.prefix,
-                                    );
-                                context.push(
-                                  '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-          }),
+          ..._buildCategorySections(
+            categories,
+            byCategory,
+            colorScheme,
+            firstListenAsync,
+          ),
           const SizedBox(height: 32),
           if (widget.fromOnboarding && _selectedPrefix != null) ...[
             Container(

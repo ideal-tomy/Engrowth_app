@@ -34,7 +34,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      animationDuration: EngrowthElementTokens.switchDuration,
+    );
     if (widget.initialProvider == 'google') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {

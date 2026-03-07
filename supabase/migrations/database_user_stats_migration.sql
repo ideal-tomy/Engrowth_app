@@ -1,6 +1,19 @@
 -- user_stats テーブル作成（習慣化UX用）
 -- Supabase DashboardのSQL Editorで実行してください
 
+-- 既存テーブルに不足カラムがあれば追加（部分適用からの復旧用）
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_stats') THEN
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS last_study_date DATE;
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS daily_done_count INTEGER DEFAULT 0;
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS daily_goal_count INTEGER DEFAULT 3;
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS daily_reset_date DATE;
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS streak_count INTEGER DEFAULT 0;
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Asia/Tokyo';
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS user_stats (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,

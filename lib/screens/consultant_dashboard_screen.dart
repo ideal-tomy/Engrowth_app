@@ -10,6 +10,7 @@ import '../services/voice_submission_service.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/coach_provider.dart';
 import '../widgets/consultant/submission_detail_drawer.dart';
+import '../theme/engrowth_theme.dart';
 import '../widgets/dashboard/readable_tab_bar.dart';
 
 /// コンサルタント用ダッシュボード
@@ -45,7 +46,11 @@ class _ConsultantDashboardScreenState extends ConsumerState<ConsultantDashboardS
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      animationDuration: EngrowthElementTokens.switchDuration,
+    );
     _loadData();
   }
 

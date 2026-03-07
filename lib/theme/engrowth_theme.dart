@@ -213,51 +213,60 @@ class EngrowthTheme {
 }
 
 /// Motion Token: Route遷移（ページ間）
-/// Zero-Latency: 1秒超は禁止。通常 <= 240ms、結果系 <= 320ms
+/// 緩やかで高級感のある同期。フェードアウト（前ページの残り）を早め、フェードインは維持
 class EngrowthRouteTokens {
   /// standardPush: 学習系詳細（fade + slightSlide）
-  static const Duration standardPushDuration = Duration(milliseconds: 220);
-  static const Duration standardPushReverseDuration = Duration(milliseconds: 180);
+  static const Duration standardPushDuration = Duration(milliseconds: 1100);
+  static const Duration standardPushReverseDuration = Duration(milliseconds: 900);
   static const double standardPushSlideOffset = 0.03;
   static const Curve standardPushCurve = Curves.easeOutCubic;
 
+  /// フェードアウト: 前ページの残り時間を短く（opacity を前半で完了）
+  /// 0.35 = 全体の35%で opacity 0→1 完了 → 前ページが早く消える
+  static const double standardPushFadeIntervalEnd = 0.50;
+  static const Curve standardPushFadeIntervalCurve = Curves.easeOut;
+
   /// modalPush: 設定/補助導線（fade + upFromBottom）
-  static const Duration modalPushDuration = Duration(milliseconds: 180);
-  static const Duration modalPushReverseDuration = Duration(milliseconds: 160);
+  static const Duration modalPushDuration = Duration(milliseconds: 900);
+  static const Duration modalPushReverseDuration = Duration(milliseconds: 800);
   static const double modalPushSlideOffset = 0.06;
   static const Curve modalPushCurve = Curves.easeOutCubic;
+  static const double modalPushFadeIntervalEnd = 0.35;
+  static const Curve modalPushFadeIntervalCurve = Curves.easeOut;
 
   /// resultPush: リザルト画面（fade + scale）
-  static const Duration resultPushDuration = Duration(milliseconds: 260);
-  static const Duration resultPushReverseDuration = Duration(milliseconds: 200);
+  static const Duration resultPushDuration = Duration(milliseconds: 1300);
+  static const Duration resultPushReverseDuration = Duration(milliseconds: 1000);
   static const double resultPushScaleBegin = 0.98;
   static const Curve resultPushCurve = Curves.easeOutCubic;
+  static const double resultPushFadeIntervalEnd = 0.35;
+  static const Curve resultPushFadeIntervalCurve = Curves.easeOut;
 }
 
 /// Motion Token: Element（画面内切替・AnimatedSwitcher）
-/// 同期された滑らかさを優先。小振幅で体感遅延を抑える
+/// 緩やかで高級感のある同期: ボタン登場・ポップアップが揃うことで行動要請にちょうどいい
 class EngrowthElementTokens {
   /// 画面内切替の duration
-  static const Duration switchDuration = Duration(milliseconds: 180);
+  static const Duration switchDuration = Duration(milliseconds: 900);
 
   /// 表示側 curve
   static const Curve switchCurveIn = Curves.easeOutCubic;
 
-  /// 非表示側 curve
-  static const Curve switchCurveOut = Curves.easeInCubic;
+  /// 非表示側 curve（前のページが早く消える）
+  static const Curve switchCurveOut = Curves.easeOut;
 
   /// 切替時の Y オフセット（小振幅 0.02〜0.03）
   static const double switchOffsetY = 0.025;
 }
 
 /// Motion Token: Stagger（段階表示）
-/// 要素間の遅延を抑え、同期感を保つ
+/// 緩やかな段階表示で同期感を保ち、行動要請にちょうどいいテンポに
 class EngrowthStaggerTokens {
   /// 1 要素あたり遅延
-  static const Duration itemDelay = Duration(milliseconds: 50);
+  static const Duration itemDelay = Duration(milliseconds: 250);
 
   /// 各要素の duration
-  static const Duration itemDuration = Duration(milliseconds: 180);
+  static const Duration itemDuration = Duration(milliseconds: 900);
 
   /// curve
   static const Curve staggerCurve = Curves.easeOutCubic;

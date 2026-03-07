@@ -483,7 +483,7 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
 
   Widget _buildCard(BuildContext context, String title, {required bool hasResume, required bool isCompleted}) {
     return AnimatedScale(
-      duration: const Duration(milliseconds: 160),
+      duration: EngrowthElementTokens.switchDuration,
       curve: Curves.easeOutBack,
       scale: _pressed ? 0.97 : 1,
       child: GestureDetector(

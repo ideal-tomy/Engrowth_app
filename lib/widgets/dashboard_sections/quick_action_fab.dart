@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/onboarding_provider.dart';
 import '../../providers/home_primary_cta_provider.dart';
 import '../../providers/resume_card_tap_context_provider.dart';
+import '../../theme/engrowth_theme.dart';
 
 /// ホーム右下のFAB展開型クイックアクション
 /// 匿名: 挨拶体験 / 学習開始 / アカウント作成
@@ -33,7 +34,7 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: EngrowthElementTokens.switchDuration,
     );
     _expandAnimation = CurvedAnimation(
       parent: _controller,
@@ -106,7 +107,7 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
           heroTag: 'quick_action_fab',
           child: AnimatedRotation(
             turns: _controller.isCompleted ? 0.125 : 0,
-            duration: const Duration(milliseconds: 200),
+            duration: EngrowthElementTokens.switchDuration,
             child: const Icon(Icons.add),
           ),
         ),

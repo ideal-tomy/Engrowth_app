@@ -7,6 +7,7 @@ import '../services/mission_delivery_demo_service.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/role_provider.dart';
 import '../services/admin_permission_service.dart';
+import '../theme/engrowth_theme.dart';
 import '../widgets/dashboard/readable_tab_bar.dart';
 
 /// 管理者ダッシュボード
@@ -26,7 +27,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      animationDuration: EngrowthElementTokens.switchDuration,
+    );
   }
 
   @override

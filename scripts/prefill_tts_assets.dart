@@ -13,7 +13,7 @@
 ///       tts_synthesize Edge Function がデプロイ済み、database_tts_assets_migration 実行済み
 ///
 /// 冪等: 既にキャッシュ済みの場合はスキップ（Edge Function がキャッシュヒットを返す）
-/// Phase 4: キーは Edge と一致（text|language|voice|speed|tts-1-hd）。速度0.6も --include-slow で投入可。
+/// Phase 4: キーは Edge と一致（text|language|voice|speed|tts-1）。速度0.6も --include-slow で投入可。
 
 import 'dart:convert';
 import 'dart:io';
@@ -109,59 +109,111 @@ void main(List<String> args) async {
   );
 }
 
+const _pageSize = 1000; // Supabase デフォルト上限を超えるためページネーション
+
 Future<List<Map<String, dynamic>>> _buildTasks(
   SupabaseClient client,
   bool includeSlow,
   int limit,
 ) async {
-  final utterances = await client
-      .from('conversation_utterances')
-      .select('english_text, japanese_text, speaker_role');
-
-  if (utterances is! List || utterances.isEmpty) {
-    return [];
-  }
-
-  // ユニーク (text, language, voice, speed) を構築
-  // Edge cacheKey と完全一致させるため同じ正規化を使用
   final Set<String> keys = {};
   final List<Map<String, dynamic>> tasks = [];
   final speeds = [1.0, if (includeSlow) _speedSlow];
 
-  for (final row in utterances) {
-    if (row is! Map) continue;
-    final en = _normalizeTextForCache((row['english_text'] as String?) ?? '');
-    final jp = _normalizeTextForCache((row['japanese_text'] as String?) ?? '');
-    final role = (row['speaker_role'] as String?)?.toUpperCase() ?? '';
-
-    for (final speed in speeds) {
-      if (en.isNotEmpty) {
-        final voice = _voiceForRole(role);
-        final k = '$en|en-US|$voice|$speed';
-        if (!keys.contains(k)) {
-          keys.add(k);
-          tasks.add({
-            'text': en,
-            'language': 'en-US',
-            'voice': voice,
-            'speakingRate': speed,
-          });
+  // 1. conversation_utterances: ページネーションで全件取得（1000件リミット対策）
+  var page = 0;
+  while (true) {
+    final from = page * _pageSize;
+    final to = from + _pageSize - 1;
+    final utterances = await client
+        .from('conversation_utterances')
+        .select('english_text, japanese_text, speaker_role')
+        .order('id', ascending: true)
+        .range(from, to);
+    if (utterances is! List || utterances.isEmpty) break;
+    for (final row in utterances) {
+      if (row is! Map) continue;
+      final en = _normalizeTextForCache((row['english_text'] as String?) ?? '');
+      final jp = _normalizeTextForCache((row['japanese_text'] as String?) ?? '');
+      final role = (row['speaker_role'] as String?)?.toUpperCase() ?? '';
+      for (final speed in speeds) {
+        if (en.isNotEmpty) {
+          final voice = _voiceForRole(role);
+          final k = '$en|en-US|$voice|$speed';
+          if (!keys.contains(k)) {
+            keys.add(k);
+            tasks.add({
+              'text': en,
+              'language': 'en-US',
+              'voice': voice,
+              'speakingRate': speed,
+            });
+          }
         }
-      }
-      if (jp.isNotEmpty) {
-        final voice = _voiceForRole(role);
-        final k = '$jp|ja-JP|$voice|$speed';
-        if (!keys.contains(k)) {
-          keys.add(k);
-          tasks.add({
-            'text': jp,
-            'language': 'ja-JP',
-            'voice': voice,
-            'speakingRate': speed,
-          });
+        if (jp.isNotEmpty) {
+          final voice = _voiceForRole(role);
+          final k = '$jp|ja-JP|$voice|$speed';
+          if (!keys.contains(k)) {
+            keys.add(k);
+            tasks.add({
+              'text': jp,
+              'language': 'ja-JP',
+              'voice': voice,
+              'speakingRate': speed,
+            });
+          }
         }
       }
     }
+    if ((utterances as List).length < _pageSize) break;
+    page++;
+  }
+
+  // 2. sentences: シナリオ学習・即興作文などで TTS 再生される発話（別テーブル対策）
+  page = 0;
+  while (true) {
+    final from = page * _pageSize;
+    final to = from + _pageSize - 1;
+    final rows = await client
+        .from('sentences')
+        .select('dialogue_en, dialogue_jp')
+        .order('id', ascending: true)
+        .range(from, to);
+    if (rows is! List || rows.isEmpty) break;
+    for (final row in rows) {
+      if (row is! Map) continue;
+      final en = _normalizeTextForCache((row['dialogue_en'] as String?) ?? '');
+      final jp = _normalizeTextForCache((row['dialogue_jp'] as String?) ?? '');
+      const voice = _voiceRoleB; // シナリオ/例文は nova で統一
+      for (final speed in speeds) {
+        if (en.isNotEmpty) {
+          final k = '$en|en-US|$voice|$speed';
+          if (!keys.contains(k)) {
+            keys.add(k);
+            tasks.add({
+              'text': en,
+              'language': 'en-US',
+              'voice': voice,
+              'speakingRate': speed,
+            });
+          }
+        }
+        if (jp.isNotEmpty) {
+          final k = '$jp|ja-JP|$voice|$speed';
+          if (!keys.contains(k)) {
+            keys.add(k);
+            tasks.add({
+              'text': jp,
+              'language': 'ja-JP',
+              'voice': voice,
+              'speakingRate': speed,
+            });
+          }
+        }
+      }
+    }
+    if ((rows as List).length < _pageSize) break;
+    page++;
   }
 
   final result = limit > 0 ? tasks.take(limit).toList() : tasks;

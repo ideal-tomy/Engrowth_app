@@ -4,7 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
-const MODEL = "tts-1-hd";
+const MODEL = "tts-1";
 const BUCKET = "tts-audio";
 
 const corsHeaders: Record<string, string> = {

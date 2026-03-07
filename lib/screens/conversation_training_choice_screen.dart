@@ -121,7 +121,7 @@ class _TrainingChoiceCardState extends State<_TrainingChoiceCard> {
         splashColor: colorScheme.primary.withOpacity(0.2),
         highlightColor: colorScheme.primary.withOpacity(0.08),
         child: AnimatedScale(
-          duration: const Duration(milliseconds: 170),
+          duration: EngrowthElementTokens.switchDuration,
           curve: Curves.easeOutBack,
           scale: _pressed ? 0.98 : 1,
           child: Container(

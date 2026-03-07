@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/engrowth_theme.dart';
+
 /// 主要遷移先ページ用の余白＋軽いフェードイン
 /// ヘッダー下に呼吸余白を確保し、高級感のある初期表示を実現
 class LuxuryPageBody extends StatefulWidget {
@@ -26,7 +28,7 @@ class _LuxuryPageBodyState extends State<LuxuryPageBody>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: EngrowthElementTokens.switchDuration,
     )..forward();
     _animation = CurvedAnimation(
       parent: _controller,

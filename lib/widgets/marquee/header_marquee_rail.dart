@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/ui_experiments_provider.dart';
+import '../../theme/engrowth_theme.dart';
 import 'marquee_rail_data.dart';
 
 /// ヘッダー直下に表示するMarquee導線
@@ -251,7 +252,7 @@ class _MarqueeChipWithScaleState extends State<_MarqueeChipWithScale> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 100),
+        duration: EngrowthElementTokens.switchDuration,
         curve: Curves.easeInOut,
         child: widget.child,
       ),

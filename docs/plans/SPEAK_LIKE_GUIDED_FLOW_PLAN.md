@@ -161,9 +161,10 @@ flowchart TD
 
 ## Motion Token 準拠
 
-- ポップアップ出現: `EngrowthElementTokens.switchDuration`（180ms）
-- ボタン段階表示: `EngrowthStaggerTokens`（50ms delay, 180ms duration）
-- 過剰な 1000ms 超えは禁止。
+- 緩やかで高級感のある同期（5倍速）: ページ移動・ボタン登場が揃うことで遅く感じない
+- ポップアップ出現: `EngrowthElementTokens.switchDuration`（900ms）
+- ボタン段階表示: `EngrowthStaggerTokens`（250ms delay, 900ms duration）
+- ページ遷移: `EngrowthRouteTokens`（standardPush 1100ms, modalPush 900ms）
 
 ---
 
