@@ -117,6 +117,11 @@ class EngrowthTheme {
           return const IconThemeData(color: EngrowthColors.onSurfaceVariant);
         }),
       ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: EngrowthColors.primary,
+        foregroundColor: EngrowthColors.onPrimary,
+        elevation: 4,
+      ),
       dividerTheme: const DividerThemeData(color: EngrowthColors.silverBorder),
       iconTheme: const IconThemeData(color: EngrowthColors.onSurfaceVariant),
     );
@@ -205,6 +210,11 @@ class EngrowthTheme {
           }
           return IconThemeData(color: onSurface.withOpacity(0.7));
         }),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: accent,
+        foregroundColor: const Color(0xFFFFFFFF),
+        elevation: 4,
       ),
       dividerTheme: DividerThemeData(color: onSurface.withOpacity(0.2)),
       iconTheme: IconThemeData(color: onSurface.withOpacity(0.7)),

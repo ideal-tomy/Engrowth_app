@@ -93,8 +93,50 @@ await _current!.onCanPlay.first.timeout(const Duration(seconds: 10));
 
 ---
 
-## 5. 関連ドキュメント
+## 5. モデル変更時（tts-1 / tts-1-hd）
+
+キャッシュキーに**モデル名**が含まれるため、`tts-1-hd` ↔ `tts-1` を切り替えると**既存の DB アセットはヒットしません**（「いままで流れてたものも流れなくなった」状態）。
+
+**対処**: モデル変更後は必ず prefill を再実行する。
+
+```bash
+dart run scripts/prefill_tts_assets.dart
+```
+
+- Edge Function を先にデプロイ済みであること（`MODEL` 定数がアプリ・prefill と一致していること）
+- 既存レコードは `cache_key` が違うだけなので、prefill で新キーが生成されれば再生可能になる
+
+---
+
+## 6. prefill 完了／未完了の確認（証拠提示用）
+
+**目的**: パッチ（prefill）処理が「完了している発話」と「未完了（tts_assets にない）発話」を特定し、  
+「DB に存在するのにアプリで再生されない」証拠を出す。
+
+### 手順
+
+1. **照合スクリプトで一覧を取得**
+   ```bash
+   dart run scripts/check_tts_prefill_status.dart
+   dart run scripts/check_tts_prefill_status.dart --conversation-id=<会話UUID>
+   dart run scripts/check_tts_prefill_status.dart --output=report.csv
+   ```
+   - 発話ごとに **in_tts_assets: YES/NO** を表示（アプリと同じ cache_key で照合）
+   - `--output=report.csv` で CSV を出力し、証拠資料として使える
+
+2. **結果の見方**
+   - **tts_assets に存在: N** → prefill 済み（DB にキャッシュあり）
+   - **tts_assets に不在: M** → prefill 未完了、または別キーで投入されている可能性
+
+3. **「完了しているのに再生されない」証拠の出し方**
+   - 上記で **in_tts_assets=YES** の発話を CSV で確認
+   - 同じ会話をアプリで再生し、その発話が鳴らないことを記録
+   - その発話の `--text "..."` で `verify_tts_cache_hash.dart` を実行し、アプリ側のレシピ文字列とハッシュが一致するか確認（キー不一致の切り分け）
+
+---
+
+## 7. 関連ドキュメント
 
 - `TTS_かんたん確認手順.md` - 初心者向けチェックリスト
 - `TTS_DEBUG_CHECKLIST.md` - 5秒壁・direct_db 低下時の診断
-- `TTS_CACHE_FULL_RUNBOOK.md` - prefill 手順
+- `TTS_CACHE_FULL_RUNBOOK.md` - prefill 手順・運用

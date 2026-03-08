@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -60,6 +61,10 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   bool _isCountdownActive = false;  // 3秒カウントダウン中
   int _countdownValue = 3;  // カウントダウン表示用
   bool _stopPlaybackRequested = false;  // 再生停止フラグ
+  /// Web オートプレイでブロックされたとき、続きから再生する用
+  bool _playAllPausedByBlock = false;
+  int? _playAllResumeFromIndex;
+  List<ConversationUtterance>? _playAllResumeUtterances;
   ValueNotifier<int>? _transcriptCurrentIndexNotifier;  // 英語シート用：再生中のフレーズインデックス
   ValueNotifier<bool>? _transcriptIsPlayingNotifier;  // 英語シート用：再生中フラグ（同期用）
   Timer? _autoAdvanceTimer;
@@ -497,6 +502,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     if (_isPlaying) return;
 
     _stopPlaybackRequested = false;
+    _playAllPausedByBlock = false;
+    _playAllResumeFromIndex = null;
+    _playAllResumeUtterances = null;
     // Phase 2: 再生開始時に _clearPrefetch しない（先読み済み index 0 を保持。
     // 停止・次へ・戻る・役割切替時のみクリア）
     final fromIndex = startIndex ?? 0;
@@ -599,7 +607,60 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       try {
         await speakFuture;
       } on TtsPlaybackBlockedException {
+        // Web: 2本目以降がオートプレイでブロックされた場合、続きを再生するUIを出す
+        if (kIsWeb && mounted && i + 1 < utterances.length) {
+          final resumeIndex = i + 1;
+          final resumeList = List<ConversationUtterance>.from(utterances);
+          setState(() {
+            _isPlaying = false;
+            _playAllPausedByBlock = true;
+            _playAllResumeFromIndex = resumeIndex;
+            _playAllResumeUtterances = resumeList;
+          });
+          _transcriptIsPlayingNotifier?.value = false;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text(
+                  'ブラウザの制限のため一度止まりました。続きを再生するには下のボタンをタップしてください。',
+                ),
+                action: SnackBarAction(
+                  label: '続きを再生',
+                  onPressed: () {
+                    if (!mounted) return;
+                    final idx = _playAllResumeFromIndex;
+                    final list = _playAllResumeUtterances;
+                    if (idx == null || list == null) return;
+                    setState(() {
+                      _playAllResumeFromIndex = null;
+                      _playAllResumeUtterances = null;
+                      _playAllPausedByBlock = false;
+                    });
+                    _playAllConversation(list, showPromptOnComplete: showPromptOnComplete, startIndex: idx);
+                  },
+                ),
+                duration: const Duration(seconds: 10),
+              ),
+            );
+          }
+        }
         break;
+      } on Exception catch (e) {
+        // TTS cache miss 時は当該発話をスキップして続行（流れる分は最後まで再生）
+        final msg = e.toString();
+        if (msg.contains('TTS cache miss') || msg.contains('音声がDBにありません')) {
+          if (kDebugMode) {
+            final preview = utterance.englishText.length > 50
+                ? '${utterance.englishText.substring(0, 50)}...'
+                : utterance.englishText;
+            debugPrint(
+              'TTS skip: 発話 ${i + 1}/${utterances.length} はDBにありません（スキップして続行）'
+              ' text="$preview"',
+            );
+          }
+          continue;
+        }
+        rethrow;
       }
 
       if (utterancesPlayedCount == 0 && tapToFirstAudioMs == null) {

@@ -39,6 +39,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _hasRecordedImpression = false;
+  bool _isFabExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -55,11 +56,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       drawer: const _SettingsDrawer(),
-      floatingActionButton: const QuickActionFab(),
+      floatingActionButton: QuickActionFab(
+        isExpanded: _isFabExpanded,
+        onOpenChange: (open) => setState(() => _isFabExpanded = open),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      body: StartupShortcutOverlay(
-        child: SafeArea(
-          child: Column(
+      body: Stack(
+        children: [
+          StartupShortcutOverlay(
+            child: SafeArea(
+              child: Column(
           children: [
             _DashboardHeader(),
             if (enableMarquee) ...[
@@ -125,6 +131,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
     ),
+    if (_isFabExpanded)
+      Positioned.fill(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _isFabExpanded = false),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(color: Colors.black54),
+          ),
+        ),
+      ),
+        ],
+      ),
     );
   }
 }

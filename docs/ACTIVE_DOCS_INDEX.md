@@ -35,7 +35,11 @@
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
 
 ## TTS（音声再生・キャッシュ）
-- `docs/TTS_FLOW.md`（全体フロー・10秒タイムアウトの意味）
+- `docs/TTS_FLOW.md`（全体フロー・10秒タイムアウトの意味・prefill 照合手順）
+- `docs/TTS_音声DB確認手順_やさしい版.md`（キャッシュキーを合わせて「DBに保存されている音声が再生できるか」確認する手順・やさしい版）
+- `docs/TTS_キャッシュを合わせる方法_やさしい版.md`（キャッシュを合わせる意味と、モデル・声・正規化をそろえる手順・やさしい版）
+- `docs/TTS_最初の1件だけ再生される現象_調査.md`（99% YES なのに2本目以降が流れない原因と対処：Web オートプレイ・再生速度）
+- `docs/TTS_tts-1で音声を用意し直す手順.md`（tts-1 で音声を一から揃える手順・やることだけ）
 - `docs/TTS_DEBUG_CHECKLIST.md`（5秒壁・direct_db 低下時の診断、デプロイ前後チェック）
 - `docs/TTS_CACHE_FULL_RUNBOOK.md`（prefill 手順）
 

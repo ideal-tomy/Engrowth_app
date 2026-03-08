@@ -18,7 +18,14 @@ import '../../theme/engrowth_theme.dart';
 /// 匿名: 挨拶体験 / 学習開始 / アカウント作成
 /// ログイン: 続きから再開 / 今日の会話目標 / 次に学習
 class QuickActionFab extends ConsumerStatefulWidget {
-  const QuickActionFab({super.key});
+  const QuickActionFab({
+    super.key,
+    required this.isExpanded,
+    required this.onOpenChange,
+  });
+
+  final bool isExpanded;
+  final void Function(bool open) onOpenChange;
 
   @override
   ConsumerState<QuickActionFab> createState() => _QuickActionFabState();
@@ -40,6 +47,19 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
       parent: _controller,
       curve: Curves.easeOut,
     );
+    if (widget.isExpanded) _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant QuickActionFab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isExpanded != widget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
   }
 
   @override
@@ -48,14 +68,12 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
     super.dispose();
   }
 
-  void _toggle() {
+  void _onFabPressed() {
     HapticFeedback.selectionClick();
-    if (_controller.isCompleted) {
-      _controller.reverse();
-    } else {
+    if (!widget.isExpanded) {
       ref.read(analyticsServiceProvider).logHomeQuickFabOpened();
-      _controller.forward();
     }
+    widget.onOpenChange(!widget.isExpanded);
   }
 
   @override
@@ -69,44 +87,47 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
         ? _buildAnonymousActions(onboardingCompleted)
         : _buildSignedInActions(recommended.valueOrNull);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
+    final chipChildren = <Widget>[];
+    for (var i = 0; i < actions.length; i++) {
+      if (i > 0) chipChildren.add(const SizedBox(height: 12));
+      final action = actions[i];
+      chipChildren.add(
+        _QuickActionChip(
+          icon: action.icon,
+          label: action.label,
+          onTap: () {
+            widget.onOpenChange(false);
+            action.onTap();
+          },
+        ),
+      );
+    }
+
+    return Stack(
+      alignment: Alignment.bottomRight,
+      clipBehavior: Clip.none,
       children: [
-        SizeTransition(
-          sizeFactor: _expandAnimation,
-          axisAlignment: 1,
-          child: FadeTransition(
-            opacity: _expandAnimation,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: actions
-                  .asMap()
-                  .entries
-                  .map(
-                    (e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _QuickActionChip(
-                        icon: e.value.icon,
-                        label: e.value.label,
-                        onTap: () {
-                          _controller.reverse();
-                          e.value.onTap();
-                        },
-                      ),
-                    ),
-                  )
-                  .toList(),
+        Positioned(
+          bottom: 100,
+          right: 20,
+          child: SizeTransition(
+            sizeFactor: _expandAnimation,
+            axisAlignment: 1,
+            child: FadeTransition(
+              opacity: _expandAnimation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: chipChildren,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
         FloatingActionButton(
-          onPressed: _toggle,
+          onPressed: _onFabPressed,
           heroTag: 'quick_action_fab',
           child: AnimatedRotation(
-            turns: _controller.isCompleted ? 0.125 : 0,
+            turns: widget.isExpanded ? 0.125 : 0,
             duration: EngrowthElementTokens.switchDuration,
             child: const Icon(Icons.add),
           ),
@@ -277,10 +298,13 @@ class _QuickActionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: colorScheme.surface,
+      color: colorScheme.surfaceContainerHighest,
       elevation: 4,
       shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(28),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(28),

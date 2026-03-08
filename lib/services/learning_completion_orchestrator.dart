@@ -71,14 +71,17 @@ class LearningCompletionOrchestrator {
 
     // バックエンド連携（DB未設定時はここで失敗するが処理は続行）
     try {
+      if (!context.mounted) return;
       final statsNotifier = ref.read(userStatsNotifierProvider.notifier);
       final statsService = ref.read(userStatsServiceProvider);
 
       await statsNotifier.updateStreak();
       await statsNotifier.incrementDailyDone();
+      if (!context.mounted) return;
 
       ref.read(analyticsServiceProvider).logStudyComplete();
       final stats = await statsService.getOrCreateUserStats(userId);
+      if (!context.mounted) return;
       if (stats.isMissionCompleted) {
         ref.read(analyticsServiceProvider).logMissionComplete();
       }
@@ -111,6 +114,7 @@ class LearningCompletionOrchestrator {
           completedScenarios++;
         }
       }
+      if (!context.mounted) return;
 
       final achievementService = AchievementService();
       final newlyUnlocked = await achievementService.checkAndUnlockAchievements(
@@ -120,6 +124,7 @@ class LearningCompletionOrchestrator {
         scenarioCount: completedScenarios,
         hintFreeCount: hintFreeCount,
       );
+      if (!context.mounted) return;
 
       if (newlyUnlocked.isNotEmpty) {
         final achievements = await ref.read(achievementsProvider.future);
@@ -140,6 +145,7 @@ class LearningCompletionOrchestrator {
 
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null && user.isAnonymous) {
+        if (!context.mounted) return;
         final convNotifier = ref.read(anonymousConversionProvider.notifier);
         await convNotifier.onCompletion();
         if (await convNotifier.shouldShowPrompt() && context.mounted) {
@@ -156,6 +162,7 @@ class LearningCompletionOrchestrator {
     }
 
     // 進捗ミニポップアップはDB失敗時も表示（UI確認のため）
+    if (!context.mounted) return;
     final track = progressTrack;
     if (track != null && (track == 'scenario' || track == 'story')) {
       try {
@@ -181,6 +188,7 @@ class LearningCompletionOrchestrator {
       }
     }
 
+    if (!context.mounted) return;
     try {
       ref.invalidate(userStatsProvider);
       ref.invalidate(userStatsNotifierProvider);
