@@ -420,7 +420,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
 
     await _ttsService.speakEnglish(utterance.englishText, role: utterance.speakerRole);
 
-    if (mounted) _progressController.value = 1.0;
+    if (!mounted) return;
+    _progressController.value = 1.0;
     setState(() => _isPlaying = false);
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -508,6 +509,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
     // Phase 2: 再生開始時に _clearPrefetch しない（先読み済み index 0 を保持。
     // 停止・次へ・戻る・役割切替時のみクリア）
     final fromIndex = startIndex ?? 0;
+    if (!mounted) return;
     setState(() => _isPlaying = true);
     _transcriptIsPlayingNotifier?.value = true;
 
@@ -561,6 +563,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       if (_stopPlaybackRequested) break;
 
       final utterance = utterances[i];
+      if (!mounted) break;
       setState(() => _currentUtteranceIndex = i);
       _transcriptCurrentIndexNotifier?.value = i;  // 英語シートのハイライト同期
 
@@ -607,6 +610,7 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
       try {
         await speakFuture;
       } on TtsPlaybackBlockedException {
+        if (!mounted) break;
         // Web: 2本目以降がオートプレイでブロックされた場合、続きを再生するUIを出す
         if (kIsWeb && mounted && i + 1 < utterances.length) {
           final resumeIndex = i + 1;
@@ -645,8 +649,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
           }
         }
         break;
-      } on Exception catch (e) {
-        // TTS cache miss 時は当該発話をスキップして続行（流れる分は最後まで再生）
+      } on Object catch (e) {
+        // TTS cache miss 時は当該発話をスキップして続行（Uncaught (in promise) を防ぐため Object でキャッチ）
         final msg = e.toString();
         if (msg.contains('TTS cache miss') || msg.contains('音声がDBにありません')) {
           if (kDebugMode) {
@@ -658,11 +662,15 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
               ' text="$preview"',
             );
           }
+          // 次の発話再生前に再生状態をリセット（1回エラー後に鳴らなくなるバグ対策）
+          await _ttsService.stop();
+          if (!mounted) break;
           continue;
         }
         rethrow;
       }
 
+      if (!mounted) break;
       if (utterancesPlayedCount == 0 && tapToFirstAudioMs == null) {
         tapToFirstAudioMs = usedPrefetch
             ? utteranceStartTime.difference(playTapTime).inMilliseconds
@@ -683,11 +691,12 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
           sessionId: _sessionId!,
           playbackType: 'tts',
         );
-        if (_mode == 'listen') {
+        if (mounted && _mode == 'listen') {
           setState(() => _textVisibleMap[utterance.id] = true);
         }
       }
 
+      if (!mounted) break;
       if (i < utterances.length - 1 && !_stopPlaybackRequested) {
         final next = utterances[i + 1];
         final pauseMs =

@@ -47,3 +47,4 @@
 - 旧計画・完了済み検討メモは `docs/archive/` に集約する。
 - ルート `docs/` に残す文書は「現在進行の一次資料」のみ。
 - 新規に一次資料を追加したら、このIndexを同時更新する。
+- **打ち切り・結論レポート**: `docs/TTS_Supabase_DB再生_作業履歴と結論レポート.md`（Supabase DB 由来 TTS 再生の試行・ハッシュ一致施策・エラー対応・未達成の理由の総括。archive は .cursorignore のため docs 直下に配置）
