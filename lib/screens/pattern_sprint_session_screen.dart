@@ -461,26 +461,30 @@ class _PatternSprintSessionScreenState
                           ),
                         if (!_currentPhase.showEnglish && !_currentPhase.showJapanese)
                           Text(
-                            _isPlaying ? 'Listen...' : 'Repeat now',
+                            _isPlaying ? '音声をよく聴いてください' : 'いま、あなたが声に出す番です',
                             style: TextStyle(
                               fontSize: 18,
                               color: colorScheme.onSurfaceVariant,
                             ),
+                            textAlign: TextAlign.center,
                           ),
                       ],
                     ),
                   ),
                 ),
                 Text(
-                  _isPlaying
-                      ? 'Listening...'
-                      : _isPaused
-                          ? '一時停止中'
-                          : 'Repeat now',
+                  _isPaused
+                      ? '一時停止中'
+                      : _isPlaying
+                          ? '音声をよく聴いてください'
+                          : _currentPhase == PatternSprintPhase.phase3
+                              ? 'いま、あなたが声に出す番です'
+                              : '音を真似しながら、口をしっかり動かしてみましょう',
                   style: TextStyle(
                     fontSize: 14,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 Row(

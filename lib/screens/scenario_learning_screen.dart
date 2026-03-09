@@ -269,6 +269,7 @@ class _ScenarioSection extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 10),
                       child: _ScenarioConversationCard(
                         conversation: conversation,
+                        highlightOnce: useKey,
                       ),
                     );
                   },
@@ -326,9 +327,11 @@ class _ScenarioSection extends StatelessWidget {
 /// 横スクロール用の会話カード（サムネイル + タイトル、タップで会話学習へ）
 class _ScenarioConversationCard extends ConsumerStatefulWidget {
   final Conversation conversation;
+  final bool highlightOnce;
 
   const _ScenarioConversationCard({
     required this.conversation,
+    this.highlightOnce = false,
   });
 
   @override
@@ -339,6 +342,7 @@ class _ScenarioConversationCardState extends ConsumerState<_ScenarioConversation
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scale;
+  bool _showHighlight = false;
 
   @override
   void initState() {
@@ -350,6 +354,19 @@ class _ScenarioConversationCardState extends ConsumerState<_ScenarioConversation
     _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+
+    if (widget.highlightOnce) {
+      // 初回導線用: カードに単発のフォーカス演出を付与
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _showHighlight = true);
+        Future.delayed(EngrowthElementTokens.switchDuration, () {
+          if (mounted) {
+            setState(() => _showHighlight = false);
+          }
+        });
+      });
+    }
   }
 
   @override
@@ -406,6 +423,20 @@ class _ScenarioConversationCardState extends ConsumerState<_ScenarioConversation
               children: [
                 // 背景画像
                 _buildThumbnail(),
+                // 単発フォーカス用の柔らかいハイライトオーバーレイ
+                AnimatedOpacity(
+                  opacity: _showHighlight ? 1 : 0,
+                  duration: EngrowthElementTokens.switchDuration,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.55),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
                 // 下部グラデーション（テキスト可読性確保）
                 Positioned.fill(
                   child: DecoratedBox(

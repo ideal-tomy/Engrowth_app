@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/learning_handoff_result.dart';
 import '../models/tutorial.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/feedback_provider.dart';
@@ -201,7 +202,11 @@ class _TutorialConversationScreenState
             _statusMessage = '体験完了！';
           });
           await Future.delayed(const Duration(milliseconds: 800));
-          if (mounted) context.pop();
+          if (mounted) {
+            context.pop(
+              LearningHandoffResult.completedWithMode('greeting_experience'),
+            );
+          }
         }
         return;
       }

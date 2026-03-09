@@ -12,7 +12,7 @@ import '../providers/onboarding_provider.dart';
 import '../theme/engrowth_theme.dart';
 
 /// 初回体験フロー
-/// 30秒会話・パターンスクリプト・3分会話・録音提出の順で操作を案内
+/// 挨拶・30秒会話・パターンスクリプト・日次提出疑似体験の順で操作を案内
 class OnboardingFlowScreen extends ConsumerStatefulWidget {
   const OnboardingFlowScreen({super.key});
 
@@ -27,6 +27,15 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   static const int _totalSteps = 7;
   static const String _variant = 'v2';
 
+  // 日次提出疑似体験用の簡易タイマー状態
+  Timer? _mockDailySubmitTimer;
+  int _mockDailySubmitRemainingSec = 0;
+  bool _mockDailySubmitActive = false;
+
+  // ウェルカムCTA用の単発パルス演出
+  Timer? _welcomePulseTimer;
+  bool _welcomePulseActive = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,10 +43,23 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           step: 'welcome',
           variant: _variant,
         );
+
+    // ウェルカム画面の主要CTAに、ごく軽い単発パルスを付与
+    _welcomePulseTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted || _currentPage != 0) return;
+      setState(() => _welcomePulseActive = true);
+      Future.delayed(EngrowthElementTokens.switchDuration, () {
+        if (mounted) {
+          setState(() => _welcomePulseActive = false);
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
+    _mockDailySubmitTimer?.cancel();
+    _welcomePulseTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -55,6 +77,60 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
       curve: Curves.easeInOut,
     );
     setState(() => _currentPage++);
+  }
+
+  void _startMockDailySubmit() {
+    if (_mockDailySubmitActive) return;
+    HapticFeedback.selectionClick();
+    ref
+        .read(analyticsServiceProvider)
+        .logOnboardingMockSubmitStarted(variant: _variant);
+    _mockDailySubmitTimer?.cancel();
+    setState(() {
+      _mockDailySubmitActive = true;
+      _mockDailySubmitRemainingSec = 30;
+    });
+    _mockDailySubmitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_mockDailySubmitRemainingSec <= 1) {
+        timer.cancel();
+        setState(() {
+          _mockDailySubmitRemainingSec = 0;
+          _mockDailySubmitActive = false;
+        });
+        ref
+            .read(analyticsServiceProvider)
+            .logOnboardingMockSubmitCompleted(
+              variant: _variant,
+              skippedEarly: false,
+            );
+        _goToNext();
+      } else {
+        setState(() {
+          _mockDailySubmitRemainingSec--;
+        });
+      }
+    });
+  }
+
+  void _skipMockDailySubmit() {
+    HapticFeedback.selectionClick();
+    final wasActive = _mockDailySubmitActive;
+    _mockDailySubmitTimer?.cancel();
+    setState(() {
+      _mockDailySubmitActive = false;
+      _mockDailySubmitRemainingSec = 0;
+    });
+    ref
+        .read(analyticsServiceProvider)
+        .logOnboardingMockSubmitCompleted(
+          variant: _variant,
+          skippedEarly: wasActive,
+        );
+    _goToNext();
   }
 
   String _stepId(int index) {
@@ -208,16 +284,21 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           const Spacer(),
           SizedBox(
             width: double.infinity,
-            child: FilledButton(
-              onPressed: _goToNext,
-              style: FilledButton.styleFrom(
-                backgroundColor: EngrowthColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: AnimatedScale(
+              scale: _welcomePulseActive ? 1.04 : 1.0,
+              duration: EngrowthElementTokens.switchDuration,
+              curve: EngrowthElementTokens.switchCurveIn,
+              child: FilledButton(
+                onPressed: _goToNext,
+                style: FilledButton.styleFrom(
+                  backgroundColor: EngrowthColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                child: const Text('はじめる'),
               ),
-              child: const Text('はじめる'),
             ),
           ),
         ],
@@ -384,14 +465,15 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           Icon(Icons.auto_stories, size: 64, color: colorScheme.primary),
           const SizedBox(height: 20),
           Text(
-            '3分会話',
+          '3分英会話（上級モード）',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 12),
           Text(
-            '3分の会話を聞いて役になりきる。次へで進む。',
+          '少しスパルタですが、3分の会話を通して聞いて・まねして・話すモードです。'
+          ' 音で覚えてから取り組むと、英会話の地力アップにとても効果的です。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -403,20 +485,23 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/story-training?from_onboarding=true'),
+            onPressed: _goToNext,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('体験する'),
+            child: const Text('次へ進む'),
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: _goToNext,
-            child: const Text('あとで体験する'),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            context.push('/story-training');
+          },
+          child: const Text('あとで詳しく見る'),
           ),
         ],
       ),
@@ -430,17 +515,19 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.send, size: 64, color: colorScheme.primary),
+          Icon(Icons.event_note, size: 64, color: colorScheme.primary),
           const SizedBox(height: 20),
           Text(
-            '録音をコンサルタントに提出',
+          '今日あった出来事を英語で言ってみる',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 12),
           Text(
-            '録音→「コンサルタントに提出」で担当者に共有。フィードバックが届く。',
+            'ここではまだ録音はしません。今日あった出来事を1つ決めて、'
+            '英語で30秒くらい声に出してみましょう。'
+            '\n\n本番では、同じように話した内容を録音して「コンサルタントに提出」します。',
             style: TextStyle(
               fontSize: 15,
               height: 1.6,
@@ -449,37 +536,43 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             textAlign: TextAlign.center,
           ),
           const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/recordings'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          if (_mockDailySubmitActive) ...[
+            Text(
+              '画面は気にせず、今日あった出来事を英語で話してみてください。',
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
               ),
-              child: const Text('録音履歴を見る'),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => _tryStepAndAdvance('/recordings?tab=0'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 16),
+            Text(
+              '${_mockDailySubmitRemainingSec.toString().padLeft(2, '0')} 秒',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 24),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _startMockDailySubmit,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                child: const Text('30秒練習をはじめる'),
               ),
-              child: const Text('提出する'),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
           TextButton(
-            onPressed: _goToNext,
-            child: const Text('あとで確認する'),
+            onPressed: _skipMockDailySubmit,
+            child: Text(_mockDailySubmitActive ? '途中だけど次へ進む' : '今日はスキップする'),
           ),
         ],
       ),

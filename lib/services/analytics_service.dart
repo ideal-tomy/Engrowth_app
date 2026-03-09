@@ -397,6 +397,23 @@ class AnalyticsService {
           if (variant != null) 'variant': variant,
         },
       );
+  void logOnboardingMockSubmitStarted({String? variant}) => logEvent(
+        eventType: 'onboarding_mock_submit_started',
+        eventProperties: {
+          if (variant != null) 'variant': variant,
+        },
+      );
+  void logOnboardingMockSubmitCompleted({
+    String? variant,
+    bool? skippedEarly,
+  }) =>
+      logEvent(
+        eventType: 'onboarding_mock_submit_completed',
+        eventProperties: {
+          if (variant != null) 'variant': variant,
+          if (skippedEarly != null) 'skipped_early': skippedEarly,
+        },
+      );
   void logDailyReportRecorded() => logEvent(eventType: 'daily_report_recorded');
   void logDailyReportSubmitted() => logEvent(eventType: 'daily_report_submitted');
   void logDailyReportCardShown({String? status}) =>
