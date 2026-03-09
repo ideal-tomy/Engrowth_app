@@ -19,7 +19,6 @@ class TtsService {
   bool _isInitialized = false;
   bool _isSpeaking = false;
   bool _useOpenAiTts = false;
-  bool _disposed = false;
   int _speakRequestId = 0;
 
   /// Web で autoplay ブロック時: 再試行 UI を表示するコールバック（strict_no_overlap 方針）
@@ -73,9 +72,7 @@ class TtsService {
     String? ttsSessionId,
     void Function()? onFlutterFallback,
   }) async {
-    if (_disposed) return;
     await initialize();
-    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
       await stop();
       final requestId = ++_speakRequestId;
@@ -124,9 +121,7 @@ class TtsService {
 
   /// 英語で再生（ゆっくり固定）
   Future<void> speakEnglishSlow(String text, {String? role}) async {
-    if (_disposed) return;
     await initialize();
-    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
       await stop();
       final requestId = ++_speakRequestId;
@@ -154,9 +149,7 @@ class TtsService {
 
   /// 日本語で再生
   Future<void> speakJapanese(String text, {String? role}) async {
-    if (_disposed) return;
     await initialize();
-    if (_disposed) return;
     if (_useOpenAiTts && _openAiTts != null) {
       await stop();
       final requestId = ++_speakRequestId;
@@ -220,10 +213,9 @@ class TtsService {
 
   /// 破棄（再入防止）
   void dispose() {
-    if (_disposed) return;
-    _disposed = true;
     _speakRequestId++;
     _openAiTts?.dispose();
     _flutterTts.stop();
+    _isSpeaking = false;
   }
 }

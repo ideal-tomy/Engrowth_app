@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/conversation.dart';
@@ -112,6 +113,21 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
         await _ttsService.speakEnglish(utterance.englishText);
       } on TtsPlaybackBlockedException {
         break;
+      } on Exception catch (e) {
+        // 会話画面と同様: TTSキャッシュミスはスキップして続行し、それ以外は再スロー
+        final msg = e.toString();
+        if (msg.contains('TTS cache miss') || msg.contains('音声がDBにありません')) {
+          if (kDebugMode) {
+            final preview = utterance.englishText.length > 50
+                ? '${utterance.englishText.substring(0, 50)}...'
+                : utterance.englishText;
+            debugPrint(
+              'TTS skip (story): 発話 ${i + 1}/${utterances.length} はDBにありません（スキップして続行） text="$preview"',
+            );
+          }
+          continue;
+        }
+        rethrow;
       }
 
       if (!mounted) break;

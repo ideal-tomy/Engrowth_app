@@ -63,7 +63,7 @@ class EngrowthTheme {
         elevation: 0,
       ),
       dividerColor: EngrowthColors.silverBorder,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: EngrowthColors.cardSurfaceLight,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -157,7 +157,7 @@ class EngrowthTheme {
         elevation: 0,
       ),
       dividerColor: onSurface.withOpacity(0.2),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(

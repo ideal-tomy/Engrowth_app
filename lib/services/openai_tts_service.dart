@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/env_config.dart';
@@ -17,6 +19,37 @@ class OpenAiTtsService {
   /// デプロイWebのネットワーク遅延を考慮し、250ms→800msに拡張
   static const _dbTimeout = Duration(milliseconds: 800);
   static const _bucket = 'tts-audio';
+
+  // #region agent log
+  Future<void> _agentDebugLog({
+    required String runId,
+    required String hypothesisId,
+    required String location,
+    required String message,
+    required Map<String, Object?> data,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('http://127.0.0.1:7637/ingest/26b6c108-ae04-4eec-a0d9-b0c254d481bc'),
+        headers: const {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': '528958',
+        },
+        body: jsonEncode({
+          'sessionId': '528958',
+          'runId': runId,
+          'hypothesisId': hypothesisId,
+          'location': location,
+          'message': message,
+          'data': data,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        }),
+      );
+    } catch (_) {
+      // ログ送信失敗時はアプリ動作へ影響させない
+    }
+  }
+  // #endregion
 
   /// Supabase が初期化済みか
   static bool get isAvailable {
@@ -196,6 +229,26 @@ class OpenAiTtsService {
     if (kDebugMode) {
       debugPrint('🚨 【犯人特定用】アプリ側のレシピ生文字列: "$keyStr"');
     }
+
+    // #region agent log
+    unawaited(_agentDebugLog(
+      runId: 'tts_db_miss_prefill_check',
+      hypothesisId: 'H1_env_or_key_mismatch',
+      location: 'openai_tts_service.dart:_synthesizeAndPlay',
+      message: 'TTS DB miss before throwing exception',
+      data: {
+        'normalizedPreview': normalized.length > 80 ? '${normalized.substring(0, 80)}...' : normalized,
+        'language': language,
+        'voice': voice,
+        'speakingRate': clampedSpeed,
+        'model': kTtsModel,
+        'cacheKeyHashPrefix': keyHash.substring(0, 8),
+        'dbResult': dbResult.dbResult,
+        'dbElapsedMs': dbResult.dbElapsedMs,
+        'supabaseUrl': EnvConfig.supabaseUrl,
+      },
+    ));
+    // #endregion
     TtsDebugCollector.recordDbMiss(
       cacheKey: keyHash,
       textPreview: normalized.length > 80 ? '${normalized.substring(0, 80)}...' : normalized,
