@@ -17,6 +17,7 @@ import '../widgets/common/content_skeleton.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/transition_metrics_provider.dart';
 import '../providers/first_listen_completed_provider.dart';
+import '../widgets/common/engrowth_popup.dart';
 import '../widgets/guided_flow/listen_first_popup.dart';
 import '../widgets/guided_flow/story_after_listen_action_popup.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
@@ -29,6 +30,12 @@ class StoryStudyScreen extends ConsumerStatefulWidget {
   final bool asSheet;
   /// ポップアップカルーセル内に埋め込むとき true。AppBar を出さずコンテンツのみ表示する。
   final bool asPopupContent;
+  /// カルーセルで「次の学習」として表示しているとき true。ListenFirst を「学習を始める」表記に。
+  final bool isNextInCarousel;
+  /// true のとき「まずは音声を…」ポップアップを出さず、再生ボタンを最初から表示（次の学習へ直行時用）
+  final bool skipListenFirstPopup;
+  /// 次のストーリーのタイトル（6択の「次の学習へ」で「○○へ進みます」を表示するため）
+  final String? nextStoryTitle;
   final VoidCallback? onClose;
   /// 初回聴き終わり時に呼ばれる（カルーセルで次ページへ進むトリガーに使用）
   final VoidCallback? onCompleted;
@@ -40,6 +47,9 @@ class StoryStudyScreen extends ConsumerStatefulWidget {
     required this.storyId,
     this.asSheet = false,
     this.asPopupContent = false,
+    this.isNextInCarousel = false,
+    this.skipListenFirstPopup = false,
+    this.nextStoryTitle,
     this.onClose,
     this.onCompleted,
     this.autoStartPlayback = false,
@@ -67,6 +77,10 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.skipListenFirstPopup) {
+      _guidedFlowPlayButtonRevealed = true;
+      _hasShownListenFirstPopup = true;
+    }
     _ttsService.initialize();
     WidgetsBinding.instance.addPostFrameCallback((_) => _logTransitionCompleteIfNeeded());
   }
@@ -117,7 +131,10 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
       final utterance = utterances[i];
       setState(() => _currentUtteranceIndex = i);
       try {
-        await _ttsService.speakEnglish(utterance.englishText);
+        await _ttsService.speakEnglish(
+          utterance.englishText,
+          role: utterance.speakerRole,
+        );
       } on TtsPlaybackBlockedException {
         break;
       } on Exception catch (e) {
@@ -183,7 +200,18 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               StoryAfterListenActionPopup.show(
                 context,
                 storyId: widget.storyId,
-                onNextLearning: () => widget.onCompleted?.call(),
+                onNextLearning: () async {
+                  if (widget.nextStoryTitle != null && mounted) {
+                    await EngrowthPopup.show<void>(
+                      context,
+                      barrierDismissible: true,
+                      title: '${widget.nextStoryTitle} へ進みます',
+                      autoCloseAfter: const Duration(seconds: 3),
+                      analyticsVariant: 'story_next_transition',
+                    );
+                  }
+                  widget.onCompleted?.call();
+                },
               );
             } else {
               _showStoryNextActionDialog();
@@ -199,6 +227,28 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     await _ttsService.stop();
     if (mounted) {
       setState(() => _isPlaying = false);
+    }
+  }
+
+  /// デバッグ用: 聴き終わり状態にし、6択ポップアップを出して流れを確認できるようにする
+  Future<void> _debugMarkConversationComplete() async {
+    if (!kDebugMode) return;
+    final service = ref.read(firstListenCompletedServiceProvider);
+    await service.markCompleted('story', widget.storyId);
+    ref.invalidate(firstListenCompletedProvider(('story', widget.storyId)));
+    if (!mounted) return;
+    setState(() {
+      _hasListenedToAll = true;
+      _guidedFlowPlayButtonRevealed = true;
+      _hasShownListenFirstPopup = true;
+    });
+    if (!mounted) return;
+    if (widget.asPopupContent) {
+      StoryAfterListenActionPopup.show(
+        context,
+        storyId: widget.storyId,
+        onNextLearning: () => widget.onCompleted?.call(),
+      );
     }
   }
 
@@ -326,14 +376,15 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     final conversationsAsync = ref.watch(storyConversationsProvider(widget.storyId));
     final firstListenAsync = ref.watch(firstListenCompletedProvider(('story', widget.storyId)));
 
-    // Speak風ガイドフロー: 初回のみポップアップ表示
+    // Speak風ガイドフロー: 初回のみポップアップ表示（skipListenFirstPopup 時は出さない）
     ref.listen(firstListenCompletedProvider(('story', widget.storyId)), (_, next) {
       next.whenData((isCompleted) {
         if (isCompleted) return;
-        if (_hasShownListenFirstPopup || !mounted) return;
+        if (widget.skipListenFirstPopup || _hasShownListenFirstPopup || !mounted) return;
         _hasShownListenFirstPopup = true;
         ListenFirstPopup.show(
           context,
+          forNextStory: widget.isNextInCarousel,
           contentType: 'story',
           contentId: widget.storyId,
           onShown: () => ref.read(analyticsServiceProvider).logGuidedFlowPopupShown(
@@ -352,11 +403,14 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                 contentType: 'story',
                 contentId: widget.storyId,
               );
-              // 閉じたあと、次のストーリーでは自動で再生開始
-              ref.read(storyUtterancesOrderedProvider(widget.storyId).future).then((utterances) {
-                if (mounted && !_isPlaying && utterances.isNotEmpty) {
-                  _playAllUtterances(utterances);
-                }
+              // 閉じたあと、次のストーリーでは自動で再生開始（1フレーム遅延でUI更新後に再生）
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                ref.read(storyUtterancesOrderedProvider(widget.storyId).future).then((utterances) {
+                  if (mounted && !_isPlaying && utterances.isNotEmpty) {
+                    _playAllUtterances(utterances);
+                  }
+                });
               });
             }
           },
@@ -569,20 +623,48 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
       );
 
     if (widget.asPopupContent) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      return Stack(
         children: [
-          _StoryHeroBanner(storyId: widget.storyId, story: story),
-          Expanded(
-            child: FadeSlideSwitcher(
-              childKey: ValueKey(
-                utterancesAsync.hasValue
-                    ? 'data'
-                    : (utterancesAsync.hasError ? 'error' : 'loading'),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _StoryHeroBanner(storyId: widget.storyId, story: story),
+              Expanded(
+                child: FadeSlideSwitcher(
+                  childKey: ValueKey(
+                    utterancesAsync.hasValue
+                        ? 'data'
+                        : (utterancesAsync.hasError ? 'error' : 'loading'),
+                  ),
+                  child: content,
+                ),
               ),
-              child: content,
-            ),
+            ],
           ),
+          if (kDebugMode)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Material(
+                color: Colors.amber.shade700,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: () => _debugMarkConversationComplete(),
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Text(
+                      '会話を完了状態にする',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       );
     }
@@ -596,6 +678,11 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             onPressed: () => context.pop(),
           ),
           actions: [
+            if (kDebugMode)
+              TextButton(
+                onPressed: _debugMarkConversationComplete,
+                child: const Text('完了にする', style: TextStyle(fontSize: 12)),
+              ),
             FavoriteToggleIcon(
               targetType: 'story',
               targetId: widget.storyId,

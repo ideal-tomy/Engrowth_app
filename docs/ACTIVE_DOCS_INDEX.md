@@ -39,6 +39,9 @@
 ## Development / Tooling
 - `docs/FLUTTER_HOT_RELOAD_TROUBLESHOOTING.md`（Hot reload / Hot restart が効かない原因と対処・公式・Cursor フォーラム準拠）
 
+## 3分会話（ポップアップカルーセル・学習フロー）
+- `docs/STORY_LEARNING_FLOW.md`（一覧→カルーセル内学習→次の学習へ→次ストーリーの流れ・デバッグボタン）
+
 ## Motion Sync（遷移・体感遅延・CTA計測）
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
 

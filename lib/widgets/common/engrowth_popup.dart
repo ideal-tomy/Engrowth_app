@@ -180,7 +180,10 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
     if (widget.primaryLabel != null) {
       children.add(EngrowthPrimaryButton(
         label: widget.primaryLabel!,
-        onPressed: widget.onPrimary,
+        onPressed: () {
+          if (context.mounted) Navigator.of(context).pop();
+          widget.onPrimary?.call();
+        },
       ));
     }
 

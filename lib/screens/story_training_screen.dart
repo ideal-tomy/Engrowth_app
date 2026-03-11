@@ -515,28 +515,19 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
                 storyId: widget.story.id,
                 asPopupContent: true,
                 onCompleted: () => advanceNotifier.value?.call(),
+                nextStoryTitle: nextStory?.title,
               ),
             ),
-            EngrowthPopupPage(
-              title: '次の学習へ',
-              subtitle: 'おつかれさまです。続けて学習しますか？',
-              primaryLabel: '次へ',
-              autoAdvanceAfter: const Duration(seconds: 3),
-            ),
-            if (nextStory != null) ...[
-              EngrowthPopupPage(
-                title: nextStory.title,
-                subtitle: '次のストーリーに進みます',
-                primaryLabel: '学習する',
-              ),
+            if (nextStory != null)
               EngrowthPopupPage(
                 customChild: StoryStudyScreen(
                   storyId: nextStory.id,
                   asPopupContent: true,
+                  isNextInCarousel: true,
+                  skipListenFirstPopup: true,
                   onCompleted: () => advanceNotifier.value?.call(),
                 ),
               ),
-            ],
           ];
           if (!context.mounted) return;
           EngrowthPopupCarousel.show<void>(
@@ -545,17 +536,6 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
             advanceCallbackNotifier: advanceNotifier,
             analyticsSourceScreen: 'story_training',
             pages: pages,
-            onAutoAdvanceFromPage: (fromIndex) {
-              if (fromIndex == 1 && nextStory != null) {
-                ref.read(analyticsServiceProvider).logEvent(
-                      eventType: 'story_next_auto_advanced',
-                      eventProperties: {
-                        'from_story_id': widget.story.id,
-                        'to_story_id': nextStory!.id,
-                      },
-                    );
-              }
-            },
           );
         },
         child: Container(
