@@ -11,6 +11,7 @@ import '../services/pattern_sprint_service.dart';
 import '../services/tts_service.dart';
 import '../models/learning_handoff_result.dart';
 import '../services/analytics_service.dart';
+import '../utils/router.dart';
 
 /// パターンスプリント セッション実行画面
 /// 3段階練習: 1回目日英表示→2回目英文のみ→3回目テキストなし→シャドーイング待機→次へ
@@ -102,6 +103,20 @@ class _PatternSprintSessionScreenState
     );
     if (url != null && gen == _prefetchGenId && mounted) {
       _prefetchedUrls[next] = url;
+    }
+  }
+
+  /// セッション開始前に「1本目だけは必ず」URLをDBから取得しておくウォームアップ
+  Future<void> _warmupFirst(List<PatternSprintItem> items) async {
+    if (items.isEmpty) return;
+    final gen = _prefetchGenId;
+    final url = await _ttsService.fetchAudioUrlForEnglish(
+      items[0].englishText,
+      role: items[0].speakerRole,
+    );
+    if (!mounted || gen != _prefetchGenId) return;
+    if (url != null) {
+      _prefetchedUrls[0] = url;
     }
   }
 
@@ -216,6 +231,15 @@ class _PatternSprintSessionScreenState
   }
 
   Future<void> _runLoop(List<PatternSprintItem> items) async {
+    if (items.isEmpty) {
+      _onSessionComplete(items);
+      return;
+    }
+
+    // 最初の1本目だけは確実にURLをDBから取っておく
+    await _warmupFirst(items);
+    if (!mounted || _stopped) return;
+
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _stopped) return;
       setState(() => _elapsedSec++);
@@ -241,8 +265,22 @@ class _PatternSprintSessionScreenState
     );
     if (!mounted) return;
     if (widget.fromOnboarding) {
-      // チュートリアル経由の場合は、ポップアップを挟まずにオンボーディングへ結果を返す
-      context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
+      // チュートリアル経由の場合は、一覧画面を挟まずに
+      // 「セッション → パターンスプリント一覧」の2段階をまとめてポップして
+      // 直接オンボーディングへ LearningHandoffResult を返す
+      final result = LearningHandoffResult.completedWithMode('pattern_sprint');
+      final navigator = appRouter.routerDelegate.navigatorKey.currentState;
+      if (navigator != null) {
+        if (navigator.canPop()) {
+          navigator.pop(result); // セッションを閉じる
+        }
+        if (navigator.canPop()) {
+          navigator.pop(result); // 一覧を閉じてオンボーディングへ
+        }
+      } else {
+        // フォールバック: 現在のコンテキストから1回だけポップ
+        context.pop(result);
+      }
     } else {
       _showCompleteDialog(items);
     }
