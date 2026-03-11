@@ -32,10 +32,20 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
   // Speak風ガイドフロー: ポップアップ閉じ済みのプレフィックス
   final Set<String> _guidedFlowPlayRevealedForPrefix = {};
 
+  /// セッションを開き、オンボーディングからなら戻り値で一覧を閉じてオンボーディングに返す
+  Future<void> _pushSessionAndReturnIfOnboarding(String prefix) async {
+    final fromParam = widget.fromOnboarding ? '&from_onboarding=true' : '';
+    final uri =
+        '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$_selectedDurationSec$fromParam';
+    final result = await context.push<LearningHandoffResult>(uri);
+    if (widget.fromOnboarding && mounted) {
+      context.pop(result ?? LearningHandoffResult.notCompleted);
+    }
+  }
+
   void _onOverlayComplete() {
     if (_selectedPrefix == null) return;
     final prefix = _selectedPrefix!;
-    final duration = _selectedDurationSec;
     ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
           stepType: 'pattern_sprint',
         );
@@ -47,19 +57,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
       context,
       title: 'パターンスプリント',
       body: '聞く→まねして言うを短時間で繰り返します。音声を聴いたら即座にリピートしましょう。',
-      onStart: () async {
-        final fromParam =
-            widget.fromOnboarding ? '&from_onboarding=true' : '';
-        final uri =
-            '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$duration$fromParam';
-        final result = await context.push<LearningHandoffResult>(uri);
-        if (widget.fromOnboarding &&
-            result != null &&
-            result.completed &&
-            mounted) {
-          context.pop(result);
-        }
-      },
+      onStart: () => _pushSessionAndReturnIfOnboarding(prefix),
     );
   }
 
@@ -202,15 +200,13 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                   ),
                 ),
                 FilledButton.tonal(
-                  onPressed: () {
+                  onPressed: () async {
                     HapticFeedback.selectionClick();
                     ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
                           categoryId: category.id,
                           prefix: firstPrefix,
                         );
-                    context.push(
-                      '/pattern-sprint/session?prefix=${Uri.encodeComponent(firstPrefix)}&duration=$_selectedDurationSec',
-                    );
+                    await _pushSessionAndReturnIfOnboarding(firstPrefix);
                   },
                   style: showOnlySelectedCategory && isSelectedCategory
                       ? FilledButton.styleFrom(
@@ -271,7 +267,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                         IconButton.filledTonal(
                           icon: const Icon(Icons.play_arrow_rounded),
                           tooltip: 'このパターンですぐ始める',
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.selectionClick();
                             ref.read(analyticsServiceProvider).logHapticFired(
                                   trigger: 'pattern_sprint_start_from_list_item',
@@ -280,9 +276,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                                   categoryId: category.id,
                                   prefix: p.prefix,
                                 );
-                            context.push(
-                              '/pattern-sprint/session?prefix=${Uri.encodeComponent(p.prefix)}&duration=$_selectedDurationSec',
-                            );
+                            await _pushSessionAndReturnIfOnboarding(p.prefix);
                           },
                         ),
                       ],
@@ -462,14 +456,12 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
           FilledButton(
             onPressed: _selectedPrefix == null
                 ? null
-                : () {
+                : () async {
                     HapticFeedback.selectionClick();
                     ref.read(analyticsServiceProvider).logHapticFired(
                           trigger: 'pattern_sprint_start',
                         );
-                    context.push(
-                      '/pattern-sprint/session?prefix=${Uri.encodeComponent(_selectedPrefix!)}&duration=$_selectedDurationSec',
-                    );
+                    await _pushSessionAndReturnIfOnboarding(_selectedPrefix!);
                   },
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),

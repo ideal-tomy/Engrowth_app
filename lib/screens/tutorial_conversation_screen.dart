@@ -15,6 +15,7 @@ import '../services/tts_service.dart';
 import '../theme/engrowth_theme.dart';
 import '../utils/tutorial_intent_resolver.dart';
 import '../widgets/recording_waveform.dart';
+import '../widgets/tutorial/tutorial_sequencer.dart';
 
 /// 事前生成チュートリアル会話画面
 /// 聞く→話す→返答を低遅延で体験
@@ -32,7 +33,8 @@ class TutorialConversationScreen extends ConsumerStatefulWidget {
 }
 
 class _TutorialConversationScreenState
-    extends ConsumerState<TutorialConversationScreen> {
+    extends ConsumerState<TutorialConversationScreen>
+    with TickerProviderStateMixin {
   final TtsService _ttsService = TtsService();
   final RecordingService _recordingService = RecordingService();
   final SttService _sttService = SttService();
@@ -45,16 +47,23 @@ class _TutorialConversationScreenState
   bool _hasStarted = false;
   bool _hasLoggedLoadFailed = false;
 
+  late final TutorialSequencer _sequence;
+
   @override
   void initState() {
     super.initState();
     _ttsService.initialize();
+    _sequence = TutorialSequencer(
+      vsync: this,
+      onProgress: (_) {},
+    );
   }
 
   @override
   void dispose() {
     _recordingService.dispose();
     _ttsService.dispose();
+    _sequence.dispose();
     super.dispose();
   }
 
@@ -76,25 +85,43 @@ class _TutorialConversationScreenState
   }
 
   Future<void> _enterStep(TutorialSession session, TutorialStep step) async {
-    setState(() {
-      _currentStep = step;
-      _statusMessage = null;
-    });
-    ref.read(analyticsServiceProvider).logTutorialStepStarted(
-          stepId: step.id,
-          stepOrder: step.stepOrder,
-        );
-    await _playPromptOrResponse(
-      step.promptTextEn,
-      audioUrl: step.promptAudioUrl,
+    await _sequence.runStep(
+      TutorialSequenceStep(
+        // 登場: ステップのプロンプトを表示
+        enterDuration: const Duration(milliseconds: 600),
+        onEnter: () async {
+          if (!mounted) return;
+          setState(() {
+            _currentStep = step;
+            _statusMessage = null;
+          });
+          ref.read(analyticsServiceProvider).logTutorialStepStarted(
+                stepId: step.id,
+                stepOrder: step.stepOrder,
+              );
+          await _playPromptOrResponse(
+            step.promptTextEn,
+            audioUrl: step.promptAudioUrl,
+          );
+        },
+        // 滞在: プロンプト直後の静かな余白
+        stayDuration: const Duration(milliseconds: 600),
+        // 演出: 自動録音開始
+        performDuration: const Duration(milliseconds: 600),
+        onPerform: () async {
+          if (!mounted) return;
+          await _scheduleAutoRecord(session);
+        },
+        // 余白: 録音中のメッセージ表示などに任せるためゼロ
+        pauseDuration: Duration.zero,
+        // 退場: 次ステップは録音完了側で制御するためゼロ
+        exitDuration: Duration.zero,
+      ),
     );
-    if (!mounted) return;
-    _scheduleAutoRecord(session);
   }
 
   /// TTS終了後、短いディレイで自動録音開始（同意済みの場合）
   Future<void> _scheduleAutoRecord(TutorialSession session) async {
-    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted || _currentStep == null || _isProcessing || _isRecording) return;
 
     final hasConsent = await RecordingConsentService.hasConsent();

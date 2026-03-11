@@ -49,6 +49,23 @@
 
 - チュートリアル内の「今日あった出来事」のテキスト切替、ハイライトの長さなども、多くの箇所で `EngrowthElementTokens.switchDuration` を参照しています。
 
+### 3.1 チュートリアル/オンボーディングの「現行基準値」
+
+**ファイル:** `lib/screens/onboarding_flow_screen.dart`, `lib/screens/tutorial_conversation_screen.dart`  
+
+`EngrowthElementTokens` とは別に、チュートリアル/オンボーディング固有の Duration・ディレイがいくつか存在します。  
+これらは **現行の体感テンポを基準とした値** として採用しており、トークン化する場合もまずこの数値を写す想定です。
+
+| 用途 | 実装箇所 | 現行値 | 備考 |
+|------|----------|--------|------|
+| オンボーディング内 `PageView` ページ送り | `OnboardingFlowScreen._goToNext` / `previousPage` | 300 ms | `EngrowthElementTokens.switchDuration (900ms)` より短いが、オンボーディング標準としてこの値を採用する。将来トークン化する場合は `OnboardingPageDuration = 300ms` 相当で定義。 |
+| 日次提出疑似体験の説明切り替えディレイ | `OnboardingFlowScreen._maybeStartMockDailyIntro` | 3 sec 間隔 | Speak風UXの「滞在 2〜3秒」に対応するドメイン固有値。1→2→3ステップの自動進行に使用。 |
+| チュートリアル会話の自動録音開始までの余白 | `TutorialConversationScreen._scheduleAutoRecord` | 600 ms | プロンプト音声再生後の「一拍置いてから録音開始」用余白。 |
+| チュートリアル会話完了時の余韻 | `TutorialConversationScreen._handleRecordingComplete` | 800 ms | 応答TTS再生後、体験完了メッセージ表示から画面遷移までの余白。 |
+
+> 上記の値は、`EngrowthRouteTokens` / `EngrowthElementTokens` と完全には一致していませんが、**チュートリアル体験の現在の基準値**としてこのガイドに記載します。  
+> モーションを調整する際は、まずここに書かれた数値を起点に検討し、そのうえで必要であればトークン側を拡張・正規化してください。
+
 ---
 
 ## 4. 段階表示（スタッガー）のテンポ

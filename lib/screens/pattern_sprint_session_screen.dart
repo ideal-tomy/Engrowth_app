@@ -241,7 +241,8 @@ class _PatternSprintSessionScreenState
     );
     if (!mounted) return;
     if (widget.fromOnboarding) {
-      _showOnboardingValueDialog(items);
+      // チュートリアル経由の場合は、ポップアップを挟まずにオンボーディングへ結果を返す
+      context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
     } else {
       _showCompleteDialog(items);
     }
@@ -263,7 +264,8 @@ class _PatternSprintSessionScreenState
               Navigator.of(ctx).pop();
               if (context.mounted) {
                 if (widget.fromOnboarding) {
-                  context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
+                  // オンボーディングからでも「一覧へ」ならパターンスプリント一覧に留まる
+                  context.go('/pattern-sprint');
                 } else {
                   context.go('/pattern-sprint');
                 }
@@ -271,6 +273,16 @@ class _PatternSprintSessionScreenState
             },
             child: const Text('一覧へ'),
           ),
+          if (widget.fromOnboarding)
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (context.mounted) {
+                  context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
+                }
+              },
+              child: const Text('オンボーディングに戻る'),
+            ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();

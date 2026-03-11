@@ -15,6 +15,7 @@ import '../models/learning_handoff_result.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
 import '../widgets/common/fade_slide_switcher.dart';
 import '../widgets/common/stagger_reveal.dart';
+import '../widgets/tutorial/tutorial_sequencer.dart';
 
 /// シナリオ学習ページ（Netflix型: セクション + 横スクロール行）
 class ScenarioLearningScreen extends ConsumerStatefulWidget {
@@ -27,9 +28,27 @@ class ScenarioLearningScreen extends ConsumerStatefulWidget {
       _ScenarioLearningScreenState();
 }
 
-class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen> {
+class _ScenarioLearningScreenState extends ConsumerState<ScenarioLearningScreen>
+    with TickerProviderStateMixin {
   final GlobalKey _overlayTargetKey = GlobalKey();
   bool _overlayCompleted = false;
+
+  late final TutorialSequencer _sequence;
+
+  @override
+  void initState() {
+    super.initState();
+    _sequence = TutorialSequencer(
+      vsync: this,
+      onProgress: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _sequence.dispose();
+    super.dispose();
+  }
 
   static IconData _iconForCategory(String iconName) {
     switch (iconName) {

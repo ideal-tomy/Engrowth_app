@@ -36,6 +36,9 @@
 - `docs/SUPABASE_MIGRATION_ORDER.md`
 - `supabase/migrations/MIGRATION_CATALOG.md`
 
+## Development / Tooling
+- `docs/FLUTTER_HOT_RELOAD_TROUBLESHOOTING.md`（Hot reload / Hot restart が効かない原因と対処・公式・Cursor フォーラム準拠）
+
 ## Motion Sync（遷移・体感遅延・CTA計測）
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
 

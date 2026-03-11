@@ -10,6 +10,7 @@ import '../providers/coach_provider.dart';
 import '../providers/next_action_provider.dart';
 import '../providers/onboarding_provider.dart';
 import '../theme/engrowth_theme.dart';
+import '../widgets/tutorial/tutorial_sequencer.dart';
 
 /// 初回体験フロー
 /// 挨拶・30秒会話・パターンスクリプト・日次提出疑似体験の順で操作を案内
@@ -21,7 +22,8 @@ class OnboardingFlowScreen extends ConsumerStatefulWidget {
       _OnboardingFlowScreenState();
 }
 
-class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
+class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   static const int _totalSteps = 7;
@@ -39,6 +41,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   Timer? _welcomePulseTimer;
   bool _welcomePulseActive = false;
 
+  late final TutorialSequencer _welcomeSequencer;
+  Timer? _autoStepTimer;
+
   @override
   void initState() {
     super.initState();
@@ -47,15 +52,15 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           variant: _variant,
         );
 
-    // ウェルカム画面の主要CTAに、ごく軽い単発パルスを付与
-    _welcomePulseTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted || _currentPage != 0) return;
-      setState(() => _welcomePulseActive = true);
-      Future.delayed(EngrowthElementTokens.switchDuration, () {
-        if (mounted) {
-          setState(() => _welcomePulseActive = false);
-        }
-      });
+    _welcomeSequencer = TutorialSequencer(
+      vsync: this,
+      onProgress: (_) {},
+    );
+
+    // Welcome ステップの「登場→滞在→CTAパルス→余韻」をシーケンスとして実行
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _runWelcomeSequence();
     });
   }
 
@@ -63,8 +68,42 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   void dispose() {
     _mockDailySubmitTimer?.cancel();
     _welcomePulseTimer?.cancel();
+    _autoStepTimer?.cancel();
+    _welcomeSequencer.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _runWelcomeSequence() async {
+    // すでに別ページに移動している場合は何もしない
+    if (!mounted || _currentPage != 0) return;
+
+    await _welcomeSequencer.runStep(
+      TutorialSequenceStep(
+        // 登場: テキストなどは既に表示されているので、軽い待ちのみ
+        enterDuration: const Duration(milliseconds: 800),
+        onEnter: () async {
+          // ここでは特に何もしない（静寂の時間）
+        },
+        // 滞在: コンテンツを読む時間
+        stayDuration: const Duration(milliseconds: 1800),
+        // 演出: CTAボタンの単発パルス
+        performDuration: EngrowthElementTokens.switchDuration,
+        onPerform: () async {
+          if (!mounted || _currentPage != 0) return;
+          _welcomePulseTimer?.cancel();
+          setState(() => _welcomePulseActive = true);
+          await Future.delayed(EngrowthElementTokens.switchDuration);
+          if (mounted && _currentPage == 0) {
+            setState(() => _welcomePulseActive = false);
+          }
+        },
+        // 余白: パルス後の静かな待ち
+        pauseDuration: const Duration(milliseconds: 800),
+        // 退場: このステップではページ遷移させないためゼロ
+        exitDuration: Duration.zero,
+      ),
+    );
   }
 
   void _goToNext() {
@@ -151,20 +190,44 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     return ids[index.clamp(0, ids.length - 1)];
   }
 
+  void _autoAdvanceToNext() {
+    if (_currentPage >= _totalSteps - 1) return;
+    final nextIndex = _currentPage + 1;
+    final nextStepId = _stepId(nextIndex);
+    // 手動タップではないのでハプティクスは鳴らさず、ステップ完了だけ記録する
+    ref.read(analyticsServiceProvider).logOnboardingStepCompleted(
+          step: nextStepId,
+          index: nextIndex,
+          variant: _variant,
+        );
+    _pageController.jumpToPage(nextIndex);
+    setState(() => _currentPage = nextIndex);
+  }
+
   Future<void> _tryStepAndAdvance(String route) async {
     HapticFeedback.selectionClick();
     final fromStep = _stepId(_currentPage);
     final result = await context.push<LearningHandoffResult>(route);
     if (!mounted) return;
-    // 学習完了時にのみ次章へ自動進行（手動戻りの場合は進行しない）
+    // 体験が最後まで完了した場合
     if (result != null && result.completed) {
       ref.read(analyticsServiceProvider).logTutorialAutoAdvanced(
             learningMode: result.learningMode ?? 'unknown',
             fromStep: fromStep,
             toStep: _stepId(_currentPage + 1),
           );
-      _goToNext();
+      _autoAdvanceToNext();
+      return;
     }
+
+    // 途中で閉じた / エラーなどで完了しなかった場合も、
+    // オンボーディングの流れとしては次のステップへ進める
+    ref.read(analyticsServiceProvider).logTutorialAutoAdvanced(
+          learningMode: result?.learningMode ?? 'skipped_or_incomplete',
+          fromStep: fromStep,
+          toStep: _stepId(_currentPage + 1),
+        );
+    _autoAdvanceToNext();
   }
 
   Future<void> _completeOnboarding({String? nextRoute}) async {
@@ -239,7 +302,39 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) {
                   setState(() => _currentPage = i);
-                  if (i == 5) {
+                  _autoStepTimer?.cancel();
+
+                  // 「はじめる」以降は、挨拶体験 / 30秒会話 / パターンスプリプトは
+                  // 原則自動で体験をスタートさせる。
+                  if (i == 1) {
+                    // 挨拶体験: 説明を10秒見せてから自動で挨拶体験画面へ
+                    _autoStepTimer = Timer(const Duration(seconds: 10), () {
+                      if (!mounted || _currentPage != 1) return;
+                      _tryStepAndAdvance(
+                        '/tutorial-conversation?entry_source=onboarding',
+                      );
+                    });
+                  } else if (i == 2) {
+                    // 30秒会話: 説明を10秒見せてから自動で30秒会話体験へ
+                    _autoStepTimer = Timer(const Duration(seconds: 10), () {
+                      if (!mounted || _currentPage != 2) return;
+                      _tryStepAndAdvance(
+                        '/scenario-learning?from_onboarding=true',
+                      );
+                    });
+                  } else if (i == 3) {
+                    // パターンスクリプト: 説明を10秒見せてから自動で体験へ
+                    _autoStepTimer = Timer(const Duration(seconds: 10), () {
+                      if (!mounted || _currentPage != 3) return;
+                      _tryStepAndAdvance(
+                        '/pattern-sprint?from_onboarding=true',
+                      );
+                    });
+                  } else if (i == 4) {
+                    // 3分英会話説明: ここは説明のみ。現状はユーザーが読み終えたら
+                    // 「次へ」を押す前提だが、将来的に自動進行する場合はここにTimerを追加する。
+                  } else if (i == 5) {
+                    // 今日あった出来事: ポップアップシーケンスを開始
                     _maybeStartMockDailyIntro();
                   }
                 },
@@ -358,10 +453,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: _goToNext,
-            child: const Text('あとで体験する'),
-          ),
+          // 全自動フロー前提のため、「あとで体験する」は削除
         ],
       ),
     );
@@ -396,7 +488,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/scenario-learning?from_onboarding=true'),
+              onPressed: () => _tryStepAndAdvance(
+                    '/scenario-learning?from_onboarding=true',
+                  ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -407,10 +501,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: _goToNext,
-            child: const Text('あとで体験する'),
-          ),
+          // 全自動フロー前提のため、「あとで体験する」は削除
         ],
       ),
     );
@@ -445,7 +536,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => _tryStepAndAdvance('/pattern-sprint?from_onboarding=true'),
+              onPressed: () => _tryStepAndAdvance(
+                    '/pattern-sprint?from_onboarding=true',
+                  ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -456,10 +549,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: _goToNext,
-            child: const Text('あとで体験する'),
-          ),
+          // 全自動フロー前提のため、「あとで体験する」は削除
         ],
       ),
     );
@@ -492,27 +582,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             textAlign: TextAlign.center,
           ),
           const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-            onPressed: _goToNext,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            child: const Text('次へ進む'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-          onPressed: () {
-            HapticFeedback.selectionClick();
-            context.push('/story-training');
-          },
-          child: const Text('あとで詳しく見る'),
-          ),
+          // 説明のみのステップ。十分な滞在時間を取ったあとは自動で次へ進むため、ここではCTAを置かない。
         ],
       ),
     );
@@ -534,12 +604,17 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                 ),
           ),
           const SizedBox(height: 16),
-          AnimatedSwitcher(
-            duration: EngrowthElementTokens.switchDuration,
-            switchInCurve: EngrowthElementTokens.switchCurveIn,
-            switchOutCurve: EngrowthElementTokens.switchCurveOut,
-            child: _buildMockDailyStepContent(colorScheme),
-          ),
+          if (_mockDailyStep < 4)
+            Text(
+              '説明を順に表示しています',
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+              ),
+              textAlign: TextAlign.center,
+            )
+          else
+            const SizedBox.shrink(),
           const Spacer(),
           if (_mockDailySubmitActive) ...[
             const SizedBox(height: 24),
@@ -562,7 +637,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('30秒練習をはじめる'),
+                child: const Text('録音を体験する'),
               ),
             ),
             const SizedBox(height: 12),
@@ -575,64 +650,75 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   void _maybeStartMockDailyIntro() {
     if (_mockDailyIntroStarted) return;
     _mockDailyIntroStarted = true;
-    _mockDailyStep = 1;
-    // 段階的に1→2→3→4と数秒おきに切り替え（録音カウントダウン開始後は進めない）
-    Future(() async {
-      for (var step = 1; step <= 3; step++) {
-        await Future.delayed(const Duration(seconds: 3));
-        if (!mounted || _currentPage != 5 || _mockDailySubmitActive) break;
-        setState(() => _mockDailyStep = step + 1);
-      }
-    });
+    setState(() => _mockDailyStep = 1);
+    _runDailyIntroPopups();
   }
 
-  Widget _buildMockDailyStepContent(ColorScheme colorScheme) {
-    switch (_mockDailyStep) {
-      case 1:
-        return Text(
-          '今日あった出来事を、英語で録音していきます。',
-          key: const ValueKey('mock_step_1'),
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.6,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        );
-      case 2:
-        return Text(
-          'コンサルタントへの提出が、日々の基本的なミッションになります。',
-          key: const ValueKey('mock_step_2'),
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.6,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        );
-      case 3:
-        return Text(
-          '今日あった出来事を1つ決めて、30秒ほどで伝えてみましょう。',
-          key: const ValueKey('mock_step_3'),
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.6,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        );
-      default:
-        return Text(
-          '画面は気にせず、今日あった出来事を英語で話してみてください。',
-          key: const ValueKey('mock_step_4'),
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.6,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        );
+  /// 「今日あった出来事」の説明をポップアップで順に表示（各3秒で閉じる）
+  Future<void> _runDailyIntroPopups() async {
+    const texts = [
+      '今日あった出来事を、英語で録音していきます。',
+      'コンサルタントへの提出が、日々の基本的なミッションになります。',
+    ];
+    for (var i = 0; i < texts.length; i++) {
+      if (!mounted || _currentPage != 5 || _mockDailySubmitActive) break;
+      await _showDailyIntroPopup(texts[i]);
+      if (!mounted || _currentPage != 5 || _mockDailySubmitActive) break;
+      await Future.delayed(const Duration(seconds: 1));
     }
+    if (!mounted || _currentPage != 5 || _mockDailySubmitActive) return;
+    // 最後のステップ: 録音体験だけはユーザーにボタンを押してもらう
+    await _showDailyIntroPopup(
+      '今日あった出来事を1つ決めて、30秒ほどで伝えてみましょう。\n\n準備ができたら「録音を体験する」を押してください。',
+      withActionButton: true,
+    );
+    if (!mounted || _currentPage != 5 || _mockDailySubmitActive) return;
+    setState(() => _mockDailyStep = 4);
+  }
+
+  Future<void> _showDailyIntroPopup(
+    String body, {
+    bool withActionButton = false,
+  }) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black54,
+      barrierDismissible: !withActionButton,
+      builder: (ctx) {
+        if (!withActionButton) {
+          Future.delayed(const Duration(seconds: 3), () {
+            if (ctx.mounted) Navigator.of(ctx).pop();
+          });
+        }
+        return AlertDialog(
+          content: Text(
+            body,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: colorScheme.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            if (withActionButton)
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _startMockDailySubmit();
+                },
+                child: const Text('録音を体験する'),
+              )
+            else
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('閉じる'),
+              ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildResultStep() {
@@ -663,6 +749,7 @@ class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
     with TickerProviderStateMixin {
   late AnimationController _sequenceController;
   late Animation<double> _sequenceAnim;
+  late Animation<double> _ctaScaleAnim;
 
   @override
   void initState() {
@@ -670,11 +757,19 @@ class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
     HapticFeedback.mediumImpact();
     _sequenceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 3000),
     );
     _sequenceAnim = CurvedAnimation(
       parent: _sequenceController,
       curve: Curves.easeOut,
+    );
+    _ctaScaleAnim = CurvedAnimation(
+      parent: _sequenceController,
+      curve: const Interval(
+        0.9,
+        1.0,
+        curve: Curves.easeOutBack,
+      ),
     );
     double _lastHapticAt = -1;
     _sequenceController.addListener(() {
@@ -820,24 +915,31 @@ class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
               const Spacer(),
               Opacity(
                 opacity: op6,
-                child: SizedBox(
-                  width: double.infinity,
-                      child: FilledButton(
-                    onPressed: () {
-                      ref.read(analyticsServiceProvider).logResultNextLearningTap(
-                            flow: 'onboarding',
-                            targetRoute: primaryRoute,
-                          );
-                      widget.onComplete(nextRoute: primaryRoute);
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: widget.colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: AnimatedBuilder(
+                  animation: _ctaScaleAnim,
+                  builder: (context, child) => Transform.scale(
+                    scale: 0.94 + 0.06 * _ctaScaleAnim.value,
+                    child: child,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        ref.read(analyticsServiceProvider).logResultNextLearningTap(
+                              flow: 'onboarding',
+                              targetRoute: primaryRoute,
+                            );
+                        widget.onComplete(nextRoute: primaryRoute);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: widget.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      child: Text(primaryLabel),
                     ),
-                    child: Text(primaryLabel),
                   ),
                 ),
               ),
