@@ -66,3 +66,12 @@ final firstIncompleteStoryIdProvider = FutureProvider<String?>((ref) async {
   }
   return null;
 });
+
+/// 一覧の並び順（display_order）で、指定ストーリーの次のストーリーIDを返す
+final nextStoryIdProvider =
+    FutureProvider.family<String?, String>((ref, currentStoryId) async {
+  final sequences = await ref.watch(storySequencesProvider.future);
+  final currentIdx = sequences.indexWhere((s) => s.id == currentStoryId);
+  if (currentIdx < 0 || currentIdx >= sequences.length - 1) return null;
+  return sequences[currentIdx + 1].id;
+});

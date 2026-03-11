@@ -9,6 +9,7 @@ import '../providers/story_provider.dart';
 import '../providers/transition_metrics_provider.dart';
 import '../models/learning_handoff_result.dart';
 import '../theme/engrowth_theme.dart';
+import '../widgets/common/engrowth_popup.dart';
 import '../widgets/optimized_image.dart';
 import '../widgets/scenario_background.dart';
 import '../widgets/favorite_toggle_icon.dart';
@@ -17,6 +18,8 @@ import '../widgets/tutorial/learning_intro_dialog.dart';
 import '../widgets/common/fade_slide_switcher.dart';
 import '../widgets/common/stagger_reveal.dart';
 import '../widgets/common/content_skeleton.dart';
+import '../widgets/common/engrowth_popup_carousel.dart';
+import 'story_study_screen.dart';
 
 /// 3分英会話トレーニング専用ページ
 /// カテゴリ（テーマ）別にストーリーカードを横スクロール表示
@@ -490,14 +493,70 @@ class _StorySequenceCardState extends ConsumerState<_StorySequenceCard> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: (_) => setState(() => _pressed = false),
-        onTap: () {
+        onTap: () async {
           ref.read(feedbackServiceProvider).selection(trigger: 'story_card_tap');
           ref.read(transitionMetricsProvider.notifier).recordTap(
                 routeType: 'standardPush',
                 fromRoute: '/story-training',
                 toRoute: '/story/${widget.story.id}',
               );
-          context.push('/story/${widget.story.id}');
+          final advanceNotifier = ValueNotifier<VoidCallback?>(null);
+          final nextId = await ref.read(nextStoryIdProvider(widget.story.id).future);
+          final sequences = await ref.read(storySequencesProvider.future);
+          StorySequence? nextStory;
+          if (nextId != null) {
+            try {
+              nextStory = sequences.firstWhere((s) => s.id == nextId);
+            } catch (_) {}
+          }
+          final pages = <EngrowthPopupPage>[
+            EngrowthPopupPage(
+              customChild: StoryStudyScreen(
+                storyId: widget.story.id,
+                asPopupContent: true,
+                onCompleted: () => advanceNotifier.value?.call(),
+              ),
+            ),
+            EngrowthPopupPage(
+              title: '次の学習へ',
+              subtitle: 'おつかれさまです。続けて学習しますか？',
+              primaryLabel: '次へ',
+              autoAdvanceAfter: const Duration(seconds: 3),
+            ),
+            if (nextStory != null) ...[
+              EngrowthPopupPage(
+                title: nextStory.title,
+                subtitle: '次のストーリーに進みます',
+                primaryLabel: '学習する',
+              ),
+              EngrowthPopupPage(
+                customChild: StoryStudyScreen(
+                  storyId: nextStory.id,
+                  asPopupContent: true,
+                  onCompleted: () => advanceNotifier.value?.call(),
+                ),
+              ),
+            ],
+          ];
+          if (!context.mounted) return;
+          EngrowthPopupCarousel.show<void>(
+            context,
+            size: EngrowthPopupSize.large,
+            advanceCallbackNotifier: advanceNotifier,
+            analyticsSourceScreen: 'story_training',
+            pages: pages,
+            onAutoAdvanceFromPage: (fromIndex) {
+              if (fromIndex == 1 && nextStory != null) {
+                ref.read(analyticsServiceProvider).logEvent(
+                      eventType: 'story_next_auto_advanced',
+                      eventProperties: {
+                        'from_story_id': widget.story.id,
+                        'to_story_id': nextStory!.id,
+                      },
+                    );
+              }
+            },
+          );
         },
         child: Container(
           width: double.infinity,

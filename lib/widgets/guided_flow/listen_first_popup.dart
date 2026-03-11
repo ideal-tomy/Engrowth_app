@@ -8,7 +8,7 @@ import '../common/engrowth_popup.dart';
 class ListenFirstPopup {
   const ListenFirstPopup._();
 
-  /// モーダルで表示。閉じると onDismiss を呼ぶ。
+  /// モーダルで表示。OK・外側タップのいずれでも閉じられ、閉じたあと onDismiss を1回呼ぶ。
   static Future<void> show(
     BuildContext context, {
     String message = 'まずは音声を最後まで聴いてください',
@@ -22,16 +22,15 @@ class ListenFirstPopup {
 
     await EngrowthPopup.show<void>(
       context,
+      barrierDismissible: true,
       hero: const Icon(Icons.headphones, size: 40),
       title: message,
       subtitle: 'タップして閉じる',
       primaryLabel: 'OK',
-      onPrimary: () {
-        Navigator.of(context).pop();
-        onDismiss();
-      },
+      onPrimary: () => Navigator.of(context).pop(),
       analyticsVariant: 'listen_first',
       analyticsSourceScreen: contentType,
     );
+    onDismiss();
   }
 }

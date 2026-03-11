@@ -11,6 +11,7 @@ import '../providers/next_action_provider.dart';
 import '../providers/onboarding_provider.dart';
 import '../theme/engrowth_theme.dart';
 import '../widgets/tutorial/tutorial_sequencer.dart';
+import '../widgets/common/engrowth_popup.dart';
 
 /// 初回体験フロー
 /// 挨拶・30秒会話・パターンスクリプト・日次提出疑似体験の順で操作を案内
@@ -331,8 +332,11 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen>
                       );
                     });
                   } else if (i == 4) {
-                    // 3分英会話説明: ここは説明のみ。現状はユーザーが読み終えたら
-                    // 「次へ」を押す前提だが、将来的に自動進行する場合はここにTimerを追加する。
+                    // 3分英会話説明: 5秒間の滞在後に自動で「今日あった出来事」ステップへ
+                    _autoStepTimer = Timer(const Duration(seconds: 5), () {
+                      if (!mounted || _currentPage != 4) return;
+                      _autoAdvanceToNext();
+                    });
                   } else if (i == 5) {
                     // 今日あった出来事: ポップアップシーケンスを開始
                     _maybeStartMockDailyIntro();
@@ -654,7 +658,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen>
     _runDailyIntroPopups();
   }
 
-  /// 「今日あった出来事」の説明をポップアップで順に表示（各3秒で閉じる）
+  /// 「今日あった出来事」の説明を EngrowthPopup で順に表示
   Future<void> _runDailyIntroPopups() async {
     const texts = [
       '今日あった出来事を、英語で録音していきます。',
@@ -680,44 +684,54 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen>
     String body, {
     bool withActionButton = false,
   }) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    await showDialog<void>(
-      context: context,
-      barrierColor: Colors.black54,
-      barrierDismissible: !withActionButton,
-      builder: (ctx) {
-        if (!withActionButton) {
-          Future.delayed(const Duration(seconds: 3), () {
-            if (ctx.mounted) Navigator.of(ctx).pop();
-          });
-        }
-        return AlertDialog(
-          content: Text(
-            body,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.6,
-              color: colorScheme.onSurface,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            if (withActionButton)
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  _startMockDailySubmit();
-                },
-                child: const Text('録音を体験する'),
-              )
-            else
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('閉じる'),
-              ),
-          ],
-        );
+    if (!mounted) return;
+
+    if (!withActionButton) {
+      // 説明ポップアップ: 3秒で自動クローズ
+      await EngrowthPopup.show<void>(
+        context,
+        title: '今日あった出来事',
+        body: Text(
+          body,
+          textAlign: TextAlign.center,
+        ),
+        autoCloseAfter: const Duration(seconds: 3),
+        analyticsVariant: 'onboarding_daily_intro',
+        analyticsSourceScreen: 'onboarding_submit',
+      );
+      return;
+    }
+
+    // 録音スタート用ポップアップ
+    await EngrowthPopup.show<void>(
+      context,
+      title: '録音の準備をしましょう',
+      body: Text(
+        body,
+        textAlign: TextAlign.center,
+      ),
+      primaryLabel: '録音を体験する',
+      onPrimary: () {
+        Navigator.of(context).pop();
+        _startMockDailySubmit();
+        _showRecordingCountdownPopup();
       },
+      analyticsVariant: 'onboarding_daily_ready',
+      analyticsSourceScreen: 'onboarding_submit',
+    );
+  }
+
+  Future<void> _showRecordingCountdownPopup() async {
+    if (!mounted) return;
+    const totalSec = 30;
+    await EngrowthPopup.show<void>(
+      context,
+      title: '録音中',
+      subtitle: '30秒間、今日あった出来事を英語で話してみましょう。',
+      body: const _RecordingCountdownBody(totalSec: totalSec),
+      autoCloseAfter: const Duration(seconds: totalSec),
+      analyticsVariant: 'onboarding_daily_recording',
+      analyticsSourceScreen: 'onboarding_submit',
     );
   }
 
@@ -726,6 +740,70 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen>
     return _OnboardingResultStep(
       onComplete: _completeOnboarding,
       colorScheme: colorScheme,
+    );
+  }
+}
+
+/// 録音中の30秒カウントダウン表示用ボディ（EngrowthPopup 内で使用）
+class _RecordingCountdownBody extends StatefulWidget {
+  final int totalSec;
+  const _RecordingCountdownBody({required this.totalSec});
+
+  @override
+  State<_RecordingCountdownBody> createState() =>
+      _RecordingCountdownBodyState();
+}
+
+class _RecordingCountdownBodyState extends State<_RecordingCountdownBody> {
+  late int _remaining;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.totalSec;
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() {
+        if (_remaining > 0) {
+          _remaining--;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '録音中...',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '残り $_remaining 秒',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.primary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

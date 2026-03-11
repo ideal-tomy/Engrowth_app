@@ -18,6 +18,7 @@ import '../providers/analytics_provider.dart';
 import '../providers/transition_metrics_provider.dart';
 import '../providers/first_listen_completed_provider.dart';
 import '../widgets/guided_flow/listen_first_popup.dart';
+import '../widgets/guided_flow/story_after_listen_action_popup.dart';
 import '../widgets/marquee/marquee_rail_data.dart';
 
 /// 3分ストーリー学習画面
@@ -26,7 +27,11 @@ import '../widgets/marquee/marquee_rail_data.dart';
 class StoryStudyScreen extends ConsumerStatefulWidget {
   final String storyId;
   final bool asSheet;
+  /// ポップアップカルーセル内に埋め込むとき true。AppBar を出さずコンテンツのみ表示する。
+  final bool asPopupContent;
   final VoidCallback? onClose;
+  /// 初回聴き終わり時に呼ばれる（カルーセルで次ページへ進むトリガーに使用）
+  final VoidCallback? onCompleted;
   final bool autoStartPlayback;
   final bool fromOnboarding;
 
@@ -34,7 +39,9 @@ class StoryStudyScreen extends ConsumerStatefulWidget {
     super.key,
     required this.storyId,
     this.asSheet = false,
+    this.asPopupContent = false,
     this.onClose,
+    this.onCompleted,
     this.autoStartPlayback = false,
     this.fromOnboarding = false,
   });
@@ -171,7 +178,17 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             contentType: 'story',
             contentId: widget.storyId,
           );
-          if (mounted) _showStoryNextActionDialog();
+          if (mounted) {
+            if (widget.asPopupContent) {
+              StoryAfterListenActionPopup.show(
+                context,
+                storyId: widget.storyId,
+                onNextLearning: () => widget.onCompleted?.call(),
+              );
+            } else {
+              _showStoryNextActionDialog();
+            }
+          }
         }
       }
     }
@@ -335,6 +352,12 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                 contentType: 'story',
                 contentId: widget.storyId,
               );
+              // 閉じたあと、次のストーリーでは自動で再生開始
+              ref.read(storyUtterancesOrderedProvider(widget.storyId).future).then((utterances) {
+                if (mounted && !_isPlaying && utterances.isNotEmpty) {
+                  _playAllUtterances(utterances);
+                }
+              });
             }
           },
         );
@@ -544,6 +567,25 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
           ),
         ),
       );
+
+    if (widget.asPopupContent) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _StoryHeroBanner(storyId: widget.storyId, story: story),
+          Expanded(
+            child: FadeSlideSwitcher(
+              childKey: ValueKey(
+                utterancesAsync.hasValue
+                    ? 'data'
+                    : (utterancesAsync.hasError ? 'error' : 'loading'),
+              ),
+              child: content,
+            ),
+          ),
+        ],
+      );
+    }
 
     if (!widget.asSheet) {
       return Scaffold(

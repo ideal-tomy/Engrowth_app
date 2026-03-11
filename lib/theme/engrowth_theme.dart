@@ -309,6 +309,24 @@ class EngrowthPopupTokens {
 
   /// 退場アニメーションの curve
   static const Curve exitCurve = Curves.easeIn;
+
+  /// サイズバリアント: medium の高さ比率（画面高さに対する割合）
+  static const double mediumHeightFraction = 0.55;
+
+  /// サイズバリアント: large の高さ比率
+  static const double largeHeightFraction = 0.85;
+
+  /// サイズバリアント: large 時の水平 padding
+  static const double largePaddingH = 16.0;
+
+  /// スライド切替: 退場 duration
+  static const Duration slideExitDuration = Duration(milliseconds: 600);
+
+  /// スライド切替: 登場 duration
+  static const Duration slideEnterDuration = Duration(milliseconds: 900);
+
+  /// スライド切替: 退場と登場のオーバーラップ（退場開始から登場開始までの遅延）
+  static const Duration slideOverlapDelay = Duration(milliseconds: 400);
 }
 
 /// Phase B: ふわっと表示統一のアニメーション基準値（後方互換）

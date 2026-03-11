@@ -8,11 +8,24 @@ import 'engrowth_card.dart';
 import 'engrowth_cta.dart';
 import 'stagger_reveal.dart';
 
+/// ポップアップのサイズバリアント
+enum EngrowthPopupSize {
+  /// 中身に追従（通知・確認・ガイド）
+  small,
+
+  /// 画面高さの約55%（学習カード・練習フロー）
+  medium,
+
+  /// 画面高さの約85%（説明フロー・ゴール設定）
+  large,
+}
+
 /// Speak風の高級感あるポップアップテンプレート。
 /// 背景ぼかし → コンテンツ段階表示 → 退場、を EngrowthPopupTokens に基づいて統一する。
 class EngrowthPopup extends ConsumerStatefulWidget {
   const EngrowthPopup({
     super.key,
+    this.size = EngrowthPopupSize.small,
     this.hero,
     this.title,
     this.subtitle,
@@ -26,6 +39,7 @@ class EngrowthPopup extends ConsumerStatefulWidget {
     this.analyticsSourceScreen,
   });
 
+  final EngrowthPopupSize size;
   final Widget? hero;
   final String? title;
   final String? subtitle;
@@ -44,6 +58,7 @@ class EngrowthPopup extends ConsumerStatefulWidget {
 
   static Future<T?> show<T>(
     BuildContext context, {
+    EngrowthPopupSize size = EngrowthPopupSize.small,
     Widget? hero,
     String? title,
     String? subtitle,
@@ -66,6 +81,7 @@ class EngrowthPopup extends ConsumerStatefulWidget {
       pageBuilder: (context, _, __) {
         return Center(
           child: EngrowthPopup(
+            size: size,
             hero: hero,
             title: title,
             subtitle: subtitle,
@@ -179,30 +195,76 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
     return children;
   }
 
+  double _paddingForSize(EngrowthPopupSize size) {
+    switch (size) {
+      case EngrowthPopupSize.small:
+        return 24;
+      case EngrowthPopupSize.medium:
+        return 20;
+      case EngrowthPopupSize.large:
+        return EngrowthPopupTokens.largePaddingH;
+    }
+  }
+
+  BoxConstraints? _constraintsForSize(
+    EngrowthPopupSize size,
+    MediaQueryData mediaQuery,
+  ) {
+    final height = mediaQuery.size.height;
+    switch (size) {
+      case EngrowthPopupSize.small:
+        return null;
+      case EngrowthPopupSize.medium:
+        return BoxConstraints(
+          maxHeight: height * EngrowthPopupTokens.mediumHeightFraction,
+        );
+      case EngrowthPopupSize.large:
+        return BoxConstraints(
+          maxHeight: height * EngrowthPopupTokens.largeHeightFraction,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final mediaQuery = MediaQuery.of(context);
 
     final children = _buildChildren(colorScheme, textTheme);
+    final paddingH = _paddingForSize(widget.size);
+    final constraints = _constraintsForSize(widget.size, mediaQuery);
+
+    final cardContent = StaggerReveal(
+      play: _showContent,
+      children: [
+        ..._interleaveSpacing(children),
+      ],
+    );
+
+    Widget card = EngrowthCard(
+      borderRadius: 20,
+      padding: const EdgeInsets.all(24),
+      child: constraints != null
+          ? SingleChildScrollView(child: cardContent)
+          : cardContent,
+    );
+
+    if (constraints != null) {
+      card = ConstrainedBox(
+        constraints: constraints,
+        child: card,
+      );
+    }
 
     return Material(
       type: MaterialType.transparency,
       child: AnimatedBackdrop(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: EngrowthCard(
-              borderRadius: 20,
-              padding: const EdgeInsets.all(24),
-              child: StaggerReveal(
-                play: _showContent,
-                children: [
-                  ..._interleaveSpacing(children),
-                ],
-              ),
-            ),
+            padding: EdgeInsets.symmetric(horizontal: paddingH),
+            child: card,
           ),
         ),
       ),
