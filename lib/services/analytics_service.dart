@@ -832,6 +832,31 @@ class AnalyticsService {
         },
       );
 
+  // 統一ポップアップテンプレート計測
+  void logEngrowthPopupShown({
+    required String variant,
+    String? sourceScreen,
+  }) =>
+      logEvent(
+        eventType: 'engrowth_popup_shown',
+        eventProperties: {
+          'variant': variant,
+          if (sourceScreen != null) 'source_screen': sourceScreen,
+        },
+      );
+
+  void logEngrowthPopupDismissed({
+    required String variant,
+    String? dismissReason,
+  }) =>
+      logEvent(
+        eventType: 'engrowth_popup_dismissed',
+        eventProperties: {
+          'variant': variant,
+          if (dismissReason != null) 'dismiss_reason': dismissReason,
+        },
+      );
+
   /// TTS 会話再生セッション計測（Phase 1: 症状時のボトルネック特定用）
   void logTtsPlaybackSession({
     required String conversationId,

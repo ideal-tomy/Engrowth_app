@@ -289,6 +289,28 @@ class EngrowthStaggerTokens {
   static const double staggerOffsetY = 0.02;
 }
 
+/// Motion Token: Popup（背景ぼかし + コンテンツ表示）
+/// Speak風のポップアップ振付（登場→滞在→退場）の基準値
+class EngrowthPopupTokens {
+  /// 背景ぼかしのフェードイン duration
+  static const Duration backdropDuration = Duration(milliseconds: 900);
+
+  /// 背景ぼかしの強さ
+  static const double backdropSigma = 8.0;
+
+  /// 背景ぼかしの curve
+  static const Curve backdropCurve = Curves.easeOutCubic;
+
+  /// コンテンツ表示までの待機時間（ぼかし完了後の余白）
+  static const Duration contentDelay = Duration(milliseconds: 300);
+
+  /// 退場アニメーションの duration
+  static const Duration exitDuration = Duration(milliseconds: 600);
+
+  /// 退場アニメーションの curve
+  static const Curve exitCurve = Curves.easeIn;
+}
+
 /// Phase B: ふわっと表示統一のアニメーション基準値（後方互換）
 /// 新規実装は EngrowthElementTokens / EngrowthStaggerTokens を参照すること
 @Deprecated('Use EngrowthElementTokens for switch, EngrowthStaggerTokens for stagger')
