@@ -21,6 +21,11 @@
 - `docs/MISSION_DELIVERY_CHANNEL_DESIGN.md`（課題配信チャネル設計・LINE連携準備）
 
 ## UI/UX・Onboarding
+- `docs/SPEAK_STYLE_UX_PRINCIPLES.md`（アプリ全体のSpeak風UX指針：静寂と動きの同期・自動表示・ゆっくりした流れ・適用範囲はユーザー向けのみ）
+- `docs/SPEAK_STYLE_ROADMAP.md`（Speak風UXをページ別にどの順番・粒度でPLAN→実装するかのロードマップ）
+- `docs/SPEAK_BENCHMARK_UX_NOTES.md`（SpeakのUI/UXコンセプト・継続の仕組みの観察メモとEngrowthへの翻訳）
+- `docs/SPEAK_TECH_STACK_REFERENCE.md`（Speak風UXを支えるアニメーション・状態管理・先読みなどの技術スタックリファレンス）
+- `docs/MOTION_TUNING_GUIDE.md`（ページ遷移・ボタン表示スピードの微調整：どのファイルのどの数字をいじるか）
 - `docs/DAILY_VOICE_ONBOARDING_QA.md`
 - `docs/MARQUEE_QA_CHECKLIST.md`
 - `docs/TUTORIAL_SCHEMA_DESIGN.md`

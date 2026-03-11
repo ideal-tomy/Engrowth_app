@@ -111,6 +111,7 @@ Engrowthは、単なる英会話学習アプリではない。
 ## 5. 開発・実装ルール（Guardrails）
 - **DB参照原則**: 音声URL取得は Supabase Client で直接参照を基本。
 - **UI一貫性**: `engrowth_theme.dart` 準拠（色・フォント・角丸・余白）。
+- **Speak風UX（ユーザー向け画面）**: 静寂と動きの同期・説明は自動表示/切り替え・ゆっくりした自然な流れで誘導。コンサルタント/管理者ダッシュボードは対象外。詳細は `docs/SPEAK_STYLE_UX_PRINCIPLES.md` および `.cursor/rules/speak-style-ux-app-wide.mdc`。
 - **Analytics徹底**: 主要アクションにイベントを必ず仕込む。
 - **速度優先**: 新機能追加時は遅延増加を必ず計測。
 - **小さく出す**: 1PR = 1目的。A/Bや計測を先に仕込む。

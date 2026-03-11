@@ -31,6 +31,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   Timer? _mockDailySubmitTimer;
   int _mockDailySubmitRemainingSec = 0;
   bool _mockDailySubmitActive = false;
+  int _mockDailyStep = 1; // 1〜4 の段階ポップアップ
+
+  bool _mockDailyIntroStarted = false;
 
   // ウェルカムCTA用の単発パルス演出
   Timer? _welcomePulseTimer;
@@ -89,6 +92,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     setState(() {
       _mockDailySubmitActive = true;
       _mockDailySubmitRemainingSec = 30;
+      _mockDailyStep = 4;
     });
     _mockDailySubmitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -123,6 +127,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     setState(() {
       _mockDailySubmitActive = false;
       _mockDailySubmitRemainingSec = 0;
+      _mockDailyStep = 1;
     });
     ref
         .read(analyticsServiceProvider)
@@ -232,7 +237,12 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (i) => setState(() => _currentPage = i),
+                onPageChanged: (i) {
+                  setState(() => _currentPage = i);
+                  if (i == 5) {
+                    _maybeStartMockDailyIntro();
+                  }
+                },
                 children: [
                   _buildWelcomeStep(),
                   _buildGreetingExperienceStep(),
@@ -518,34 +528,21 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           Icon(Icons.event_note, size: 64, color: colorScheme.primary),
           const SizedBox(height: 20),
           Text(
-          '今日あった出来事を英語で言ってみる',
+            '今日あった出来事を英語で言ってみる',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'ここではまだ録音はしません。今日あった出来事を1つ決めて、'
-            '英語で30秒くらい声に出してみましょう。'
-            '\n\n本番では、同じように話した内容を録音して「コンサルタントに提出」します。',
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.6,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 16),
+          AnimatedSwitcher(
+            duration: EngrowthElementTokens.switchDuration,
+            switchInCurve: EngrowthElementTokens.switchCurveIn,
+            switchOutCurve: EngrowthElementTokens.switchCurveOut,
+            child: _buildMockDailyStepContent(colorScheme),
           ),
           const Spacer(),
           if (_mockDailySubmitActive) ...[
-            Text(
-              '画面は気にせず、今日あった出来事を英語で話してみてください。',
-              style: TextStyle(
-                fontSize: 14,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               '${_mockDailySubmitRemainingSec.toString().padLeft(2, '0')} 秒',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -554,7 +551,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                   ),
             ),
             const SizedBox(height: 24),
-          ] else ...[
+          ] else if (_mockDailyStep >= 4) ...[
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -570,13 +567,72 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          TextButton(
-            onPressed: _skipMockDailySubmit,
-            child: Text(_mockDailySubmitActive ? '途中だけど次へ進む' : '今日はスキップする'),
-          ),
         ],
       ),
     );
+  }
+
+  void _maybeStartMockDailyIntro() {
+    if (_mockDailyIntroStarted) return;
+    _mockDailyIntroStarted = true;
+    _mockDailyStep = 1;
+    // 段階的に1→2→3→4と数秒おきに切り替え（録音カウントダウン開始後は進めない）
+    Future(() async {
+      for (var step = 1; step <= 3; step++) {
+        await Future.delayed(const Duration(seconds: 3));
+        if (!mounted || _currentPage != 5 || _mockDailySubmitActive) break;
+        setState(() => _mockDailyStep = step + 1);
+      }
+    });
+  }
+
+  Widget _buildMockDailyStepContent(ColorScheme colorScheme) {
+    switch (_mockDailyStep) {
+      case 1:
+        return Text(
+          '今日あった出来事を、英語で録音していきます。',
+          key: const ValueKey('mock_step_1'),
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.6,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        );
+      case 2:
+        return Text(
+          'コンサルタントへの提出が、日々の基本的なミッションになります。',
+          key: const ValueKey('mock_step_2'),
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.6,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        );
+      case 3:
+        return Text(
+          '今日あった出来事を1つ決めて、30秒ほどで伝えてみましょう。',
+          key: const ValueKey('mock_step_3'),
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.6,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        );
+      default:
+        return Text(
+          '画面は気にせず、今日あった出来事を英語で話してみてください。',
+          key: const ValueKey('mock_step_4'),
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.6,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        );
+    }
   }
 
   Widget _buildResultStep() {

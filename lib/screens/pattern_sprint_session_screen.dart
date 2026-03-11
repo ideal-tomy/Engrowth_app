@@ -240,7 +240,11 @@ class _PatternSprintSessionScreenState
       },
     );
     if (!mounted) return;
-    _showCompleteDialog(items);
+    if (widget.fromOnboarding) {
+      _showOnboardingValueDialog(items);
+    } else {
+      _showCompleteDialog(items);
+    }
   }
 
   void _showCompleteDialog(List<PatternSprintItem> items) {
@@ -284,6 +288,75 @@ class _PatternSprintSessionScreenState
         ],
       ),
     );
+  }
+
+  Future<void> _showOnboardingValueDialog(List<PatternSprintItem> items) async {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: 'pattern_sprint_value',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 900),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        // 3.5秒後にダイアログを閉じて Onboarding へ戻る（固まり防止）
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(const Duration(milliseconds: 3500), () {
+            if (dialogContext.mounted) {
+              Navigator.of(dialogContext).pop();
+            }
+          });
+        });
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ),
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'パターンスプリントおつかれさまでした',
+                    style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '音声から聞こえた発話を、そのままの音とスピードでまねすることで、'
+                    '英会話の基礎が自然と身に付いていきます。',
+                    style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+    context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
   }
 
   void _onStop() {

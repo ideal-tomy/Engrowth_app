@@ -251,6 +251,10 @@ class EngrowthRouteTokens {
   static const Curve resultPushCurve = Curves.easeOutCubic;
   static const double resultPushFadeIntervalEnd = 0.35;
   static const Curve resultPushFadeIntervalCurve = Curves.easeOut;
+
+  /// チュートリアル導線専用（5倍水準のゆっくりクロスフェード）
+  static const Duration tutorialCrossfadeDuration = Duration(milliseconds: 1800);
+  static const Duration tutorialCrossfadeReverseDuration = Duration(milliseconds: 1400);
 }
 
 /// Motion Token: Element（画面内切替・AnimatedSwitcher）

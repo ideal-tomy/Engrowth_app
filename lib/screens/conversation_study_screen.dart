@@ -76,6 +76,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
   DateTime? _lastAdvanceTap;  // 連打対策
   String? _index0PrefetchedForConversation;  // Phase 2: 1発話目先読み済み会話ID
 
+  // Onboarding導線: 30秒会話の自動スタート制御
+  bool _autoStartedFromOnboarding = false;
+
   // AI会話ループ用
   final SttService _sttService = SttService();
   final AiConversationService _aiConversationService = AiConversationService();
@@ -706,8 +709,8 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
         if (!wasStoppedByUser) _hasListenedToAll = true;
       });
       _transcriptIsPlayingNotifier?.value = false;
-        if (!wasStoppedByUser && showPromptOnComplete) {
-        // オンボーディング導線: 聴き終わったら即チュートリアル次章へ戻る
+      if (!wasStoppedByUser && showPromptOnComplete) {
+        // オンボーディング導線: 聴き終わったら少し余韻を置いてからチュートリアル次章へ戻る
         if (widget.fromOnboarding && _mode == 'listen') {
           if (mounted) {
             final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -718,6 +721,9 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
                 sessionId: _sessionId,
               );
             }
+          }
+          await Future.delayed(EngrowthElementTokens.switchDuration);
+          if (mounted) {
             context.pop(LearningHandoffResult.completedWithMode('quick30'));
           }
           return;
@@ -1090,6 +1096,21 @@ class _ConversationStudyScreenState extends ConsumerState<ConversationStudyScree
             _index0PrefetchedForConversation == widget.conversationId &&
             !_isPlaying) {
           _prefetchNextUtterances(utterances, -1);  // index 0 と 1 を先読み
+        }
+      });
+    }
+
+    // Onboarding経由: listenモードかつ初回のみ、会話全体を自動再生
+    if (widget.fromOnboarding &&
+        _mode == 'listen' &&
+        !_autoStartedFromOnboarding &&
+        !_isPlaying &&
+        !_hasListenedToAll &&
+        utterances.isNotEmpty) {
+      _autoStartedFromOnboarding = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isPlaying && !_hasListenedToAll) {
+          _playAllConversation(utterances);
         }
       });
     }

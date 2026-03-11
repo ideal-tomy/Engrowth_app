@@ -21,8 +21,9 @@ alwaysApply: true
 # UI/UX Guardrails
 
 - Sound-First: テキストより先に「聴く/話す」体験を優先。
-- Zero-Latency: 体験テンポを阻害する遅延を避ける（重い処理は事前準備/フォールバック）。
+- Zero-Latency: 体験テンポを阻害する遅延を避ける（重い処理は事前準備/フォールバック）。意図した余韻・余白は「贅沢な時間」として別設計。
 - 一貫性: `engrowth_theme.dart` 準拠、色や余白の直書きを避ける。
+- Speak風UX: ユーザー向け画面（コンサルタント/管理者ダッシュボード除く）は、静寂と動きの同期・自動表示・ゆっくりした流れに統一。詳細は `.cursor/rules/speak-style-ux-app-wide.mdc` と `docs/SPEAK_STYLE_UX_PRINCIPLES.md` を参照。
 
 # Instrumentation
 

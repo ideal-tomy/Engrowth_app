@@ -194,6 +194,30 @@ Page<void> _resultPushPage({
   );
 }
 
+/// tutorialCrossfade: チュートリアル導線専用（5倍水準のゆっくりクロスフェード）
+Page<void> _tutorialCrossfadePage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: EngrowthRouteTokens.tutorialCrossfadeDuration,
+    reverseTransitionDuration: EngrowthRouteTokens.tutorialCrossfadeReverseDuration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: EngrowthRouteTokens.standardPushCurve,
+      );
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: child,
+      );
+    },
+  );
+}
+
 /// 導線ポリシー:
 /// - タブルート直下（/home, /library, /progress, /words）: 戻る矢印なし
 /// - push で開く詳細/設定画面: 戻る矢印あり（GoRouterの自動 leading に任せる）
@@ -287,7 +311,8 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _standardPushPage(
+        final pageBuilder = fromOnboarding ? _tutorialCrossfadePage : _standardPushPage;
+        return pageBuilder(
           context: context,
           state: state,
           child: PatternSprintListScreen(fromOnboarding: fromOnboarding),
@@ -301,7 +326,8 @@ final appRouter = GoRouter(
             final duration = int.tryParse(state.uri.queryParameters['duration'] ?? '45') ?? 45;
             final fromOnboarding =
                 state.uri.queryParameters['from_onboarding'] == 'true';
-            return _standardPushPage(
+            final pageBuilder = fromOnboarding ? _tutorialCrossfadePage : _standardPushPage;
+            return pageBuilder(
               context: context,
               state: state,
               child: PatternSprintSessionScreen(
@@ -381,7 +407,8 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) {
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
-        return _standardPushPage(
+        final pageBuilder = fromOnboarding ? _tutorialCrossfadePage : _standardPushPage;
+        return pageBuilder(
           context: context,
           state: state,
           child: ScenarioLearningScreen(fromOnboarding: fromOnboarding),
@@ -455,7 +482,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/onboarding',
-      pageBuilder: (context, state) => _standardPushPage(
+      pageBuilder: (context, state) => _tutorialCrossfadePage(
         context: context,
         state: state,
         child: const OnboardingFlowScreen(),
@@ -492,13 +519,16 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/tutorial-conversation',
-      pageBuilder: (context, state) => _standardPushPage(
-        context: context,
-        state: state,
-        child: TutorialConversationScreen(
-          entrySource: state.uri.queryParameters['entry_source'] ?? 'direct',
-        ),
-      ),
+      pageBuilder: (context, state) {
+        final entrySource = state.uri.queryParameters['entry_source'] ?? 'direct';
+        final useTutorialTransition = entrySource == 'onboarding';
+        final pageBuilder = useTutorialTransition ? _tutorialCrossfadePage : _standardPushPage;
+        return pageBuilder(
+          context: context,
+          state: state,
+          child: TutorialConversationScreen(entrySource: entrySource),
+        );
+      },
     ),
     GoRoute(
       path: '/help',
