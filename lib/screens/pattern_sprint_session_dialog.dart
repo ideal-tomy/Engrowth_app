@@ -467,35 +467,23 @@ class _PatternSprintSessionDialogState
                               ),
                             if (!_currentPhase.showEnglish &&
                                 !_currentPhase.showJapanese)
-                              Text(
-                                _isPlaying
-                                    ? '音声をよく聴いてください'
-                                    : 'いま、あなたが声に出す番です',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              const SizedBox.shrink(),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _isPaused
-                          ? '一時停止中'
-                          : _isPlaying
-                              ? '音声をよく聴いてください'
-                              : _currentPhase == PatternSprintPhase.phase3
-                                  ? 'いま、あなたが声に出す番です'
-                                  : '音を真似しながら、口をしっかり動かしてみましょう',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colorScheme.onSurfaceVariant,
+                    if (_isPaused)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '一時停止中',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,

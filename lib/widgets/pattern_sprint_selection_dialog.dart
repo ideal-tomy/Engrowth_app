@@ -21,8 +21,6 @@ class PatternSprintSelectionDialog extends ConsumerStatefulWidget {
 
 class _PatternSprintSelectionDialogState
     extends ConsumerState<PatternSprintSelectionDialog> {
-  int _step = 0;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -50,20 +48,12 @@ class _PatternSprintSelectionDialogState
               child: Material(
                 borderRadius: BorderRadius.circular(20),
                 color: colorScheme.surface,
-                child: AnimatedSwitcher(
-                  duration: EngrowthPopupTokens.slideExitDuration,
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: _step == 0
-                      ? _buildStep0(context, colorScheme, textTheme, maxH)
-                      : _buildStep1(
-                          context,
-                          colorScheme,
-                          textTheme,
-                          categories,
-                          byCategory,
-                          maxH,
-                        ),
+                child: _buildContent(
+                  context,
+                  colorScheme,
+                  textTheme,
+                  categories,
+                  byCategory,
                 ),
               ),
             ),
@@ -73,46 +63,12 @@ class _PatternSprintSelectionDialogState
     );
   }
 
-  Widget _buildStep0(
-    BuildContext context,
-    ColorScheme colorScheme,
-    TextTheme textTheme,
-    double maxH,
-  ) {
-    return Padding(
-      key: const ValueKey<int>(0),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'どのパターンスクリプトでトレーニングしますか？',
-            textAlign: TextAlign.center,
-            style: textTheme.titleLarge?.copyWith(
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              setState(() => _step = 1);
-            },
-            child: const Text('選択する'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep1(
+  Widget _buildContent(
     BuildContext context,
     ColorScheme colorScheme,
     TextTheme textTheme,
     List<PatternSprintCategory> categories,
     Map<String, List<PatternDefinition>> byCategory,
-    double maxH,
   ) {
     final items = <_SelectionItem>[];
     for (final cat in categories) {
@@ -127,19 +83,19 @@ class _PatternSprintSelectionDialogState
     }
 
     return Padding(
-      key: const ValueKey<int>(1),
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'パターンを選択',
-            style: textTheme.titleMedium?.copyWith(
+            'どのパターンスクリプトでトレーニングしますか？',
+            textAlign: TextAlign.center,
+            style: textTheme.titleLarge?.copyWith(
               color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           ...items.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
