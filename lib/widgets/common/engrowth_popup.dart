@@ -20,12 +20,26 @@ enum EngrowthPopupSize {
   large,
 }
 
+/// ポップアップの演出バリアント
+enum EngrowthPopupVariant {
+  /// デフォルト。ボタンor外タップで閉じる。退場アニメーションあり。
+  standard,
+
+  /// 自動で表示→滞在→退場する橋渡し演出。学習ステップ間のつなぎ用。
+  /// showDuration 後に自動退場。タップでも早期退場可。
+  bridge,
+
+  /// ミッション達成・節目演出。自動では消さずボタン待ち。
+  missionClear,
+}
+
 /// Speak風の高級感あるポップアップテンプレート。
 /// 背景ぼかし → コンテンツ段階表示 → 退場、を EngrowthPopupTokens に基づいて統一する。
 class EngrowthPopup extends ConsumerStatefulWidget {
   const EngrowthPopup({
     super.key,
     this.size = EngrowthPopupSize.small,
+    this.variant = EngrowthPopupVariant.standard,
     this.hero,
     this.title,
     this.subtitle,
@@ -37,9 +51,11 @@ class EngrowthPopup extends ConsumerStatefulWidget {
     this.autoCloseAfter,
     this.analyticsVariant,
     this.analyticsSourceScreen,
+    this.barrierDismissible = false,
   });
 
   final EngrowthPopupSize size;
+  final EngrowthPopupVariant variant;
   final Widget? hero;
   final String? title;
   final String? subtitle;
@@ -55,10 +71,12 @@ class EngrowthPopup extends ConsumerStatefulWidget {
 
   /// 計測用スクリーン名
   final String? analyticsSourceScreen;
+  final bool barrierDismissible;
 
   static Future<T?> show<T>(
     BuildContext context, {
     EngrowthPopupSize size = EngrowthPopupSize.small,
+    EngrowthPopupVariant variant = EngrowthPopupVariant.standard,
     Widget? hero,
     String? title,
     String? subtitle,
@@ -72,16 +90,38 @@ class EngrowthPopup extends ConsumerStatefulWidget {
     String? analyticsVariant,
     String? analyticsSourceScreen,
   }) {
+    // variant によるデフォルト値補正
+    Duration? effectiveAutoClose = autoCloseAfter;
+    bool effectiveBarrierDismissible = barrierDismissible;
+    EngrowthPopupSize effectiveSize = size;
+
+    switch (variant) {
+      case EngrowthPopupVariant.standard:
+        effectiveAutoClose = autoCloseAfter;
+        break;
+      case EngrowthPopupVariant.bridge:
+        effectiveAutoClose ??= EngrowthPopupTokens.bridgeShowDuration;
+        effectiveBarrierDismissible = true;
+        if (size == EngrowthPopupSize.small) {
+          effectiveSize = EngrowthPopupSize.small;
+        }
+        break;
+      case EngrowthPopupVariant.missionClear:
+        effectiveAutoClose = null;
+        break;
+    }
+
     return showGeneralDialog<T>(
       context: context,
-      barrierDismissible: barrierDismissible,
+      barrierDismissible: false,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.transparent,
       transitionDuration: EngrowthPopupTokens.backdropDuration,
       pageBuilder: (context, _, __) {
         return Center(
           child: EngrowthPopup(
-            size: size,
+            size: effectiveSize,
+            variant: variant,
             hero: hero,
             title: title,
             subtitle: subtitle,
@@ -90,9 +130,10 @@ class EngrowthPopup extends ConsumerStatefulWidget {
             onPrimary: onPrimary,
             secondaryLabel: secondaryLabel,
             onSecondary: onSecondary,
-            autoCloseAfter: autoCloseAfter,
+            autoCloseAfter: effectiveAutoClose,
             analyticsVariant: analyticsVariant,
             analyticsSourceScreen: analyticsSourceScreen,
+            barrierDismissible: effectiveBarrierDismissible,
           ),
         );
       },
@@ -111,6 +152,20 @@ class EngrowthPopup extends ConsumerStatefulWidget {
 
 class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
   bool _showContent = false;
+  bool _isExiting = false;
+
+  void _startExit() {
+    if (_isExiting) return;
+    _isExiting = true;
+    setState(() {});
+    final fadeDuration = EngrowthPopupTokens.bridgeFadeOutDuration;
+    final blurDuration = EngrowthPopupTokens.bridgeBlurExitDuration;
+    final total = fadeDuration > blurDuration ? fadeDuration : blurDuration;
+    Future.delayed(total, () {
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+    });
+  }
 
   @override
   void initState() {
@@ -137,7 +192,7 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
     if (widget.autoCloseAfter != null) {
       Future.delayed(widget.autoCloseAfter!, () {
         if (!mounted) return;
-        Navigator.of(context).maybePop();
+        _startExit();
       });
     }
   }
@@ -181,8 +236,10 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
       children.add(EngrowthPrimaryButton(
         label: widget.primaryLabel!,
         onPressed: () {
-          if (context.mounted) Navigator.of(context).pop();
-          widget.onPrimary?.call();
+          _startExit();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onPrimary?.call();
+          });
         },
       ));
     }
@@ -191,7 +248,12 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
       children.add(const SizedBox(height: 8));
       children.add(EngrowthSecondaryButton(
         label: widget.secondaryLabel!,
-        onPressed: widget.onSecondary,
+        onPressed: () {
+          _startExit();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onSecondary?.call();
+          });
+        },
       ));
     }
 
@@ -241,6 +303,13 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
 
     final cardContent = StaggerReveal(
       play: _showContent,
+      baseDelay: switch (widget.variant) {
+        EngrowthPopupVariant.standard => EngrowthStaggerTokens.itemDelay,
+        EngrowthPopupVariant.bridge =>
+          const Duration(milliseconds: 400),
+        EngrowthPopupVariant.missionClear =>
+          const Duration(milliseconds: 300),
+      },
       children: [
         ..._interleaveSpacing(children),
       ],
@@ -263,13 +332,37 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
 
     return Material(
       type: MaterialType.transparency,
-      child: AnimatedBackdrop(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: paddingH),
-            child: card,
+      child: Stack(
+        children: [
+          // 背景タップによるクローズ（barrierDismissible 相当）
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: widget.barrierDismissible ? _startExit : null,
+              child: const SizedBox.shrink(),
+            ),
           ),
-        ),
+          AnimatedBackdrop(
+            isExiting: _isExiting,
+            exitDuration: EngrowthPopupTokens.bridgeBlurExitDuration,
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: paddingH),
+                child: AnimatedOpacity(
+                  duration: EngrowthPopupTokens.bridgeFadeOutDuration,
+                  curve: EngrowthPopupTokens.exitCurve,
+                  opacity: _isExiting ? 0 : 1,
+                  child: AnimatedSlide(
+                    duration: EngrowthPopupTokens.bridgeFadeOutDuration,
+                    curve: EngrowthPopupTokens.exitCurve,
+                    offset: _isExiting ? const Offset(0, 0.05) : Offset.zero,
+                    child: card,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

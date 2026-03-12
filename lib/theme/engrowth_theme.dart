@@ -310,6 +310,19 @@ class EngrowthPopupTokens {
   /// 退場アニメーションの curve
   static const Curve exitCurve = Curves.easeIn;
 
+  /// Bridge ポップアップ: 自動で表示→滞在→退場する橋渡し演出の表示時間
+  static const Duration bridgeShowDuration = Duration(milliseconds: 5000);
+
+  /// Bridge ポップアップ: カード本体がフェードアウトする速度
+  static const Duration bridgeFadeOutDuration = Duration(milliseconds: 800);
+
+  /// Bridge ポップアップ: 背景ぼかしが晴れる速度
+  static const Duration bridgeBlurExitDuration = Duration(milliseconds: 1200);
+
+  /// Mission Clear: ボタン待ち（自動では消さない）用のぼかし退場速度
+  static const Duration missionClearBlurExitDuration =
+      Duration(milliseconds: 1500);
+
   /// サイズバリアント: medium の高さ比率（画面高さに対する割合）
   static const double mediumHeightFraction = 0.55;
 

@@ -200,9 +200,10 @@ class PatternSprintService {
   }
 
   /// セッション秒数から目安フレーズ数を算出
-  /// 3段階練習により1フレーズあたり約10〜12秒想定
+  /// 約30秒→2フレーズ、約45秒→3フレーズ、約60秒→4フレーズ（切りの良い終了のため）
   static int estimatePhraseCountForDuration(int durationSec) {
-    const secPerPhrase = 11.0;
-    return (durationSec / secPerPhrase).round().clamp(3, 30);
+    if (durationSec <= 35) return 2;
+    if (durationSec <= 50) return 3;
+    return 4;
   }
 }

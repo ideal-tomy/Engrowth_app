@@ -392,7 +392,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             step: 'listen_first',
             contentId: widget.storyId,
           ),
-          onDismiss: () {
+          onDismiss: (_) {
             if (mounted) {
               setState(() => _guidedFlowPlayButtonRevealed = true);
               ref.read(analyticsServiceProvider).logGuidedFlowPopupDismissed(

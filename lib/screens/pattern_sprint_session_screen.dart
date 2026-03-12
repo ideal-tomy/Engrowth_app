@@ -11,6 +11,7 @@ import '../services/pattern_sprint_service.dart';
 import '../services/tts_service.dart';
 import '../models/learning_handoff_result.dart';
 import '../services/analytics_service.dart';
+import '../widgets/common/engrowth_popup.dart';
 
 /// パターンスプリント セッション実行画面
 /// 3段階練習: 1回目日英表示→2回目英文のみ→3回目テキストなし→シャドーイング待機→次へ
@@ -271,57 +272,32 @@ class _PatternSprintSessionScreenState
     }
   }
 
-  void _showCompleteDialog(List<PatternSprintItem> items) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('セッション完了'),
-        content: Text(
-          '${items.length} フレーズを練習しました。\n'
-          '推定 ${_elapsedSec} 秒。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              if (context.mounted) {
-                if (widget.fromOnboarding) {
-                  // オンボーディングからでも「一覧へ」ならパターンスプリント一覧に留まる
-                  context.go('/pattern-sprint');
-                } else {
-                  context.go('/pattern-sprint');
-                }
-              }
-            },
-            child: const Text('一覧へ'),
-          ),
-          if (widget.fromOnboarding)
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                if (context.mounted) {
-                  context.pop(LearningHandoffResult.completedWithMode('pattern_sprint'));
-                }
-              },
-              child: const Text('オンボーディングに戻る'),
-            ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              setState(() {
-                _currentIndex = 0;
-                _currentPhase = PatternSprintPhase.phase1;
-                _elapsedSec = 0;
-                _stopped = false;
-                _loopStarted = true;
-              });
-              _runLoop(items);
-            },
-            child: const Text('もう1セット'),
-          ),
-        ],
-      ),
+  Future<void> _showCompleteDialog(List<PatternSprintItem> items) async {
+    final practicedCount = items.length;
+    final elapsed = _elapsedSec;
+
+    await EngrowthPopup.show<void>(
+      context,
+      variant: EngrowthPopupVariant.missionClear,
+      title: 'パターンスプリントおつかれさまです',
+      subtitle: '約${elapsed}秒で $practicedCount フレーズ練習しました。',
+      primaryLabel: 'もう1セット',
+      onPrimary: () {
+        setState(() {
+          _currentIndex = 0;
+          _currentPhase = PatternSprintPhase.phase1;
+          _elapsedSec = 0;
+          _stopped = false;
+          _loopStarted = true;
+        });
+        _runLoop(items);
+      },
+      secondaryLabel: '一覧へ',
+      onSecondary: () {
+        if (context.mounted) {
+          context.go('/pattern-sprint');
+        }
+      },
     );
   }
 

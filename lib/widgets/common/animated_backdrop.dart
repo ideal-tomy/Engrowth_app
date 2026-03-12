@@ -5,24 +5,33 @@ import 'package:flutter/material.dart';
 import '../../theme/engrowth_theme.dart';
 
 /// Popup 用の背景ぼかしアニメーション。
-/// sigma 0 → EngrowthPopupTokens.backdropSigma へ Tween しつつ、暗いオーバーレイもフェードインする。
+/// 登場時: sigma 0 → EngrowthPopupTokens.backdropSigma へ Tween しつつ、暗いオーバーレイもフェードイン。
+/// 退場時: sigma EngrowthPopupTokens.backdropSigma → 0 へ Tween しつつ、オーバーレイもフェードアウト。
 class AnimatedBackdrop extends StatelessWidget {
   const AnimatedBackdrop({
     super.key,
     required this.child,
     this.duration,
+    this.isExiting = false,
+    this.exitDuration,
   });
 
   final Widget child;
   final Duration? duration;
+  final bool isExiting;
+  final Duration? exitDuration;
 
   @override
   Widget build(BuildContext context) {
-    final effectiveDuration =
-        duration ?? EngrowthPopupTokens.backdropDuration;
+    final effectiveDuration = isExiting
+        ? (exitDuration ?? EngrowthPopupTokens.bridgeBlurExitDuration)
+        : (duration ?? EngrowthPopupTokens.backdropDuration);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: EngrowthPopupTokens.backdropSigma),
+      tween: Tween<double>(
+        begin: isExiting ? EngrowthPopupTokens.backdropSigma : 0,
+        end: isExiting ? 0 : EngrowthPopupTokens.backdropSigma,
+      ),
       duration: effectiveDuration,
       curve: EngrowthPopupTokens.backdropCurve,
       builder: (context, sigma, _) {

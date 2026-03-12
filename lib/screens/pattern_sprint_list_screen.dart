@@ -5,13 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../models/pattern_sprint_category.dart';
 import '../providers/pattern_sprint_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/first_listen_completed_provider.dart';
+import '../services/listen_first_popup_prefs_service.dart';
 import '../widgets/guided_flow/listen_first_popup.dart';
 import '../services/pattern_sprint_service.dart';
 import '../widgets/favorite_toggle_icon.dart';
 import '../widgets/tutorial/simulated_finger_overlay.dart';
 import '../models/learning_handoff_result.dart';
 import '../widgets/tutorial/learning_intro_dialog.dart';
+import '../widgets/common/engrowth_popup.dart';
+import '../widgets/pattern_sprint_selection_dialog.dart';
+import 'pattern_sprint_session_dialog.dart';
 
 /// パターンスプリント: パターン選択・秒数選択・セッション開始
 class PatternSprintListScreen extends ConsumerStatefulWidget {
@@ -32,14 +37,75 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
   // Speak風ガイドフロー: ポップアップ閉じ済みのプレフィックス
   final Set<String> _guidedFlowPlayRevealedForPrefix = {};
 
+  /// もう1セットからの再開時は ListenFirstPopup を出さない
+  bool _skipListenFirstForRestart = false;
+
+  /// 選択ポップアップからセッション開始時は ListenFirstPopup を出さない（選択＝即開始のため）
+  bool _skipListenFirstForSelectionPopup = false;
+
   /// セッションを開き、オンボーディングからなら戻り値で一覧を閉じてオンボーディングに返す
   Future<void> _pushSessionAndReturnIfOnboarding(String prefix) async {
-    final fromParam = widget.fromOnboarding ? '&from_onboarding=true' : '';
-    final uri =
-        '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$_selectedDurationSec$fromParam';
-    final result = await context.push<LearningHandoffResult>(uri);
-    if (widget.fromOnboarding && mounted) {
-      context.pop(result ?? LearningHandoffResult.notCompleted);
+    if (widget.fromOnboarding) {
+      final fromParam = '&from_onboarding=true';
+      final uri =
+          '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$_selectedDurationSec$fromParam';
+      final result = await context.push<LearningHandoffResult>(uri);
+      if (mounted) {
+        context.pop(result ?? LearningHandoffResult.notCompleted);
+      }
+      return;
+    }
+
+    await _startSession(prefix);
+  }
+
+  /// カテゴリ内の次のパターン prefix を返す（同じカテゴリで次へ、末尾なら先頭に戻る）
+  String _getNextPrefixInCategory(String currentPrefix) {
+    final byCategory = ref.read(patternByCategoryProvider);
+    for (final list in byCategory.values) {
+      final idx = list.indexWhere((p) => p.prefix == currentPrefix);
+      if (idx >= 0) {
+        final nextIdx = (idx + 1) % list.length;
+        return list[nextIdx].prefix;
+      }
+    }
+    return currentPrefix;
+  }
+
+  /// 通常利用時: showDialog でセッション実行 → 完了時のみミッション達成ポップアップ → もう1セットで再帰
+  Future<void> _startSession(String prefix) async {
+    final result = await showDialog<PatternSprintResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PatternSprintSessionDialog(
+        prefix: prefix,
+        durationSec: _selectedDurationSec,
+      ),
+    );
+
+    if (!mounted || result == null || !result.completed) return;
+
+    bool wantsRestart = false;
+    await EngrowthPopup.show<void>(
+      context,
+      variant: EngrowthPopupVariant.missionClear,
+      title: 'パターンスプリントおつかれさまです',
+      subtitle: '約${result.elapsedSec}秒で ${result.playedCount} フレーズ練習しました。',
+      primaryLabel: 'もう1セット',
+      onPrimary: () {
+        wantsRestart = true;
+      },
+      secondaryLabel: '一覧へ',
+      onSecondary: () {},
+    );
+
+    if (mounted && wantsRestart) {
+      final nextPrefix = _getNextPrefixInCategory(prefix);
+      setState(() {
+        _selectedPrefix = nextPrefix;
+        _skipListenFirstForRestart = true;
+      });
+      _startSession(nextPrefix);
     }
   }
 
@@ -68,6 +134,30 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     if (patterns.isNotEmpty) {
       _selectedPrefix = patterns.first.prefix;
     }
+    if (!widget.fromOnboarding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowSelectionPopup());
+    }
+  }
+
+  /// パターンスプリントページ初回訪問時: ラージポップアップで選択→即セッション開始
+  Future<void> _maybeShowSelectionPopup() async {
+    if (!mounted) return;
+    final prefix = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.transparent,
+      builder: (_) => const PatternSprintSelectionDialog(),
+    );
+    if (!mounted || prefix == null) return;
+    setState(() {
+      _selectedPrefix = prefix;
+      _skipListenFirstForSelectionPopup = true;
+    });
+    ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+          categoryId: '',
+          prefix: prefix,
+        );
+    await _startSession(prefix);
   }
 
   static const _durations = <int>[30, 45, 60];
@@ -83,39 +173,60 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
         ? const AsyncValue.data(true)
         : ref.watch(firstListenCompletedProvider(('pattern', selectedPrefix)));
 
-    // Speak風ガイドフロー: 初回カテゴリアクセス時にポップアップ
+    // Speak風ガイドフロー: 初回カテゴリアクセス時にポップアップ（もう1セット時は出さない）
     ref.listen(
       selectedPrefix.isNotEmpty
           ? firstListenCompletedProvider(('pattern', selectedPrefix))
           : firstListenCompletedProvider(('pattern', '__skip__')),
       (_, next) {
         if (selectedPrefix.isEmpty) return;
-        next.whenData((isCompleted) {
+        if (_skipListenFirstForRestart || _skipListenFirstForSelectionPopup) {
+          if (mounted) {
+            setState(() {
+              _skipListenFirstForRestart = false;
+              _skipListenFirstForSelectionPopup = false;
+            });
+          }
+          return;
+        }
+        next.whenData((isCompleted) async {
           if (isCompleted) return;
           if (_guidedFlowPlayRevealedForPrefix.contains(selectedPrefix) || !mounted) return;
-          ListenFirstPopup.show(
-          context,
-          message: 'まずは音声を聴いてから、まねして言いましょう',
-          contentType: 'pattern',
-          contentId: selectedPrefix,
-          onShown: () => ref.read(analyticsServiceProvider).logGuidedFlowPopupShown(
+          final prefs = ListenFirstPopupPrefsService();
+          if (await prefs.isDismissedPermanently()) return;
+          final isAnonymous = ref.read(isAnonymousProvider);
+          if (isAnonymous && await prefs.wasShownToday()) return;
+          if (!mounted) return;
+          await ListenFirstPopup.show(
+            context,
+            message: 'まずは音声を聴いてから、まねして言いましょう',
+            showDismissPermanentlyCheckbox: !isAnonymous,
             contentType: 'pattern',
-            step: 'listen_first',
             contentId: selectedPrefix,
-          ),
-          onDismiss: () {
-            if (mounted) {
-              setState(() => _guidedFlowPlayRevealedForPrefix.add(selectedPrefix));
-              ref.read(analyticsServiceProvider).logGuidedFlowPopupDismissed(
-                contentType: 'pattern',
-                step: 'listen_first',
-              );
-              ref.read(analyticsServiceProvider).logGuidedFlowPlayRevealed(
-                contentType: 'pattern',
-                contentId: selectedPrefix,
-              );
-            }
-          },
+            onShown: () => ref.read(analyticsServiceProvider).logGuidedFlowPopupShown(
+              contentType: 'pattern',
+              step: 'listen_first',
+              contentId: selectedPrefix,
+            ),
+            onDismiss: (dismissPermanently) {
+              if (mounted) {
+                if (dismissPermanently) {
+                  prefs.setDismissedPermanently(true);
+                }
+                if (isAnonymous) {
+                  prefs.markShownToday();
+                }
+                setState(() => _guidedFlowPlayRevealedForPrefix.add(selectedPrefix));
+                ref.read(analyticsServiceProvider).logGuidedFlowPopupDismissed(
+                  contentType: 'pattern',
+                  step: 'listen_first',
+                );
+                ref.read(analyticsServiceProvider).logGuidedFlowPlayRevealed(
+                  contentType: 'pattern',
+                  contentId: selectedPrefix,
+                );
+              }
+            },
           );
         });
       },
@@ -142,19 +253,8 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     ColorScheme colorScheme,
     AsyncValue<bool> firstListenAsync,
   ) {
-    final isFirstTimeGuidedFlow = (_selectedPrefix != null) &&
-        (firstListenAsync.valueOrNull ?? true) == false;
-    final isGuidedFlowRevealed = _guidedFlowPlayRevealedForPrefix.contains(_selectedPrefix ?? '');
-    final showOnlySelectedCategory = isFirstTimeGuidedFlow && isGuidedFlowRevealed;
-
-    final categoriesToShow = showOnlySelectedCategory
-        ? categories.where((c) {
-            final patterns = byCategory[c.id] ?? [];
-            return patterns.any((p) => p.prefix == _selectedPrefix);
-          }).toList()
-        : categories;
-
-    return categoriesToShow.map((category) {
+    // 一覧画面は常に全カテゴリ・全パターンを表示する
+    return categories.map((category) {
       final patterns = byCategory[category.id] ?? [];
       if (patterns.isEmpty) return const SizedBox.shrink();
 
@@ -208,19 +308,12 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                         );
                     await _pushSessionAndReturnIfOnboarding(firstPrefix);
                   },
-                  style: showOnlySelectedCategory && isSelectedCategory
-                      ? FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primaryContainer,
-                          foregroundColor: colorScheme.onPrimaryContainer,
-                        )
-                      : null,
                   child: Text('${patterns.first.displayName}でスタート'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (!showOnlySelectedCategory)
-              ...patterns.map((p) {
+            ...patterns.map((p) {
                 final isSelected = _selectedPrefix == p.prefix;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -382,7 +475,7 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: FilterChip(
-                    label: Text('$sec秒'),
+                    label: Text('約${sec}秒'),
                     selected: isSelected,
                     onSelected: (v) {
                       if (v) {

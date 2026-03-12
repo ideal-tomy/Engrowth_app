@@ -41,6 +41,7 @@
 
 ## 3分会話（ポップアップカルーセル・学習フロー）
 - `docs/STORY_LEARNING_FLOW.md`（一覧→カルーセル内学習→次の学習へ→次ストーリーの流れ・デバッグボタン）
+- `docs/LEARNING_FLOW_ARCHITECTURE.md`（LearningStep / LearningFlowController / Bridgeポップアップ設計メモ）
 
 ## Motion Sync（遷移・体感遅延・CTA計測）
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）
