@@ -278,39 +278,41 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.displayName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      Text(
-                        category.usageHint,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    category.displayName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
-                FilledButton.tonal(
-                  onPressed: () async {
-                    HapticFeedback.selectionClick();
-                    ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
-                          categoryId: category.id,
-                          prefix: firstPrefix,
-                        );
-                    await _pushSessionAndReturnIfOnboarding(firstPrefix);
-                  },
-                  child: Text('${patterns.first.displayName}でスタート'),
+                Flexible(
+                  child: Text(
+                    category.usageHint,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonal(
+                onPressed: () async {
+                  HapticFeedback.selectionClick();
+                  ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                        categoryId: category.id,
+                        prefix: firstPrefix,
+                      );
+                  await _pushSessionAndReturnIfOnboarding(firstPrefix);
+                },
+                child: Text('${patterns.first.displayName}でスタート'),
+              ),
             ),
             const SizedBox(height: 8),
             ...patterns.map((p) {
@@ -329,7 +331,8 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                     title: Text(
                       p.displayName,
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                       ),
                     ),
                     subtitle: Text(
@@ -340,17 +343,23 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                       ),
                     ),
                     selected: isSelected,
-                    onTap: () {
+                    onTap: () async {
                       HapticFeedback.selectionClick();
                       ref.read(analyticsServiceProvider).logPatternSprintCategorySelected(
                             categoryId: category.id,
                             prefix: p.prefix,
                           );
                       setState(() => _selectedPrefix = p.prefix);
+                      ref.read(analyticsServiceProvider).logPatternSprintCategoryStarted(
+                            categoryId: category.id,
+                            prefix: p.prefix,
+                          );
+                      await _pushSessionAndReturnIfOnboarding(p.prefix);
                     },
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // ハートのみタップで再生しない（お気に入り登録専用）
                         FavoriteToggleIcon(
                           targetType: 'pattern',
                           targetId: p.prefix,

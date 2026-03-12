@@ -413,9 +413,9 @@ class _PatternSprintSessionDialogState
               }
 
               return Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 48),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -437,26 +437,19 @@ class _PatternSprintSessionDialogState
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_currentPhase.showJapanese)
-                              Text(
-                                item.japaneseText,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            if (_currentPhase.showJapanese &&
-                                _currentPhase.showEnglish)
-                              const SizedBox(height: 12),
-                            if (_currentPhase.showEnglish)
-                              Text(
+                    // 日本語を縦中央に・ボタンは下30％付近（余白でバランス調整）
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Spacer(flex: 2),
+                          // 英語（phase1のみ・テキストが消えていく演出）
+                          AnimatedOpacity(
+                            opacity: _currentPhase.showEnglish ? 1 : 0,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOut,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Text(
                                 item.englishText,
                                 style: TextStyle(
                                   fontSize: 22,
@@ -465,50 +458,77 @@ class _PatternSprintSessionDialogState
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                            if (!_currentPhase.showEnglish &&
-                                !_currentPhase.showJapanese)
-                              const SizedBox.shrink(),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_isPaused)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          '一時停止中',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton.filled(
-                          onPressed: _onPauseResume,
-                          icon: Icon(
-                              _isPaused ? Icons.play_arrow : Icons.pause),
-                          tooltip: _isPaused ? '再開' : '一時停止',
-                        ),
-                        IconButton.filled(
-                          onPressed: _onSkip,
-                          icon: const Icon(Icons.skip_next),
-                          tooltip: 'スキップ',
-                        ),
-                        IconButton.filled(
-                          onPressed: _onStop,
-                          icon: const Icon(Icons.stop),
-                          style: IconButton.styleFrom(
-                            backgroundColor: colorScheme.errorContainer,
-                            foregroundColor: colorScheme.onErrorContainer,
+                          // 日本語（phase1,2）または音声再生アイコン（phase3）
+                          SizedBox(
+                            height: 72,
+                            child: Center(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 400),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                child: _currentPhase.showJapanese
+                                    ? Text(
+                                        item.japaneseText,
+                                        key: const ValueKey('ja'),
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      )
+                                    : _PulsingAudioIcon(
+                                        key: const ValueKey('icon'),
+                                        color: colorScheme.primary,
+                                        isPlaying: _isPlaying && !_isPaused,
+                                      ),
+                              ),
+                            ),
                           ),
-                          tooltip: '停止',
-                        ),
-                      ],
+                          const SizedBox(height: 24),
+                          if (_isPaused)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                '一時停止中',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          // ボタン（日本語・アイコンと同じブロック内・下30％付近に固定）
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              IconButton.filled(
+                                onPressed: _onPauseResume,
+                                icon: Icon(
+                                    _isPaused ? Icons.play_arrow : Icons.pause),
+                                tooltip: _isPaused ? '再開' : '一時停止',
+                              ),
+                              IconButton.filled(
+                                onPressed: _onSkip,
+                                icon: const Icon(Icons.skip_next),
+                                tooltip: 'スキップ',
+                              ),
+                              IconButton.filled(
+                                onPressed: _onStop,
+                                icon: const Icon(Icons.stop),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: colorScheme.errorContainer,
+                                  foregroundColor: colorScheme.onErrorContainer,
+                                ),
+                                tooltip: '停止',
+                              ),
+                            ],
+                          ),
+                          const Spacer(flex: 3),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -545,6 +565,79 @@ class _PatternSprintSessionDialogState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 音声再生中を示すパルスアニメーション付きアイコン
+class _PulsingAudioIcon extends StatefulWidget {
+  const _PulsingAudioIcon({
+    super.key,
+    required this.color,
+    required this.isPlaying,
+  });
+
+  final Color color;
+  final bool isPlaying;
+
+  @override
+  State<_PulsingAudioIcon> createState() => _PulsingAudioIconState();
+}
+
+class _PulsingAudioIconState extends State<_PulsingAudioIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _scale = Tween<double>(begin: 0.9, end: 1.15).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    if (widget.isPlaying) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_PulsingAudioIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying) {
+      if (!_controller.isAnimating) _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.isPlaying && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: widget.isPlaying ? _scale.value : 1,
+          child: Icon(
+            Icons.graphic_eq,
+            size: 56,
+            color: widget.color,
+          ),
+        );
+      },
     );
   }
 }
