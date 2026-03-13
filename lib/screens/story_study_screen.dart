@@ -276,7 +276,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
       barrierColor: Colors.black54,
       enableDrag: true,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.5,
         minChildSize: 0.3,
         maxChildSize: 0.95,
         expand: false,
@@ -518,8 +518,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             );
           }
           final hasCompletedFirstListen = firstListenAsync.valueOrNull ?? false;
-          final hideContentForGuidedFlow = !hasCompletedFirstListen && !_guidedFlowPlayButtonRevealed;
-          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying && !hideContentForGuidedFlow) {
+          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying) {
             _autoStarted = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _isPlaying) return;
@@ -532,10 +531,6 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Speak風ガイドフロー Phase 1: ポップアップ表示前は何も表示しない
-                if (hideContentForGuidedFlow)
-                  const SizedBox.shrink()
-                else ...[
                 // メイン: 3分一気に聴く
                 _SectionTitle(icon: Icons.headphones, label: '3分一気に聴く'),
                 const SizedBox(height: 8),
@@ -587,37 +582,33 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Row(
-                              children: [
-                                IconButton(
-                                  tooltip: 'リピート再生',
-                                  onPressed: () {
-                                    setState(() {
-                                      _repeatModeEnabled = !_repeatModeEnabled;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
-                                    color: _repeatModeEnabled
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'シャドーイングモード',
-                                  onPressed: () {
-                                    setState(() {
-                                      _shadowingModeEnabled = !_shadowingModeEnabled;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    Icons.hearing,
-                                    color: _shadowingModeEnabled
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                            IconButton(
+                              tooltip: 'リピート再生',
+                              onPressed: () {
+                                setState(() {
+                                  _repeatModeEnabled = !_repeatModeEnabled;
+                                });
+                              },
+                              icon: Icon(
+                                _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
+                                color: _repeatModeEnabled
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'シャドーイングモード',
+                              onPressed: () {
+                                setState(() {
+                                  _shadowingModeEnabled = !_shadowingModeEnabled;
+                                });
+                              },
+                              icon: Icon(
+                                Icons.hearing,
+                                color: _shadowingModeEnabled
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
@@ -658,37 +649,33 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'リピート再生',
-                                      onPressed: () {
-                                        setState(() {
-                                          _repeatModeEnabled = !_repeatModeEnabled;
-                                        });
-                                      },
-                                      icon: Icon(
-                                        _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
-                                        color: _repeatModeEnabled
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'シャドーイングモード（長めの間を入れる）',
-                                      onPressed: () {
-                                        setState(() {
-                                          _shadowingModeEnabled = !_shadowingModeEnabled;
-                                        });
-                                      },
-                                      icon: Icon(
-                                        Icons.hearing,
-                                        color: _shadowingModeEnabled
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
+                                IconButton(
+                                  tooltip: 'リピート再生',
+                                  onPressed: () {
+                                    setState(() {
+                                      _repeatModeEnabled = !_repeatModeEnabled;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
+                                    color: _repeatModeEnabled
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'シャドーイングモード（長めの間を入れる）',
+                                  onPressed: () {
+                                    setState(() {
+                                      _shadowingModeEnabled = !_shadowingModeEnabled;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    Icons.hearing,
+                                    color: _shadowingModeEnabled
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                             );
@@ -703,7 +690,6 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                   onShowTranscript: () => _showTranscriptSheet(utterances),
                   onShowPracticeMenu: () => _showPracticeMenuSheet(),
                 ),
-                ],  // else (guided flow phase 2+)
               ],
             ),
           );
@@ -727,7 +713,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _StoryHeroBanner(storyId: widget.storyId, story: story),
+              _StoryHeroBanner(storyId: widget.storyId, story: story, large: true),
               Expanded(
                 child: FadeSlideSwitcher(
                   childKey: ValueKey(
@@ -791,7 +777,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
         ),
         body: Column(
           children: [
-            _StoryHeroBanner(storyId: widget.storyId, story: story),
+            _StoryHeroBanner(storyId: widget.storyId, story: story, large: true),
             Expanded(
               child: FadeSlideSwitcher(
                 childKey: ValueKey(
@@ -864,8 +850,14 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 class _StoryHeroBanner extends StatelessWidget {
   final String storyId;
   final StorySequence? story;
+  /// 一覧ポップアップでは小さく、フル画面では大きく表示するためのフラグ
+  final bool large;
 
-  const _StoryHeroBanner({required this.storyId, this.story});
+  const _StoryHeroBanner({
+    required this.storyId,
+    this.story,
+    this.large = false,
+  });
 
   static const _defaultGradient = LinearGradient(
     colors: [Color(0xFFF0F1F4), Color(0xFFDDE1E8)],
@@ -875,18 +867,21 @@ class _StoryHeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final height = large ? screenHeight * 0.5 : 120.0;
+
     return Hero(
       tag: 'storyHero_$storyId',
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
         child: SizedBox(
-          height: 120,
+          height: height,
           width: double.infinity,
           child: story?.thumbnailUrl != null
               ? OptimizedImage(
                   imageUrl: story!.thumbnailUrl!,
                   width: double.infinity,
-                  height: 120,
+                  height: height,
                   fit: BoxFit.cover,
                 )
               : DecoratedBox(
@@ -997,40 +992,38 @@ class _BottomActionBar extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
+          child: FilledButton.tonal(
             onPressed: onShowTranscript,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.brightness == Brightness.light
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant,
-              side: BorderSide(
-                color: colorScheme.brightness == Brightness.light
-                    ? colorScheme.primary.withOpacity(0.6)
-                    : colorScheme.outlineVariant,
-              ),
+            style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
             ),
-            child: const Text('会話の英文を表示する'),
+            child: Text(
+              '会話の英文を表示する',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: OutlinedButton(
+          child: FilledButton.tonal(
             onPressed: onShowPracticeMenu,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.brightness == Brightness.light
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant,
-              side: BorderSide(
-                color: colorScheme.brightness == Brightness.light
-                    ? colorScheme.primary.withOpacity(0.6)
-                    : colorScheme.outlineVariant,
-              ),
+            style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
             ),
-            child: const Text('練習メニュー'),
+            child: Text(
+              '練習メニュー',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
           ),
         ),
       ],

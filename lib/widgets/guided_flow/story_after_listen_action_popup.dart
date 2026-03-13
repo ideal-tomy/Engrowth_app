@@ -55,20 +55,31 @@ class _StoryAfterListenActionBody extends ConsumerStatefulWidget {
 }
 
 class _StoryAfterListenActionBodyState extends ConsumerState<_StoryAfterListenActionBody> {
-  int _visibleCount = 0;
+  // 最初は -1（全て非表示）からスタートし、タイマー1回目で A役ボタンが現れる
+  int _visibleCount = -1;
   Timer? _timer;
   bool _hasLoggedShown = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(StoryAfterListenActionPopup.staggerDelay, (_) {
-      if (!mounted) return;
-      if (_visibleCount < 5) {
-        setState(() => _visibleCount++);
-      } else {
-        _timer?.cancel();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ポップアップ本体（タイトル・サブタイトル）が表示されてから
+      // 少し間をおいてボタンのスタッガー表示を開始する
+      _timer = Timer(
+        const Duration(milliseconds: 900),
+        () {
+          if (!mounted) return;
+          _timer = Timer.periodic(StoryAfterListenActionPopup.staggerDelay, (_) {
+            if (!mounted) return;
+            if (_visibleCount < 5) {
+              setState(() => _visibleCount++);
+            } else {
+              _timer?.cancel();
+            }
+          });
+        },
+      );
     });
   }
 
