@@ -146,6 +146,12 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
         label: '挨拶体験',
         onTap: () => _handleOnboardingTap(),
       ));
+    } else {
+      actions.add(_QuickAction(
+        icon: Icons.school_outlined,
+        label: 'チュートリアル',
+        onTap: () => _handleOnboardingTap(),
+      ));
     }
 
     actions.add(_QuickAction(
@@ -169,6 +175,11 @@ class _QuickActionFabState extends ConsumerState<QuickActionFab>
         icon: Icons.replay,
         label: '続きから再開',
         onTap: () => _handleResumeOrRecommendedTap(),
+      ),
+      _QuickAction(
+        icon: Icons.school_outlined,
+        label: 'チュートリアル',
+        onTap: () => _handleOnboardingTap(),
       ),
       _QuickAction(
         icon: Icons.smart_toy_outlined,

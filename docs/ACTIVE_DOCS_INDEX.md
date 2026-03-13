@@ -22,6 +22,7 @@
 
 ## UI/UX・Onboarding
 - `docs/SPEAK_STYLE_UX_PRINCIPLES.md`（アプリ全体のSpeak風UX指針：静寂と動きの同期・自動表示・ゆっくりした流れ・適用範囲はユーザー向けのみ）
+- `docs/PATTERN_SPRINT_UX_REFERENCE.md`（パターンスプリント実装のUXリファレンス・他ページへの適用ガイド・依頼テンプレート）
 - `docs/SPEAK_STYLE_ROADMAP.md`（Speak風UXをページ別にどの順番・粒度でPLAN→実装するかのロードマップ）
 - `docs/SPEAK_BENCHMARK_UX_NOTES.md`（SpeakのUI/UXコンセプト・継続の仕組みの観察メモとEngrowthへの翻訳）
 - `docs/SPEAK_TECH_STACK_REFERENCE.md`（Speak風UXを支えるアニメーション・状態管理・先読みなどの技術スタックリファレンス）
@@ -42,6 +43,7 @@
 ## 3分会話（ポップアップカルーセル・学習フロー）
 - `docs/STORY_LEARNING_FLOW.md`（一覧→カルーセル内学習→次の学習へ→次ストーリーの流れ・デバッグボタン）
 - `docs/LEARNING_FLOW_ARCHITECTURE.md`（LearningStep / LearningFlowController / Bridgeポップアップ設計メモ）
+- `docs/PATTERN_SPRINT_UX_REFERENCE.md`（パターンスプリントのUX実装リファレンス・3分会話・シナリオ会話への適用ガイド・依頼テンプレート付き）
 
 ## Motion Sync（遷移・体感遅延・CTA計測）
 - `docs/MOTION_SYNC_ANALYTICS_QUERIES.md`（transition_complete_ms / tap_to_first_content_ms / cta_tap_rate の before/after 比較クエリ）

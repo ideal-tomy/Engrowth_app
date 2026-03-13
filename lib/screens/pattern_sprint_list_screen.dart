@@ -43,6 +43,9 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
   /// 選択ポップアップからセッション開始時は ListenFirstPopup を出さない（選択＝即開始のため）
   bool _skipListenFirstForSelectionPopup = false;
 
+  /// オンボーディング時、直接ダイアログ表示済みか（二重表示防止）
+  bool _onboardingIntroShown = false;
+
   /// セッションを開き、オンボーディングからなら戻り値で一覧を閉じてオンボーディングに返す
   Future<void> _pushSessionAndReturnIfOnboarding(String prefix) async {
     if (widget.fromOnboarding) {
@@ -50,9 +53,12 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
       final uri =
           '/pattern-sprint/session?prefix=${Uri.encodeComponent(prefix)}&duration=$_selectedDurationSec$fromParam';
       final result = await context.push<LearningHandoffResult>(uri);
-      if (mounted) {
-        context.pop(result ?? LearningHandoffResult.notCompleted);
-      }
+      if (!mounted) return;
+      // セッション終了後、一覧を閉じてオンボーディングへ戻り次のセクションへ自動進行
+      final value = result ?? LearningHandoffResult.notCompleted;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.pop(value);
+      });
       return;
     }
 
@@ -109,8 +115,26 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     }
   }
 
+  /// オンボーディング時のみ: ダイアログをスキップして直接セッションへ遷移
+  Future<void> _pushSessionDirectlyFromOnboarding() async {
+    if (_selectedPrefix == null || !widget.fromOnboarding) return;
+    if (_onboardingIntroShown) return;
+    _onboardingIntroShown = true;
+    final prefix = _selectedPrefix!;
+    ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
+          stepType: 'pattern_sprint',
+        );
+    ref.read(analyticsServiceProvider).logTutorialOneTapStartSuccess(
+          learningMode: 'pattern_sprint',
+          targetId: prefix,
+        );
+    await _pushSessionAndReturnIfOnboarding(prefix);
+  }
+
   void _onOverlayComplete() {
     if (_selectedPrefix == null) return;
+    if (widget.fromOnboarding && _onboardingIntroShown) return;
+    if (widget.fromOnboarding) _onboardingIntroShown = true;
     final prefix = _selectedPrefix!;
     ref.read(analyticsServiceProvider).logTutorialStepAutoadvanced(
           stepType: 'pattern_sprint',
@@ -124,6 +148,9 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
       title: 'パターンスプリント',
       body: '聞く→まねして言うを短時間で繰り返します。音声を聴いたら即座にリピートしましょう。',
       onStart: () => _pushSessionAndReturnIfOnboarding(prefix),
+      autoDismissDuration: widget.fromOnboarding
+          ? const Duration(seconds: 3)
+          : const Duration(seconds: 5),
     );
   }
 
@@ -136,6 +163,15 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
     }
     if (!widget.fromOnboarding) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowSelectionPopup());
+    } else {
+      // オンボーディング時: 一覧を短く表示後、直接セッションへ遷移（音声自動再生）
+      // （LearningIntroDialog を挟むと一覧で止まる不具合対策）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (!mounted || !widget.fromOnboarding || _selectedPrefix == null) return;
+          _pushSessionDirectlyFromOnboarding();
+        });
+      });
     }
   }
 
@@ -543,7 +579,9 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => _onOverlayComplete(),
+                      onPressed: _selectedPrefix != null
+                          ? () => _pushSessionAndReturnIfOnboarding(_selectedPrefix!)
+                          : null,
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text('今すぐスタート'),
@@ -574,18 +612,9 @@ class _PatternSprintListScreenState extends ConsumerState<PatternSprintListScree
       ),
     );
 
+    // オンボーディング時は initState で直接ダイアログ表示するためオーバーレイは使わない
     if (widget.fromOnboarding && _selectedPrefix != null) {
-      return Stack(
-        children: [
-          scrollChild,
-          Positioned.fill(
-            child: SimulatedFingerOverlay(
-              targetKey: _overlayTargetKey,
-              onComplete: _onOverlayComplete,
-            ),
-          ),
-        ],
-      );
+      return scrollChild;
     }
     return scrollChild;
   }

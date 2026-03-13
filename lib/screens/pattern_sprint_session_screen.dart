@@ -182,8 +182,16 @@ class _PatternSprintSessionScreenState
   void _advance(List<PatternSprintItem> items) {
     if (!mounted || _stopped || _elapsedSec >= widget.durationSec) return;
     if (_currentIndex >= items.length) {
-      _onSessionComplete(items);
-      return;
+      if (widget.fromOnboarding && items.isNotEmpty) {
+        // オンボーディング: タイマー終了まで先頭に戻ってループ
+        setState(() {
+          _currentIndex = 0;
+          _currentPhase = PatternSprintPhase.phase1;
+        });
+      } else {
+        _onSessionComplete(items);
+        return;
+      }
     }
 
     final item = items[_currentIndex];
@@ -416,7 +424,11 @@ class _PatternSprintSessionScreenState
             tapId: ctx.tapId,
           );
     }
-    final params = (prefix: widget.prefix, durationSec: widget.durationSec);
+    final params = (
+      prefix: widget.prefix,
+      durationSec: widget.durationSec,
+      minPhrases: widget.fromOnboarding ? 6 : null,
+    );
     final itemsAsync = ref.watch(patternSprintSessionItemsProvider(params));
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -492,111 +504,151 @@ class _PatternSprintSessionScreenState
             });
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '残り ${remaining}秒',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      '${_currentIndex + 1} / ${items.length} (${_currentPhase.index}/3)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (_currentPhase.showJapanese)
-                          Text(
-                            item.japaneseText,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        if (_currentPhase.showJapanese && _currentPhase.showEnglish)
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final totalH = constraints.maxHeight;
+              // ボタン領域を下から30%の位置に固定
+              final bottomZoneH = totalH * 0.30;
+              final topZoneH = totalH - bottomZoneH;
+
+              return Column(
+                children: [
+                  // ── 上部エリア: ヘッダー + テキスト（固定位置） ──
+                  SizedBox(
+                    height: topZoneH,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
                           const SizedBox(height: 12),
-                        if (_currentPhase.showEnglish)
-                          Text(
-                            item.englishText,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                            textAlign: TextAlign.center,
+                          // ヘッダー（残り時間・進捗）
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '残り ${remaining}秒',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                '${_currentPhase.index} / 3',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                        if (!_currentPhase.showEnglish && !_currentPhase.showJapanese)
-                          Text(
-                            _isPlaying ? '音声をよく聴いてください' : 'いま、あなたが声に出す番です',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: colorScheme.onSurfaceVariant,
+                          // テキスト領域（残りを均等に使い、中央に配置）
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // 日本語（phase1 のみ表示、それ以外は高さだけ確保）
+                                AnimatedOpacity(
+                                  opacity: _currentPhase.showJapanese ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 350),
+                                  child: Text(
+                                    item.japaneseText,
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w500,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // 英語 or アイコン（常に同じ位置）
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 400),
+                                  child: _currentPhase.showEnglish
+                                      ? Text(
+                                          item.englishText,
+                                          key: const ValueKey('english'),
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w700,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        )
+                                      : Icon(
+                                          _isPlaying
+                                              ? Icons.hearing_rounded
+                                              : Icons.record_voice_over_rounded,
+                                          key: const ValueKey('icon'),
+                                          size: 56,
+                                          color: _isPlaying
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
+                                ),
+                                const SizedBox(height: 12),
+                                // ガイドテキスト
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Text(
+                                    _isPaused
+                                        ? '一時停止中'
+                                        : _isPlaying
+                                            ? '音声をよく聴いてください'
+                                            : _currentPhase == PatternSprintPhase.phase3
+                                                ? 'いま、あなたが声に出す番です'
+                                                : '音を真似しながら、口をしっかり動かしてみましょう',
+                                    key: ValueKey('$_isPlaying-${_currentPhase.index}-$_isPaused'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                      ],
-                    ),
-                  ),
-                ),
-                Text(
-                  _isPaused
-                      ? '一時停止中'
-                      : _isPlaying
-                          ? '音声をよく聴いてください'
-                          : _currentPhase == PatternSprintPhase.phase3
-                              ? 'いま、あなたが声に出す番です'
-                              : '音を真似しながら、口をしっかり動かしてみましょう',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton.filled(
-                      onPressed: _onPauseResume,
-                      icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                      tooltip: _isPaused ? '再開' : '一時停止',
-                    ),
-                    IconButton.filled(
-                      onPressed: _onSkip,
-                      icon: const Icon(Icons.skip_next),
-                      tooltip: 'スキップ',
-                    ),
-                    IconButton.filled(
-                      onPressed: _onStop,
-                      icon: const Icon(Icons.stop),
-                      style: IconButton.styleFrom(
-                        backgroundColor: colorScheme.errorContainer,
-                        foregroundColor: colorScheme.onErrorContainer,
+                        ],
                       ),
-                      tooltip: '停止',
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  // ── 下部エリア: 操作ボタン（下30%に固定） ──
+                  SizedBox(
+                    height: bottomZoneH,
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton.filled(
+                            onPressed: _onPauseResume,
+                            icon: Icon(
+                              _isPaused ? Icons.play_arrow : Icons.pause,
+                              size: 28,
+                            ),
+                            tooltip: _isPaused ? '再開' : '一時停止',
+                          ),
+                          IconButton.filled(
+                            onPressed: _onSkip,
+                            icon: const Icon(Icons.skip_next, size: 28),
+                            tooltip: 'スキップ',
+                          ),
+                          IconButton.filled(
+                            onPressed: _onStop,
+                            icon: const Icon(Icons.stop, size: 28),
+                            style: IconButton.styleFrom(
+                              backgroundColor: colorScheme.errorContainer,
+                              foregroundColor: colorScheme.onErrorContainer,
+                            ),
+                            tooltip: '停止',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

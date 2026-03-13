@@ -30,12 +30,16 @@ final patternByCategoryProvider = Provider<Map<String, List<PatternDefinition>>>
 });
 
 /// 指定パターン・秒数でセッション用アイテムを取得
+/// [minPhrases] オンボーディング時など、最小フレーズ数を保証したい場合に指定
 final patternSprintSessionItemsProvider = FutureProvider.family<
     List<PatternSprintItem>,
-    ({String prefix, int durationSec})>((ref, params) async {
+    ({String prefix, int durationSec, int? minPhrases})>((ref, params) async {
   final service = ref.watch(patternSprintServiceProvider);
-  final limit =
+  var limit =
       PatternSprintService.estimatePhraseCountForDuration(params.durationSec);
+  if (params.minPhrases != null && limit < params.minPhrases!) {
+    limit = params.minPhrases!;
+  }
   return service.fetchItemsForPattern(
     prefix: params.prefix,
     limit: limit,

@@ -134,11 +134,21 @@ class _StaggerRevealState extends State<StaggerReveal>
     if (widget.children.isEmpty) {
       return const SizedBox.shrink();
     }
+    // play: false のときも FadeTransition 構造を使い、初期 opacity 0 で描画する。
+    // 生の Column を返すと一瞬全表示→消える→順番表示のチラつきが発生する。
     if (!widget.play) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: widget.children,
+        children: List.generate(widget.children.length, (i) {
+          return FadeTransition(
+            opacity: _opacities[i],
+            child: SlideTransition(
+              position: _offsets[i],
+              child: widget.children[i],
+            ),
+          );
+        }),
       );
     }
 

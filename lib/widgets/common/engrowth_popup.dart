@@ -235,11 +235,11 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
     if (widget.primaryLabel != null) {
       children.add(EngrowthPrimaryButton(
         label: widget.primaryLabel!,
-        onPressed: () {
+        onPressed: () async {
+          // onPrimary を先に完了させてから閉じる（例: 録音カウントダウンを秒数終了まで表示）
+          await Future(() => widget.onPrimary?.call());
+          if (!mounted) return;
           _startExit();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            widget.onPrimary?.call();
-          });
         },
       ));
     }
@@ -248,11 +248,10 @@ class _EngrowthPopupState extends ConsumerState<EngrowthPopup> {
       children.add(const SizedBox(height: 8));
       children.add(EngrowthSecondaryButton(
         label: widget.secondaryLabel!,
-        onPressed: () {
+        onPressed: () async {
+          await Future(() => widget.onSecondary?.call());
+          if (!mounted) return;
           _startExit();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            widget.onSecondary?.call();
-          });
         },
       ));
     }

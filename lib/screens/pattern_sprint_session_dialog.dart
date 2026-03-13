@@ -338,7 +338,11 @@ class _PatternSprintSessionDialogState
 
   @override
   Widget build(BuildContext context) {
-    final params = (prefix: widget.prefix, durationSec: widget.durationSec);
+    final params = (
+      prefix: widget.prefix,
+      durationSec: widget.durationSec,
+      minPhrases: null,
+    );
     final itemsAsync = ref.watch(patternSprintSessionItemsProvider(params));
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -437,30 +441,30 @@ class _PatternSprintSessionDialogState
                       ],
                     ),
                     const SizedBox(height: 24),
-                    // 日本語を縦中央に・ボタンは下30％付近（余白でバランス調整）
+                    // 固定レイアウト: 上から日本語・英語orアイコン(中央)・ボタン(下30%)
                     Expanded(
                       child: Column(
                         children: [
                           const Spacer(flex: 2),
-                          // 英語（phase1のみ・テキストが消えていく演出）
+                          // 日本語（phase1 のみ表示、それ以外は高さだけ確保）
                           AnimatedOpacity(
-                            opacity: _currentPhase.showEnglish ? 1 : 0,
-                            duration: const Duration(milliseconds: 400),
+                            opacity: _currentPhase.showJapanese ? 1 : 0,
+                            duration: const Duration(milliseconds: 350),
                             curve: Curves.easeOut,
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: Text(
-                                item.englishText,
+                                item.japaneseText,
                                 style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurface,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
                           ),
-                          // 日本語（phase1,2）または音声再生アイコン（phase3）
+                          // 英語（phase1,2）またはアイコン（phase3）— 常に同じ位置
                           SizedBox(
                             height: 72,
                             child: Center(
@@ -468,14 +472,14 @@ class _PatternSprintSessionDialogState
                                 duration: const Duration(milliseconds: 400),
                                 switchInCurve: Curves.easeOut,
                                 switchOutCurve: Curves.easeIn,
-                                child: _currentPhase.showJapanese
+                                child: _currentPhase.showEnglish
                                     ? Text(
-                                        item.japaneseText,
-                                        key: const ValueKey('ja'),
+                                        item.englishText,
+                                        key: const ValueKey('en'),
                                         style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w500,
-                                          color: colorScheme.onSurfaceVariant,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
                                         ),
                                         textAlign: TextAlign.center,
                                       )

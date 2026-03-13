@@ -13,8 +13,8 @@ class SimulatedFingerOverlay extends StatefulWidget {
     super.key,
     required this.targetKey,
     required this.onComplete,
-    this.moveDuration = const Duration(milliseconds: 800),
-    this.tapDuration = const Duration(milliseconds: 200),
+    this.moveDuration = const Duration(milliseconds: 400),
+    this.tapDuration = const Duration(milliseconds: 150),
   });
 
   @override
@@ -39,9 +39,24 @@ class _SimulatedFingerOverlayState extends State<SimulatedFingerOverlay>
     if (!mounted) return;
     final box = widget.targetKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize || !box.attached) {
-      widget.onComplete();
+      // レイアウト未完了時は短い遅延後にリトライ（初回自動遷移時の不具合対策）
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        final retryBox =
+            widget.targetKey.currentContext?.findRenderObject() as RenderBox?;
+        if (retryBox != null && retryBox.hasSize && retryBox.attached) {
+          _startAnimation(retryBox);
+        } else {
+          widget.onComplete();
+        }
+      });
       return;
     }
+    _startAnimation(box);
+  }
+
+  void _startAnimation(RenderBox box) {
+    if (!mounted) return;
     final target = box.localToGlobal(Offset.zero);
     final size = box.size;
     final targetCenter = Offset(
