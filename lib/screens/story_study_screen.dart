@@ -64,6 +64,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   final TtsService _ttsService = TtsService();
   bool _isPlaying = false;
   int _currentUtteranceIndex = 0;
+  final ValueNotifier<int> _currentUtteranceIndexNotifier = ValueNotifier<int>(0);
   bool _stopPlaybackRequested = false;
   bool _autoStarted = false;
   bool _hasLoggedTapToFirstContent = false;
@@ -73,6 +74,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
   bool _guidedFlowPlayButtonRevealed = false;
   bool _hasShownListenFirstPopup = false;
   bool _hasListenedToAll = false;
+  bool _repeatModeEnabled = false;
+  bool _shadowingModeEnabled = false;
 
   @override
   void initState() {
@@ -114,6 +117,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
 
   @override
   void dispose() {
+    _currentUtteranceIndexNotifier.dispose();
     _ttsService.stop();
     _ttsService.dispose();
     super.dispose();
@@ -124,41 +128,53 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     _stopPlaybackRequested = false;
     setState(() => _isPlaying = true);
 
-    for (var i = 0; i < utterances.length; i++) {
-      if (!mounted) break;
-      if (_stopPlaybackRequested) break;
+    Future<void> playOnce() async {
+      for (var i = 0; i < utterances.length; i++) {
+        if (!mounted) break;
+        if (_stopPlaybackRequested) break;
 
-      final utterance = utterances[i];
-      setState(() => _currentUtteranceIndex = i);
-      try {
-        await _ttsService.speakEnglish(
-          utterance.englishText,
-          role: utterance.speakerRole,
-        );
-      } on TtsPlaybackBlockedException {
-        break;
-      } on Exception catch (e) {
-        // 会話画面と同様: TTSキャッシュミスはスキップして続行し、それ以外は再スロー
-        final msg = e.toString();
-        if (msg.contains('TTS cache miss') || msg.contains('音声がDBにありません')) {
-          if (kDebugMode) {
-            final preview = utterance.englishText.length > 50
-                ? '${utterance.englishText.substring(0, 50)}...'
-                : utterance.englishText;
-            debugPrint(
-              'TTS skip (story): 発話 ${i + 1}/${utterances.length} はDBにありません（スキップして続行） text="$preview"',
-            );
+        final utterance = utterances[i];
+        setState(() => _currentUtteranceIndex = i);
+        _currentUtteranceIndexNotifier.value = i;
+        try {
+          await _ttsService.speakEnglish(
+            utterance.englishText,
+            role: utterance.speakerRole,
+          );
+        } on TtsPlaybackBlockedException {
+          break;
+        } on Exception catch (e) {
+          // 会話画面と同様: TTSキャッシュミスはスキップして続行し、それ以外は再スロー
+          final msg = e.toString();
+          if (msg.contains('TTS cache miss') || msg.contains('音声がDBにありません')) {
+            if (kDebugMode) {
+              final preview = utterance.englishText.length > 50
+                  ? '${utterance.englishText.substring(0, 50)}...'
+                  : utterance.englishText;
+              debugPrint(
+                'TTS skip (story): 発話 ${i + 1}/${utterances.length} はDBにありません（スキップして続行） text="$preview"',
+              );
+            }
+            continue;
           }
-          continue;
+          rethrow;
         }
-        rethrow;
+
+        if (!mounted) break;
+        if (_stopPlaybackRequested) break;
+
+        if (i < utterances.length - 1) {
+          final gap = _shadowingModeEnabled ? const Duration(seconds: 3) : const Duration(milliseconds: 500);
+          await Future.delayed(gap);
+        }
       }
+    }
 
-      if (!mounted) break;
-      if (_stopPlaybackRequested) break;
-
-      if (i < utterances.length - 1) {
-        await Future.delayed(const Duration(milliseconds: 500));
+    await playOnce();
+    if (!_stopPlaybackRequested && _repeatModeEnabled) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!_stopPlaybackRequested && mounted) {
+        await playOnce();
       }
     }
 
@@ -252,6 +268,47 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
     }
   }
 
+  void _showTranscriptSheet(List<ConversationUtterance> utterances) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      enableDrag: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, scrollController) => _StoryTranscriptSheetContent(
+          utterances: utterances,
+          currentIndexListenable: _currentUtteranceIndexNotifier,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+
+  void _showPracticeMenuSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      enableDrag: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, scrollController) => _StoryPracticeMenuSheetContent(
+          storyId: widget.storyId,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+
   void _showStoryNextActionDialog() {
     showDialog<void>(
       context: context,
@@ -265,6 +322,8 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
           builder: (ctx, snapshot) {
             final conversations = snapshot.data ?? [];
             final firstId = conversations.isNotEmpty ? conversations.first.id : null;
+            final nextStoryAsync = ref.read(nextStoryIdProvider(widget.storyId));
+            final nextStoryId = nextStoryAsync.valueOrNull;
             return Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -286,6 +345,26 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                     style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 20),
+                  if (nextStoryId != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          context.pushReplacement('/story/$nextStoryId');
+                        },
+                        icon: const Icon(Icons.arrow_forward, size: 18),
+                        label: const Text('次の学習へ'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (firstId != null) ...[
                     SizedBox(
                       width: double.infinity,
@@ -438,8 +517,9 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               child: Text('発話がありません', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             );
           }
-          final isFirstTimeGuidedFlow = (firstListenAsync.valueOrNull ?? true) == false;
-          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying && !isFirstTimeGuidedFlow) {
+          final hasCompletedFirstListen = firstListenAsync.valueOrNull ?? false;
+          final hideContentForGuidedFlow = !hasCompletedFirstListen && !_guidedFlowPlayButtonRevealed;
+          if (widget.autoStartPlayback && !_autoStarted && !_isPlaying && !hideContentForGuidedFlow) {
             _autoStarted = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _isPlaying) return;
@@ -453,7 +533,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Speak風ガイドフロー Phase 1: ポップアップ表示前は何も表示しない
-                if (isFirstTimeGuidedFlow && !_guidedFlowPlayButtonRevealed)
+                if (hideContentForGuidedFlow)
                   const SizedBox.shrink()
                 else ...[
                 // メイン: 3分一気に聴く
@@ -492,15 +572,54 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                         ),
                         const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: _stopPlayback,
-                          icon: const Icon(Icons.stop, size: 22),
-                          label: const Text('停止'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.error,
-                            foregroundColor: Theme.of(context).colorScheme.onError,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: _stopPlayback,
+                                icon: const Icon(Icons.stop, size: 22),
+                                label: const Text('停止'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Theme.of(context).colorScheme.error,
+                                  foregroundColor: Theme.of(context).colorScheme.onError,
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Row(
+                              children: [
+                                IconButton(
+                                  tooltip: 'リピート再生',
+                                  onPressed: () {
+                                    setState(() {
+                                      _repeatModeEnabled = !_repeatModeEnabled;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
+                                    color: _repeatModeEnabled
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'シャドーイングモード',
+                                  onPressed: () {
+                                    setState(() {
+                                      _shadowingModeEnabled = !_shadowingModeEnabled;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    Icons.hearing,
+                                    color: _shadowingModeEnabled
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ] else
                         Builder(
@@ -517,22 +636,61 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                                 }
                               });
                             }
-                            return FilledButton.icon(
-                              onPressed: () {
-                                ref.read(analyticsServiceProvider).logPrimaryCtaTapped(
-                                      screenName: 'story_study',
-                                      surface: 'play_button',
-                                      variant: 'motion_sync',
-                                    );
-                                _playAllUtterances(utterances);
-                              },
-                              icon: const Icon(Icons.play_arrow, size: 26),
-                              label: const Text('再生して聴く'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-                              ),
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: () {
+                                      ref.read(analyticsServiceProvider).logPrimaryCtaTapped(
+                                            screenName: 'story_study',
+                                            surface: 'play_button',
+                                            variant: 'motion_sync',
+                                          );
+                                      _playAllUtterances(utterances);
+                                    },
+                                    icon: const Icon(Icons.play_arrow, size: 26),
+                                    label: const Text('再生して聴く'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Theme.of(context).colorScheme.primary,
+                                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'リピート再生',
+                                      onPressed: () {
+                                        setState(() {
+                                          _repeatModeEnabled = !_repeatModeEnabled;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _repeatModeEnabled ? Icons.repeat_one : Icons.repeat,
+                                        color: _repeatModeEnabled
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'シャドーイングモード（長めの間を入れる）',
+                                      onPressed: () {
+                                        setState(() {
+                                          _shadowingModeEnabled = !_shadowingModeEnabled;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        Icons.hearing,
+                                        color: _shadowingModeEnabled
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             );
                           },
                         ),
@@ -540,70 +698,11 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Speak風ガイドフロー: 初回聴き終わり前は A役/B役・チャンクを非表示
-                if (!isFirstTimeGuidedFlow || _hasListenedToAll) ...[
-                // A役・B役で3分通し練習
-                _SectionTitle(icon: Icons.mic, label: '役で3分通し練習'),
-                const SizedBox(height: 8),
-                conversationsAsync.when(
-                  data: (conversations) {
-                    if (conversations.isEmpty) return const SizedBox.shrink();
-                    final firstId = conversations.first.id;
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.push('/conversation/$firstId?mode=roleA'),
-                            icon: const Icon(Icons.person_outline, size: 20),
-                            label: const Text('A役で練習'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: EngrowthColors.roleA,
-                              side: const BorderSide(color: EngrowthColors.roleA),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.push('/conversation/$firstId?mode=roleB'),
-                            icon: const Icon(Icons.person_outline, size: 20),
-                            label: const Text('B役で練習'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: EngrowthColors.roleB,
-                              side: const BorderSide(color: EngrowthColors.roleB),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox(height: 48, child: Center(child: CircularProgressIndicator())),
-                  error: (_, __) => const SizedBox.shrink(),
+                // 下部2ボタン: 会話の英文を見る / 練習メニュー（ボトムシートで表示）
+                _BottomActionBar(
+                  onShowTranscript: () => _showTranscriptSheet(utterances),
+                  onShowPracticeMenu: () => _showPracticeMenuSheet(),
                 ),
-                const SizedBox(height: 28),
-                // サブ: チャンクで聴く・練習する
-                _SectionTitle(icon: Icons.queue_music, label: 'チャンクで聴く・練習する'),
-                const SizedBox(height: 8),
-                conversationsAsync.when(
-                  data: (conversations) {
-                    return Column(
-                      children: [
-                        for (var i = 0; i < conversations.length; i++) ...[
-                          _ChunkTile(
-                            conversation: conversations[i],
-                            partLabel: conversations.length > 1 ? 'パート ${i + 1}' : null,
-                          ),
-                          if (i < conversations.length - 1) const SizedBox(height: 8),
-                        ],
-                      ],
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('エラー: $e', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-                ],  // !isFirstTimeGuidedFlow || _hasListenedToAll
                 ],  // else (guided flow phase 2+)
               ],
             ),
@@ -878,6 +977,305 @@ class _ChunkTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BottomActionBar extends StatelessWidget {
+  final VoidCallback onShowTranscript;
+  final VoidCallback onShowPracticeMenu;
+
+  const _BottomActionBar({
+    required this.onShowTranscript,
+    required this.onShowPracticeMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: onShowTranscript,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.brightness == Brightness.light
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              side: BorderSide(
+                color: colorScheme.brightness == Brightness.light
+                    ? colorScheme.primary.withOpacity(0.6)
+                    : colorScheme.outlineVariant,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('会話の英文を表示する'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: onShowPracticeMenu,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.brightness == Brightness.light
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              side: BorderSide(
+                color: colorScheme.brightness == Brightness.light
+                    ? colorScheme.primary.withOpacity(0.6)
+                    : colorScheme.outlineVariant,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('練習メニュー'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StoryTranscriptSheetContent extends StatelessWidget {
+  final List<ConversationUtterance> utterances;
+  final ValueListenable<int> currentIndexListenable;
+  final ScrollController scrollController;
+
+  const _StoryTranscriptSheetContent({
+    required this.utterances,
+    required this.currentIndexListenable,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            width: 44,
+            height: 5,
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.onSurfaceVariant.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 4, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '会話の英文',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ValueListenableBuilder<int>(
+              valueListenable: currentIndexListenable,
+              builder: (context, currentIndex, _) {
+                return ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  itemCount: utterances.length,
+                  itemBuilder: (context, index) {
+                    final u = utterances[index];
+                    final isActive = index == currentIndex;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? colorScheme.primary.withOpacity(0.08)
+                            : colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            u.englishText,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isActive
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            u.japaneseText,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoryPracticeMenuSheetContent extends ConsumerWidget {
+  final String storyId;
+  final ScrollController scrollController;
+
+  const _StoryPracticeMenuSheetContent({
+    required this.storyId,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final conversationsAsync = ref.watch(storyConversationsProvider(storyId));
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            width: 44,
+            height: 5,
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.onSurfaceVariant.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 4, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '練習メニュー',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: conversationsAsync.when(
+              data: (conversations) {
+                if (conversations.isEmpty) {
+                  return const Center(child: Text('このストーリーの会話が見つかりません'));
+                }
+                final firstId = conversations.first.id;
+                return ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    Text(
+                      '役で通し練習',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              context.push('/conversation/$firstId?mode=roleA');
+                            },
+                            icon: const Icon(Icons.person_outline, size: 20),
+                            label: const Text('A役で練習'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: EngrowthColors.roleA,
+                              side: const BorderSide(color: EngrowthColors.roleA),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              context.push('/conversation/$firstId?mode=roleB');
+                            },
+                            icon: const Icon(Icons.person_outline, size: 20),
+                            label: const Text('B役で練習'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: EngrowthColors.roleB,
+                              side: const BorderSide(color: EngrowthColors.roleB),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'チャンクで聴く',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Column(
+                      children: [
+                        for (var i = 0; i < conversations.length; i++) ...[
+                          _ChunkTile(
+                            conversation: conversations[i],
+                            partLabel: conversations.length > 1 ? 'パート ${i + 1}' : null,
+                          ),
+                          if (i < conversations.length - 1) const SizedBox(height: 8),
+                        ],
+                      ],
+                    ),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text(
+                  'エラー: $e',
+                  style: TextStyle(color: colorScheme.error),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
