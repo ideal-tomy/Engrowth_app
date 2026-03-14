@@ -295,7 +295,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
-        child: const HintSettingsScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: HintSettingsScreen()),
       ),
     ),
     GoRoute(
@@ -303,7 +303,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
-        child: const PlaybackSpeedSettingsScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: PlaybackSpeedSettingsScreen()),
       ),
     ),
     GoRoute(
@@ -312,10 +312,11 @@ final appRouter = GoRouter(
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
         final pageBuilder = fromOnboarding ? _tutorialCrossfadePage : _standardPushPage;
+        final screen = PatternSprintListScreen(fromOnboarding: fromOnboarding);
         return pageBuilder(
           context: context,
           state: state,
-          child: PatternSprintListScreen(fromOnboarding: fromOnboarding),
+          child: fromOnboarding ? screen : ScaffoldWithPersistentNavBar(child: screen),
         );
       },
       routes: [
@@ -330,11 +331,11 @@ final appRouter = GoRouter(
             return pageBuilder(
               context: context,
               state: state,
-              child: PatternSprintSessionScreen(
-                prefix: Uri.decodeComponent(prefix),
-                durationSec: duration.clamp(30, 60),
-                fromOnboarding: fromOnboarding,
-              ),
+          child: PatternSprintSessionScreen(
+                  prefix: Uri.decodeComponent(prefix),
+                  durationSec: duration.clamp(30, 60),
+                  fromOnboarding: fromOnboarding,
+                ),
             );
           },
         ),
@@ -351,10 +352,10 @@ final appRouter = GoRouter(
           context: context,
           state: state,
           child: StudyScreen(
-            initialSentenceId: sentenceId,
-            initialSessionModeParam: sessionMode,
-            initialEntrySource: entrySource,
-          ),
+              initialSentenceId: sentenceId,
+              initialSessionModeParam: sessionMode,
+              initialEntrySource: entrySource,
+            ),
         );
       },
     ),
@@ -363,8 +364,10 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: SentenceListScreen(
-          initialWord: state.uri.queryParameters['word'],
+        child: ScaffoldWithPersistentNavBar(
+          child: SentenceListScreen(
+            initialWord: state.uri.queryParameters['word'],
+          ),
         ),
       ),
     ),
@@ -373,7 +376,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const WordListScreen(initialFocusSearch: true),
+        child: const ScaffoldWithPersistentNavBar(child: WordListScreen(initialFocusSearch: true)),
       ),
     ),
     GoRoute(
@@ -381,8 +384,10 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _modalPushPage(
         context: context,
         state: state,
-        child: AccountScreen(
-          initialProvider: state.uri.queryParameters['provider'],
+        child: ScaffoldWithPersistentNavBar(
+          child: AccountScreen(
+            initialProvider: state.uri.queryParameters['provider'],
+          ),
         ),
       ),
     ),
@@ -391,7 +396,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const ScenarioListScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: ScenarioListScreen()),
       ),
     ),
     GoRoute(
@@ -399,7 +404,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const ConversationTrainingChoiceScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: ConversationTrainingChoiceScreen()),
       ),
     ),
     GoRoute(
@@ -408,10 +413,11 @@ final appRouter = GoRouter(
         final fromOnboarding =
             state.uri.queryParameters['from_onboarding'] == 'true';
         final pageBuilder = fromOnboarding ? _tutorialCrossfadePage : _standardPushPage;
+        final screen = ScenarioLearningScreen(fromOnboarding: fromOnboarding);
         return pageBuilder(
           context: context,
           state: state,
-          child: ScenarioLearningScreen(fromOnboarding: fromOnboarding),
+          child: fromOnboarding ? screen : ScaffoldWithPersistentNavBar(child: screen),
         );
       },
     ),
@@ -423,7 +429,11 @@ final appRouter = GoRouter(
         return _standardPushPage(
           context: context,
           state: state,
-          child: StoryTrainingScreen(fromOnboarding: fromOnboarding),
+          child: fromOnboarding
+              ? StoryTrainingScreen(fromOnboarding: fromOnboarding)
+              : ScaffoldWithPersistentNavBar(
+                  child: StoryTrainingScreen(fromOnboarding: fromOnboarding),
+                ),
         );
       },
     ),
@@ -440,8 +450,10 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: ConversationListScreen(
-          situationType: state.uri.queryParameters['type'],
+        child: ScaffoldWithPersistentNavBar(
+          child: ConversationListScreen(
+            situationType: state.uri.queryParameters['type'],
+          ),
         ),
       ),
     ),
@@ -450,7 +462,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const FavoritesScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: FavoritesScreen()),
       ),
     ),
     GoRoute(
@@ -458,7 +470,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const NotificationsScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: NotificationsScreen()),
       ),
     ),
     GoRoute(
@@ -466,9 +478,11 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: ConsultantContactScreen(
-          initialReportType: state.uri.queryParameters['reportType'],
-          relatedSubmissionId: state.uri.queryParameters['submissionId'],
+        child: ScaffoldWithPersistentNavBar(
+          child: ConsultantContactScreen(
+            initialReportType: state.uri.queryParameters['reportType'],
+            relatedSubmissionId: state.uri.queryParameters['submissionId'],
+          ),
         ),
       ),
     ),
@@ -477,7 +491,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const ReviewListScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: ReviewListScreen()),
       ),
     ),
     GoRoute(
@@ -506,14 +520,14 @@ final appRouter = GoRouter(
           context: context,
           state: state,
           child: UnifiedResultScreen(
-            flow: flow,
-            title: title,
-            subtitle: subtitle,
-            count: count,
-            countSuffix: countSuffix,
-            primaryRoute: primaryRoute,
-            primaryCtaLabel: primaryCtaLabel,
-          ),
+              flow: flow,
+              title: title,
+              subtitle: subtitle,
+              count: count,
+              countSuffix: countSuffix,
+              primaryRoute: primaryRoute,
+              primaryCtaLabel: primaryCtaLabel,
+            ),
         );
       },
     ),
@@ -535,7 +549,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const HelpScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: HelpScreen()),
       ),
     ),
     GoRoute(
@@ -543,7 +557,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const ConceptScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: ConceptScreen()),
       ),
     ),
     GoRoute(
@@ -551,8 +565,10 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: RecordingHistoryScreen(
-          initialTab: state.uri.queryParameters['tab'],
+        child: ScaffoldWithPersistentNavBar(
+          child: RecordingHistoryScreen(
+            initialTab: state.uri.queryParameters['tab'],
+          ),
         ),
       ),
     ),
@@ -561,7 +577,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const AdminDashboardScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: AdminDashboardScreen()),
       ),
     ),
     GoRoute(
@@ -569,7 +585,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _standardPushPage(
         context: context,
         state: state,
-        child: const ConsultantDashboardScreen(),
+        child: const ScaffoldWithPersistentNavBar(child: ConsultantDashboardScreen()),
       ),
     ),
     GoRoute(
@@ -581,10 +597,10 @@ final appRouter = GoRouter(
           context: context,
           state: state,
           child: ConversationStudyScreen(
-            conversationId: state.pathParameters['id']!,
-            initialMode: state.uri.queryParameters['mode'] ?? 'listen',
-            fromOnboarding: fromOnboarding,
-          ),
+              conversationId: state.pathParameters['id']!,
+              initialMode: state.uri.queryParameters['mode'] ?? 'listen',
+              fromOnboarding: fromOnboarding,
+            ),
         );
       },
     ),
@@ -597,10 +613,10 @@ final appRouter = GoRouter(
           context: context,
           state: state,
           child: StoryStudyScreen(
-            storyId: state.pathParameters['id']!,
-            fromOnboarding: fromOnboarding,
-            autoStartPlayback: fromOnboarding,
-          ),
+              storyId: state.pathParameters['id']!,
+              fromOnboarding: fromOnboarding,
+              autoStartPlayback: fromOnboarding,
+            ),
         );
       },
     ),
@@ -611,8 +627,10 @@ final appRouter = GoRouter(
         return _standardPushPage(
           context: context,
           state: state,
-          child: ScenarioProgressBoardScreen(
-            scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+          child: ScaffoldWithPersistentNavBar(
+            child: ScenarioProgressBoardScreen(
+              scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+            ),
           ),
         );
       },
@@ -624,8 +642,10 @@ final appRouter = GoRouter(
         return _standardPushPage(
           context: context,
           state: state,
-          child: StoryProgressBoardScreen(
-            scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+          child: ScaffoldWithPersistentNavBar(
+            child: StoryProgressBoardScreen(
+              scrollToNext: extra is Map && (extra as Map<String, dynamic>)['scrollToNext'] == true,
+            ),
           ),
         );
       },
@@ -636,6 +656,90 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+/// 現在パスからフッターの選択インデックスを算出（タブ以外は 0）
+int _pathToNavIndex(String path) {
+  if (path.startsWith('/home') || path == '/') return 0;
+  if (path.startsWith('/library')) return 1;
+  if (path.startsWith('/progress')) return 2;
+  if (path.startsWith('/words')) return 3;
+  return 0;
+}
+
+String _navIndexToPath(int index) {
+  switch (index) {
+    case 0: return '/home';
+    case 1: return '/library';
+    case 2: return '/progress';
+    case 3: return '/words';
+    default: return '/home';
+  }
+}
+
+/// プッシュされた画面用：常にフッターナビを表示し、タップで該当タブへ遷移
+class ScaffoldWithPersistentNavBar extends ConsumerWidget {
+  final Widget child;
+
+  const ScaffoldWithPersistentNavBar({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final enableMarquee = ref.watch(enableMarqueeRailProvider);
+    final path = GoRouterState.of(context).uri.path;
+    final selectedIndex = _pathToNavIndex(path);
+
+    final navBar = ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: NavigationBar(
+          height: enableMarquee ? 56 : 68,
+          backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.92 : 0.95),
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) {
+            context.go(_navIndexToPath(index));
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.menu_book_outlined),
+              selectedIcon: Icon(Icons.menu_book),
+              label: 'Library',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.trending_up_outlined),
+              selectedIcon: Icon(Icons.trending_up),
+              label: 'Stats',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: 'Search',
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: enableMarquee
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BottomRecommendationRail(),
+                navBar,
+              ],
+            )
+          : navBar,
+    );
+  }
+}
 
 /// StatefulShellRoute用のScaffold
 /// NavigationBarを統一的に表示し、各タブの状態を保持

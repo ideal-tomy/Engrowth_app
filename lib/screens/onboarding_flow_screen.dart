@@ -685,128 +685,130 @@ class _OnboardingResultStepState extends ConsumerState<_OnboardingResultStep>
         final v3 =
             (2 * ((_sequenceAnim.value - 0.6) / 0.2).clamp(0.0, 1.0)).round();
 
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Opacity(
-                opacity: op0,
-                child: Icon(
-                  Icons.check_circle,
-                  size: 72,
-                  color: widget.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Opacity(
-                opacity: op1,
-                child: Text(
-                  '体験完了！',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: widget.colorScheme.onSurface,
-                      ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Opacity(
-                opacity: op2,
-                child: _ResultRow(
-                  label: '学習時間',
-                  value: v1,
-                  suffix: '分',
-                  colorScheme: widget.colorScheme,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Opacity(
-                opacity: op3,
-                child: _ResultRow(
-                  label: '話した文章',
-                  value: v2,
-                  suffix: '文',
-                  colorScheme: widget.colorScheme,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Opacity(
-                opacity: op4,
-                child: _ResultRow(
-                  label: '新しい単語',
-                  value: v3,
-                  suffix: '語',
-                  colorScheme: widget.colorScheme,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Opacity(
-                opacity: op5,
-                child: Column(
-                  children: [
-                    Text(
-                      'ホームで「続きから再開」をタップすると学習を始められます。',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: widget.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'アカウント作成で録音・進捗・連続日数が記録されます。',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: widget.colorScheme.onSurfaceVariant
-                            .withOpacity(0.9),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Opacity(
-                opacity: op6,
-                child: AnimatedBuilder(
-                  animation: _ctaScaleAnim,
-                  builder: (context, child) => Transform.scale(
-                    scale: 0.94 + 0.06 * _ctaScaleAnim.value,
-                    child: child,
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
+                Opacity(
+                  opacity: op0,
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 64,
+                    color: widget.colorScheme.primary,
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () {
-                        ref
-                            .read(analyticsServiceProvider)
-                            .logResultNextLearningTap(
-                              flow: 'onboarding',
-                              targetRoute: primaryRoute,
-                            );
-                        widget.onComplete(nextRoute: primaryRoute);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: widget.colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(height: 16),
+                Opacity(
+                  opacity: op1,
+                  child: Text(
+                    '体験完了！',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: widget.colorScheme.onSurface,
                         ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Opacity(
+                  opacity: op2,
+                  child: _ResultRow(
+                    label: '学習時間',
+                    value: v1,
+                    suffix: '分',
+                    colorScheme: widget.colorScheme,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Opacity(
+                  opacity: op3,
+                  child: _ResultRow(
+                    label: '話した文章',
+                    value: v2,
+                    suffix: '文',
+                    colorScheme: widget.colorScheme,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Opacity(
+                  opacity: op4,
+                  child: _ResultRow(
+                    label: '新しい単語',
+                    value: v3,
+                    suffix: '語',
+                    colorScheme: widget.colorScheme,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Opacity(
+                  opacity: op5,
+                  child: Column(
+                    children: [
+                      Text(
+                        'ホームで「続きから再開」をタップすると学習を始められます。',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: widget.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      child: Text(primaryLabel),
+                      const SizedBox(height: 6),
+                      Text(
+                        'アカウント作成で録音・進捗・連続日数が記録されます。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.9),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(flex: 3),
+                Opacity(
+                  opacity: op6,
+                  child: AnimatedBuilder(
+                    animation: _ctaScaleAnim,
+                    builder: (context, child) => Transform.scale(
+                      scale: 0.94 + 0.06 * _ctaScaleAnim.value,
+                      child: child,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () {
+                          ref
+                              .read(analyticsServiceProvider)
+                              .logResultNextLearningTap(
+                                flow: 'onboarding',
+                                targetRoute: primaryRoute,
+                              );
+                          widget.onComplete(nextRoute: primaryRoute);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: widget.colorScheme.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(primaryLabel),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Opacity(
-                opacity: op6,
-                child: TextButton(
-                  onPressed: () => widget.onComplete(),
-                  child: const Text('ホームへ'),
+                const SizedBox(height: 8),
+                Opacity(
+                  opacity: op6,
+                  child: TextButton(
+                    onPressed: () => widget.onComplete(),
+                    child: const Text('ホームへ'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

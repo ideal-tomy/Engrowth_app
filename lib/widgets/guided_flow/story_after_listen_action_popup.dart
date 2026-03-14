@@ -72,7 +72,7 @@ class _StoryAfterListenActionBodyState extends ConsumerState<_StoryAfterListenAc
           if (!mounted) return;
           _timer = Timer.periodic(StoryAfterListenActionPopup.staggerDelay, (_) {
             if (!mounted) return;
-            if (_visibleCount < 5) {
+            if (_visibleCount < 6) {
               setState(() => _visibleCount++);
             } else {
               _timer?.cancel();
@@ -172,6 +172,22 @@ class _StoryAfterListenActionBodyState extends ConsumerState<_StoryAfterListenAc
               padding: const EdgeInsets.only(bottom: 12),
               child: b,
             )),
+        AnimatedOpacity(
+          opacity: _visibleCount >= 6 ? 1 : 0,
+          duration: const Duration(milliseconds: 400),
+          child: Center(
+            child: TextButton(
+              onPressed: _visibleCount >= 6
+                  ? () => _closeAnd(() => context.pop())
+                  : null,
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.onSurfaceVariant,
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+              child: const Text('一覧に戻る'),
+            ),
+          ),
+        ),
       ],
     );
   }

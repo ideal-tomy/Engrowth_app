@@ -526,10 +526,12 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             });
           }
 
-          return SingleChildScrollView(
+          return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // メイン: 3分一気に聴く
                 _SectionTitle(icon: Icons.headphones, label: '3分一気に聴く'),
@@ -684,8 +686,7 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                // 下部2ボタン: 会話の英文を見る / 練習メニュー（ボトムシートで表示）
+                const SizedBox(height: 12),
                 _BottomActionBar(
                   onShowTranscript: () => _showTranscriptSheet(utterances),
                   onShowPracticeMenu: () => _showPracticeMenuSheet(),
@@ -714,15 +715,13 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _StoryHeroBanner(storyId: widget.storyId, story: story, large: true),
-              Expanded(
-                child: FadeSlideSwitcher(
-                  childKey: ValueKey(
-                    utterancesAsync.hasValue
-                        ? 'data'
-                        : (utterancesAsync.hasError ? 'error' : 'loading'),
-                  ),
-                  child: content,
+              FadeSlideSwitcher(
+                childKey: ValueKey(
+                  utterancesAsync.hasValue
+                      ? 'data'
+                      : (utterancesAsync.hasError ? 'error' : 'loading'),
                 ),
+                child: content,
               ),
             ],
           ),
@@ -778,15 +777,13 @@ class _StoryStudyScreenState extends ConsumerState<StoryStudyScreen> {
         body: Column(
           children: [
             _StoryHeroBanner(storyId: widget.storyId, story: story, large: true),
-            Expanded(
-              child: FadeSlideSwitcher(
-                childKey: ValueKey(
-                  utterancesAsync.hasValue
-                      ? 'data'
-                      : (utterancesAsync.hasError ? 'error' : 'loading'),
-                ),
-                child: content,
+            FadeSlideSwitcher(
+              childKey: ValueKey(
+                utterancesAsync.hasValue
+                    ? 'data'
+                    : (utterancesAsync.hasError ? 'error' : 'loading'),
               ),
+              child: content,
             ),
           ],
         ),
@@ -865,18 +862,14 @@ class _StoryHeroBanner extends StatelessWidget {
     end: Alignment.bottomRight,
   );
 
-  @override
-  Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final height = large ? screenHeight * 0.5 : 120.0;
-
+  Widget _buildImage(BuildContext context, {double? height}) {
     return Hero(
       tag: 'storyHero_$storyId',
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
         child: SizedBox(
-          height: height,
           width: double.infinity,
+          height: height,
           child: story?.thumbnailUrl != null
               ? OptimizedImage(
                   imageUrl: story!.thumbnailUrl!,
@@ -896,6 +889,14 @@ class _StoryHeroBanner extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (large) {
+      return Expanded(child: _buildImage(context));
+    }
+    return _buildImage(context, height: 120);
   }
 }
 
